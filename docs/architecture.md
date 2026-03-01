@@ -384,7 +384,7 @@ Caller → assistant.chat(message)
         Claude    → .claude/skills/ symlink + CLAUDE.md
         OpenCode  → .opencode/skills/ symlink + opencode.json
     → Start Agent process:
-        Cursor    → PTY spawn (node-pty)
+        Cursor    → child_process.spawn
         Claude    → child_process.spawn
         OpenCode  → child_process.spawn
     → Parse output line by line → yield StreamEvent
@@ -445,13 +445,13 @@ type StreamEvent =
 
 Three engines are implemented, created via the `createEngine(type)` factory function:
 
-**CursorEngine** — Invokes `agent` CLI via PTY:
+**CursorEngine** — Invokes `agent` CLI via child_process.spawn:
 
 ```typescript
 class CursorEngine implements AgentEngine {
   async *invoke(prompt, opts) {
     // 1. Inject Skills: symlink skillPaths to .cursor/skills/
-    // 2. PTY spawn: agent -p <prompt> --output-format stream-json --stream-partial-output ...
+    // 2. spawn: agent -p <prompt> --output-format stream-json --stream-partial-output ...
     // 3. stripAnsi + parse stream-json line by line → yield StreamEvent
     // 4. segmentAccum deduplication (Cursor's summary events)
   }
@@ -489,7 +489,7 @@ Key differences between the three engines:
 
 | | CursorEngine | ClaudeCodeEngine | OpenCodeEngine |
 |---|---|---|---|
-| Spawn method | PTY (node-pty) | child_process.spawn | child_process.spawn |
+| Spawn method | child_process.spawn | child_process.spawn | child_process.spawn |
 | Output format | stream-json (with ANSI) | stream-json (pure JSON) | NDJSON (`--format json`) |
 | Skill injection | `.cursor/skills/` symlink | `.claude/skills/` + CLAUDE.md | `.opencode/skills/` + opencode.json |
 | Session resume | `--resume <uuid>` | `--resume <uuid>` | `--session <ses_xxx>` |
@@ -515,7 +515,7 @@ But the externally exposed `StreamEvent` is completely consistent.
 **Phase 1 — CLI Assistant (Current)**
 
 - `golem-ai init` + `golem-ai run` two commands
-- Cursor Engine (with PTY + Skill injection)
+- Cursor Engine (child_process.spawn + Skill injection)
 - Skills directory scanning
 - Session management (resume + auto-fallback)
 - Concurrency lock

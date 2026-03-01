@@ -14,7 +14,7 @@ When modifying code under `src/`, the following constraints must not be violated
 2. **Don't add new core concepts** — The framework has only two concepts: assistant directory + Skill. Do not introduce Tool, Blueprint, Registry, Pipeline, or other abstractions.
 3. **Don't put CLI logic in the core library** — `cli.ts` is a thin shell; it only parses arguments and formats output. All business logic must live in `index.ts` / `workspace.ts` / `engine.ts` / `session.ts` / `server.ts`.
 4. **Don't declare Skills in config** — The `skills/` directory is the single source of truth. `golem.yaml` only configures engine and name.
-5. **Process invocation is engine-owned** — Cursor Agent must be invoked via PTY (node-pty); Claude Code uses standard child_process.spawn. Do not assume invocation style outside the engine.
+5. **Process invocation is engine-owned** — All engines use `child_process.spawn`. Do not assume invocation style outside the engine.
 
 ## Interface Change Rules
 

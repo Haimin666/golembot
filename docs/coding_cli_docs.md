@@ -21,12 +21,39 @@
 
 ---
 
+### Installation
+
+**Prerequisites**: None — the Cursor CLI (`agent`) is a standalone binary that does **not** require the Cursor IDE to be installed.
+
+**Install via curl** (recommended):
+
+```bash
+curl https://cursor.com/install -fsS | bash
+```
+
+This installs the `agent` binary to `~/.local/bin/agent` (Linux/macOS) or `~/.cursor/bin/agent` (some CI environments). Ensure the install directory is on your `PATH`:
+
+```bash
+echo "$HOME/.local/bin" >> ~/.bashrc   # or ~/.zshrc
+# In GitHub Actions:
+echo "$HOME/.cursor/bin" >> $GITHUB_PATH
+```
+
+**Verify installation:**
+
+```bash
+agent --version
+```
+
+---
+
 ### Actual Invocation Method (Verified in Golem)
 
+**Binary name**: `agent` (not `cursor`)
 **Binary path**: `~/.local/bin/agent`
 
 ```bash
-~/.local/bin/agent \
+agent \
   -p "user message" \
   --output-format stream-json \
   --stream-partial-output \
@@ -37,13 +64,13 @@
   [--model <model-name>]
 ```
 
-**Must be invoked via PTY**. Cursor Agent internally checks `isatty()` — if called with a regular `child_process.spawn()`, behavior anomalies occur (incomplete or malformed output). Golem uses `node-pty` to solve this.
+**PTY is not needed** (as of CLI version 2026.02+). Verified that `child_process.spawn` produces clean NDJSON on stdout with zero ANSI escape sequences. Golem has migrated `CursorEngine` from `node-pty` to standard `child_process.spawn`, eliminating the only native C++ dependency. `stripAnsi()` is retained as a safety net but is not expected to be triggered.
 
 ---
 
 ### stream-json Output Format
 
-One JSON object per line (NDJSON), but since it's PTY output, ANSI escape sequences are mixed in and must be stripped before parsing.
+One JSON object per line (NDJSON). With `child_process.spawn` (verified in CLI version 2026.02+), stdout produces clean JSON with no ANSI escape sequences. `stripAnsi()` is retained as a safety net.
 
 #### Event Type Overview
 
@@ -251,9 +278,9 @@ Two autonomy levels supported:
 
 ### Known Pitfalls
 
-1. **PTY buffer doesn't split by line** — `onData` callbacks may fire at arbitrary byte boundaries; you must manually maintain a buffer and split on `\n`
-2. **Buffer may have residual data when process exits** — You must drain remaining content in the `onExit` callback
-3. **ANSI sequences embedded in the middle of JSON** — You can't assume a line starts with `{`; strip first, then check
+1. **stdout buffer doesn't split by line** — `data` events may fire at arbitrary byte boundaries; you must manually maintain a buffer and split on `\n`
+2. **Buffer may have residual data when process exits** — You must drain remaining content in the `close` callback
+3. **ANSI stripping retained as safety net** — With `child_process.spawn` (2026.02+), stdout is clean JSON. `stripAnsi()` is kept for backward compatibility with older CLI versions that may have been invoked via PTY
 4. **`--sandbox disabled` is required** — Otherwise the Agent fails on certain operations (like writing files) due to permission issues
 5. **`--force --trust` are required** — Skip interactive confirmations; otherwise the Agent waits for user input and hangs
 6. **`--approve-mcps` should always be included** — Otherwise, when MCP config exists, it interactively asks whether to approve, causing headless hangs
@@ -308,7 +335,23 @@ Two autonomy levels supported:
 
 ---
 
-### Actual Invocation Method (Planned for Golem)
+### Installation
+
+**Prerequisites**: Node.js >= 18
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+**Verify installation:**
+
+```bash
+claude --version
+```
+
+---
+
+### Actual Invocation Method (Verified in Golem)
 
 **Binary path**: `~/.local/bin/claude` (same directory as Cursor Agent's `agent`)
 
@@ -322,7 +365,7 @@ Two autonomy levels supported:
   [--model <model-alias>]
 ```
 
-**PTY is not needed**. Claude Code CLI supports standard stdin/stdout — a regular `child_process.spawn()` suffices. This is a key difference from Cursor Agent, which requires `node-pty`.
+**PTY is not needed**. Claude Code CLI supports standard stdin/stdout — a regular `child_process.spawn()` suffices. All three engines (Cursor, Claude Code, OpenCode) now use the same `child_process.spawn` approach.
 
 ---
 
@@ -348,7 +391,7 @@ One JSON object per line (NDJSON); stdout outputs pure JSON without ANSI escape 
 | Tool call start | `type:"tool_call"`, `subtype:"started"` | `type:"assistant"` + `message.content[].type:"tool_use"` |
 | Tool call result | `type:"tool_call"`, `subtype:"completed"` | `type:"user"` + `message.content[].type:"tool_result"` |
 | Extended result fields | `duration_ms` | `duration_ms`, `duration_api_ms`, `total_cost_usd`, `num_turns`, `usage` |
-| ANSI sequences | Yes (PTY output) | No (pure stdout) |
+| ANSI sequences | No (clean stdout since 2026.02+) | No (pure stdout) |
 | Mixed content | Never | **A single assistant message can contain both text and tool_use blocks** |
 
 #### Assistant Message Examples
@@ -569,9 +612,31 @@ Key differences from Cursor Agent and Claude Code:
 
 ---
 
-### Actual Invocation Method (For Golem Engine Integration)
+### Installation
 
-**Installation**: `npm install -g opencode-ai` (global install via npm/pnpm/bun)
+**Prerequisites**: Node.js >= 18 (for npm) or Go >= 1.22 (for building from source)
+
+**Install via npm** (recommended):
+
+```bash
+npm install -g opencode-ai
+```
+
+**Alternative — install via Go:**
+
+```bash
+go install github.com/anomalyco/opencode@latest
+```
+
+**Verify installation:**
+
+```bash
+opencode --version
+```
+
+---
+
+### Actual Invocation Method (Verified in Golem)
 
 **Binary path**: Depends on the Node version manager, e.g., `~/.nvm/versions/node/v22.10.0/bin/opencode`
 
@@ -680,9 +745,9 @@ opencode run "user message" \
 | End events | `type:"result"` | `type:"result"` | step-finish (with cost/tokens) |
 | Error events | `type:"result"` + `is_error:true` | `type:"result"` + `is_error:true` | `type:"error"` + error object |
 | Metadata | `duration_ms` | `duration_ms`, `total_cost_usd`, `num_turns` | `cost`, `tokens` (with reasoning + cache breakdown) |
-| ANSI | Yes (PTY) | No | No |
+| ANSI | No (clean stdout since 2026.02+) | No | No |
 
-**Note**: The complete streaming event structure for `--format json` still needs further real-world testing. The structures above come from `opencode export` and error event observations. When implementing `OpenCodeEngine`, a full run with valid credentials is needed first to confirm the event sequence.
+**Note**: The streaming event structure above has been verified through real-world testing with OpenRouter + Anthropic models. The `OpenCodeEngine` in Golem has been fully implemented and passes e2e tests. Key observation: OpenCode sends text content in full chunks (not character-level deltas), similar to Claude Code's behavior without `--include-partial-messages`.
 
 ---
 
@@ -960,20 +1025,20 @@ Configuration precedence (later overrides earlier): remote config → global →
 | Type | IDE companion CLI | Official CLI Agent | Standalone open-source Agent |
 | Open source | No | No | Yes (Apache-2.0) |
 | LLM support | Cursor backend (with routing) | Anthropic models only | 75+ Providers |
-| Installation | Bundled with Cursor | `npm i -g @anthropic-ai/claude-code` | `npm i -g opencode-ai` |
-| Binary name | `cursor` | `claude` | `opencode` |
-| Node/PTY requirement | Requires `node-pty` | Not needed (child_process.spawn) | Not needed (child_process.spawn) |
+| Installation | `curl https://cursor.com/install -fsS \| bash` | `npm i -g @anthropic-ai/claude-code` | `npm i -g opencode-ai` |
+| Binary name | `agent` | `claude` | `opencode` |
+| PTY requirement | Not needed (`child_process.spawn`) | Not needed (`child_process.spawn`) | Not needed (`child_process.spawn`) |
 
 ### Invocation Methods
 
 | Dimension | Cursor Agent | Claude Code | OpenCode |
 |-----------|-------------|-------------|----------|
-| Non-interactive command | `cursor agent -m "prompt"` | `claude -p "prompt"` | `opencode run "prompt"` |
+| Non-interactive command | `agent -p "prompt"` | `claude -p "prompt"` | `opencode run "prompt"` |
 | JSON output | `--output-format stream-json` | `--output-format stream-json` | `--format json` |
 | Model selection | `--model <alias>` | `--model <alias>` | `--model provider/model` |
 | Permission bypass | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | Default allow (`opencode.json` config) |
 | Core headless params | `--approve-mcps` | `--dangerously-skip-permissions` | Permission config `"*": "allow"` |
-| Verbose output | Default (PTY) | `--verbose` (required) | Default |
+| Verbose output | Default | `--verbose` (required) | Default |
 
 ### Session Management
 
@@ -981,7 +1046,7 @@ Configuration precedence (later overrides earlier): remote config → global →
 |-----------|-------------|-------------|----------|
 | Resume specific session | `--resume <uuid>` | `--resume <uuid>` | `--session <ses_xxx>` |
 | Resume most recent | `--resume` | `--continue` | `--continue` |
-| Fork session | Not supported | Not supported | `--fork` |
+| Fork session | Not supported | `--fork-session` | `--fork` |
 | Export session | Not supported | Not supported | `opencode export <id>` |
 | Session ID format | UUID | UUID | `ses_XXXXXXXX` |
 | Session storage | `~/.cursor/` | `~/.claude/` | `~/.local/share/opencode/` |
@@ -991,7 +1056,7 @@ Configuration precedence (later overrides earlier): remote config → global →
 | Dimension | Cursor Agent | Claude Code | OpenCode |
 |-----------|-------------|-------------|----------|
 | API Key variable | `CURSOR_API_KEY` | `ANTHROPIC_API_KEY` | Depends on Provider |
-| Local login | Cursor OAuth | `claude auth login` | `opencode auth login` |
+| Local login | `agent login` (browser OAuth) | `claude auth login` | `opencode auth login` |
 | Max subscription support | Native (Cursor Pro) | OAuth + `apiKeyHelper` | Not applicable |
 | CI/CD auth | `CURSOR_API_KEY` | `ANTHROPIC_API_KEY` | Provider-specific env var |
 | OpenRouter | Not supported | Not natively supported | Natively supported (`OPENROUTER_API_KEY`) |
@@ -1015,16 +1080,16 @@ Configuration precedence (later overrides earlier): remote config → global →
 | Custom tools | Not supported | Not supported | `.opencode/tools/*.ts` |
 | Plugin system | Not supported | Not supported | `.opencode/plugins/*.ts` |
 | Subagents | Not supported | Not supported | `explore`, `general` (parallelizable) |
-| GitHub Actions | Not supported | Supported (official Action) | Supported (official Action) |
+| GitHub Actions | Supported (`curl https://cursor.com/install`) | Supported (official Action) | Supported (official Action) |
 | HTTP Server API | Not supported | Not supported | Full OpenAPI (`opencode serve`) |
 
 ### Golem Engine Integration Methods
 
-| Dimension | CursorEngine | ClaudeCodeEngine | OpenCodeEngine (planned) |
+| Dimension | CursorEngine | ClaudeCodeEngine | OpenCodeEngine |
 |-----------|-------------|-----------------|----------------------|
-| Spawn method | `node-pty` | `child_process.spawn` | `child_process.spawn` or HTTP |
-| Parser function | `parseStreamLine()` | `parseClaudeStreamLine()` | `parseOpenCodeStreamLine()` (to be implemented) |
-| Skill injection | symlink → `.cursor/skills/` | symlink → `.claude/skills/` + `CLAUDE.md` | symlink → `.opencode/skills/` (or `.agents/skills/`) |
+| Spawn method | `child_process.spawn` | `child_process.spawn` | `child_process.spawn` |
+| Parser function | `parseStreamLine()` | `parseClaudeStreamLine()` | `parseOpenCodeStreamLine()` |
+| Skill injection | symlink → `.cursor/skills/` | symlink → `.claude/skills/` + `CLAUDE.md` | symlink → `.opencode/skills/` |
 | Config generation | `.cursor/cli.json` | `CLAUDE.md` | `opencode.json` |
 | API Key injection | `CURSOR_API_KEY` | `ANTHROPIC_API_KEY` | Provider-specific env var |
 | Cold start | Fast (~1s) | Moderate (~2-3s) | Slow (5-10s, HTTP serve mode recommended) |

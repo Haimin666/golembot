@@ -69,7 +69,7 @@ Core design: The Gateway is a long-running service that reuses the `createAssist
 
 | | Cursor | Claude Code | OpenCode |
 |---|---|---|---|
-| Spawn Method | PTY (node-pty) | child_process.spawn | child_process.spawn |
+| Spawn Method | child_process.spawn | child_process.spawn | child_process.spawn |
 | Skill Injection | `.cursor/skills/` | `.claude/skills/` + CLAUDE.md | `.opencode/skills/` + opencode.json |
 | Session Resume | `--resume` | `--resume` | `--session` |
 | API Key | CURSOR_API_KEY | ANTHROPIC_API_KEY | Depends on Provider |

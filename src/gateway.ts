@@ -86,10 +86,18 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
 
           try {
             let reply = '';
+            let hasError = false;
             for await (const event of assistant.chat(fullText, { sessionKey })) {
               if (event.type === 'text') {
                 reply += event.content;
+              } else if (event.type === 'error') {
+                hasError = true;
+                console.error(`[${type}] Engine error: ${event.message}`);
               }
+            }
+
+            if (!reply.trim() && hasError) {
+              reply = 'Sorry, an error occurred while processing your message. Please try again later.';
             }
 
             if (reply.trim()) {

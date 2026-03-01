@@ -9,13 +9,12 @@ alwaysApply: false
 ## Agent CLI Invocation
 
 - Binary path: `~/.local/bin/agent` (not `cursor`, nor `cursor agent`)
-- **Must be invoked via PTY** (node-pty). Cursor Agent checks isatty(); regular child_process leads to abnormal behavior
-- PTY config: `cols: 200, rows: 50, name: 'xterm-color'`
+- Uses standard `child_process.spawn` — no PTY (node-pty) needed since CLI version 2026.02+
 - Key flags: `--output-format stream-json --stream-partial-output --force --trust --sandbox disabled --approve-mcps`
 
 ## stream-json Output Format
 
-PTY output may contain ANSI escape sequences; must `stripAnsi()` before JSON.parse.
+Output is clean NDJSON on stdout; `stripAnsi()` is retained as a safety net but is not expected to be needed.
 
 One JSON object per line, main types:
 
@@ -47,7 +46,7 @@ CreateAssistantOpts.apiKey (user-provided)
     → InvokeOpts.apiKey
       → CursorEngine:
         1. args.push('--api-key', opts.apiKey)   // CLI argument
-        2. env.CURSOR_API_KEY = opts.apiKey       // PTY env var (backup)
+        2. env.CURSOR_API_KEY = opts.apiKey       // env var (backup)
       → ClaudeCodeEngine:
         1. env.ANTHROPIC_API_KEY = opts.apiKey    // env var
 ```
@@ -86,12 +85,12 @@ After reading AGENTS.md and SKILL.md from .cursor/skills/, the Coding Agent **de
 - Correct approach: describe the task in natural language and let the Agent decide
 - Assertions should be looser (Agent may use different filenames or output directly in the reply without writing a file)
 
-## PTY Buffer Handling
+## stdout Buffer Handling
 
-- PTY onData callback may fire at arbitrary byte boundaries (not by line)
+- stdout `data` events may fire at arbitrary byte boundaries (not by line)
 - Must maintain a buffer, split on `\n`, keep the last incomplete line
-- On process exit, drain the remaining buffer (append `\n` then process)
-- After exit, check whether done/error was already yielded; if not, emit an error
+- On process close, drain the remaining buffer (append `\n` then process)
+- After close, check whether done/error was already yielded; if not, emit an error
 
 # Claude Code Engine Implementation Details
 

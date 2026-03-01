@@ -1,7 +1,8 @@
 import { symlink, readdir, mkdir, lstat, unlink, readFile, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join, basename, resolve } from 'node:path';
 import { homedir } from 'node:os';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 
 export type StreamEvent =
   | { type: 'text'; content: string }
@@ -154,9 +155,25 @@ export async function injectSkills(workspace: string, skillPaths: string[]): Pro
   }
 }
 
+export function isOnPath(cmd: string): boolean {
+  try {
+    execFileSync(process.platform === 'win32' ? 'where' : 'which', [cmd], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function findAgentBin(): string {
   const localBin = join(homedir(), '.local', 'bin', 'agent');
-  return localBin;
+  if (!existsSync(localBin) && !isOnPath('agent')) {
+    throw new Error(
+      `Cursor CLI ("agent") not found at ${localBin}\n` +
+      `Install it with: curl https://cursor.com/install -fsS | bash\n` +
+      `See: https://cursor.com/docs/cli/installation`
+    );
+  }
+  return existsSync(localBin) ? localBin : 'agent';
 }
 
 export class CursorEngine implements AgentEngine {
@@ -184,24 +201,18 @@ export class CursorEngine implements AgentEngine {
     };
     if (opts.apiKey) env.CURSOR_API_KEY = opts.apiKey;
 
-    // Dynamically import node-pty (native module)
-    const ptyMod = await import('node-pty');
-    const ptyProcess = ptyMod.spawn(agentBin, args, {
-      name: 'xterm-color',
-      cols: 200,
-      rows: 50,
+    const child = spawn(agentBin, args, {
       cwd: opts.workspace,
       env,
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
 
-    // Collect events via a queue so we can yield from async iterable
     const queue: Array<StreamEvent | null> = [];
     let resolver: (() => void) | null = null;
     let buffer = '';
 
     // Dedup: with --stream-partial-output, Cursor emits character-level deltas
     // followed by a summary event that repeats all text for each segment.
-    // Track accumulated text per segment; when a text event matches the accumulator, skip it.
     let segmentAccum = '';
 
     function enqueue(evt: StreamEvent | null) {
@@ -221,9 +232,6 @@ export class CursorEngine implements AgentEngine {
         if (!evt) continue;
 
         if (evt.type === 'text') {
-          // With --stream-partial-output, after all deltas for a segment,
-          // Cursor emits a summary event whose content equals the accumulated deltas.
-          // Detect and skip: if this text event's content matches what we've already accumulated.
           if (segmentAccum.length > 0 && evt.content === segmentAccum) {
             segmentAccum = '';
             continue;
@@ -237,37 +245,39 @@ export class CursorEngine implements AgentEngine {
       }
     }
 
-    ptyProcess.onData((data: string) => {
-      buffer += data;
+    child.stdout!.on('data', (chunk: Buffer) => {
+      buffer += chunk.toString();
       processBuffer();
     });
 
-    ptyProcess.onExit(({ exitCode }: { exitCode: number; signal?: number }) => {
-      // Drain remaining buffer
+    child.on('close', (exitCode: number | null) => {
       if (buffer.trim()) {
         buffer += '\n';
         processBuffer();
       }
 
-      // If no done event was yielded, produce one
-      if (exitCode !== 0 && !queue.some(e => e && (e.type === 'done' || e.type === 'error'))) {
-        enqueue({ type: 'error', message: `Agent process exited with code ${exitCode}` });
+      const code = exitCode ?? 1;
+      if (code !== 0 && !queue.some(e => e && (e.type === 'done' || e.type === 'error'))) {
+        enqueue({ type: 'error', message: `Agent process exited with code ${code}` });
       }
-      enqueue(null); // sentinel: stream ended
+      enqueue(null);
     });
 
-    // Yield events as they arrive
+    child.on('error', (err: Error) => {
+      enqueue({ type: 'error', message: `Failed to start Cursor Agent: ${err.message}` });
+      enqueue(null);
+    });
+
     while (true) {
       if (queue.length === 0) {
         await new Promise<void>(r => { resolver = r; });
       }
       while (queue.length > 0) {
         const evt = queue.shift()!;
-        if (evt === null) return; // stream ended
+        if (evt === null) return;
         yield evt;
         if (evt.type === 'done' || evt.type === 'error') {
-          // After done/error, kill process if still running and return
-          try { ptyProcess.kill(); } catch { /* already dead */ }
+          try { child.kill(); } catch { /* already dead */ }
           return;
         }
       }
@@ -407,7 +417,15 @@ ${skillList}
 }
 
 function findClaudeBin(): string {
-  return join(homedir(), '.local', 'bin', 'claude');
+  const localBin = join(homedir(), '.local', 'bin', 'claude');
+  if (!existsSync(localBin) && !isOnPath('claude')) {
+    throw new Error(
+      `Claude Code CLI ("claude") not found at ${localBin}\n` +
+      `Install it with: npm install -g @anthropic-ai/claude-code\n` +
+      `See: https://code.claude.com/docs/en/overview`
+    );
+  }
+  return existsSync(localBin) ? localBin : 'claude';
 }
 
 export class ClaudeCodeEngine implements AgentEngine {
@@ -653,6 +671,13 @@ export async function ensureOpenCodeConfig(workspace: string, model?: string): P
 }
 
 function findOpenCodeBin(): string {
+  if (!isOnPath('opencode')) {
+    throw new Error(
+      `OpenCode CLI ("opencode") not found in PATH\n` +
+      `Install it with: npm install -g opencode-ai\n` +
+      `See: https://opencode.ai/docs`
+    );
+  }
   return 'opencode';
 }
 

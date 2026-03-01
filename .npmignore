@@ -1,0 +1,10 @@
+dist/__tests__
+src
+examples
+docs
+.cursor
+.github
+.golem
+*.tsbuildinfo
+tsconfig.json
+vitest.config.*

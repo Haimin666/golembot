@@ -18,7 +18,7 @@ const TEMPLATES: TemplateInfo[] = [
   { name: 'research', label: 'Research Assistant', description: 'Information gathering / competitive analysis' },
 ];
 
-function generateEnvExample(engine: string, channels: string[]): string {
+export function generateEnvExample(engine: string, channels: string[]): string {
   const lines: string[] = ['# Golem environment variables', ''];
 
   lines.push('# AI Engine API Key');
@@ -59,13 +59,15 @@ function generateEnvExample(engine: string, channels: string[]): string {
   return lines.join('\n');
 }
 
-async function installTemplate(dir: string, templateName: string): Promise<void> {
-  const templatesRoot = resolve(
-    new URL('.', import.meta.url).pathname,
-    '..',
-    'templates',
-    templateName,
-  );
+export async function installTemplate(dir: string, templateName: string, templatesBase?: string): Promise<void> {
+  const templatesRoot = templatesBase
+    ? join(templatesBase, templateName)
+    : resolve(
+        new URL('.', import.meta.url).pathname,
+        '..',
+        'templates',
+        templateName,
+      );
 
   try {
     await stat(templatesRoot);

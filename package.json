@@ -27,6 +27,7 @@
   },
   "files": [
     "dist",
+    "!dist/__tests__",
     "skills",
     "templates"
   ],
@@ -41,16 +42,22 @@
     "cli"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/golem-ai"
+  },
+  "homepage": "https://github.com/user/golem-ai#readme",
+  "bugs": {
+    "url": "https://github.com/user/golem-ai/issues"
+  },
   "dependencies": {
     "commander": "^13.0.0",
     "inquirer": "^12.0.0",
-    "js-yaml": "^4.1.0",
-    "node-pty": "^1.0.0"
+    "js-yaml": "^4.1.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "esbuild",
-      "node-pty"
+      "esbuild"
     ]
   },
   "peerDependencies": {
