@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 180" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 310" fill="none">
   <defs>
     <linearGradient id="clay" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#A0724A"/>
@@ -24,37 +24,36 @@
     </filter>
   </defs>
 
-  <!-- Golem head - square, clay-like -->
-  <rect x="20" y="15" width="150" height="150" rx="22" fill="url(#clay)"/>
+  <!-- Golem head - square, centered -->
+  <rect x="165" y="10" width="150" height="150" rx="22" fill="url(#clay)"/>
 
-  <!-- Forehead crack lines (clay texture) -->
-  <path d="M55 30 L72 58 L62 52" stroke="#5C3D2E" stroke-width="2" fill="none" stroke-linecap="round"/>
-  <path d="M118 28 L106 50 L114 44" stroke="#5C3D2E" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Forehead crack lines -->
+  <path d="M200 25 L218 53 L207 47" stroke="#5C3D2E" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M263 23 L251 45 L259 39" stroke="#5C3D2E" stroke-width="2" fill="none" stroke-linecap="round"/>
 
-  <!-- Eyes - glowing blue representing the AI soul -->
-  <rect x="46" y="68" width="34" height="24" rx="5" fill="#2D1B0E"/>
-  <rect x="110" y="68" width="34" height="24" rx="5" fill="#2D1B0E"/>
-  <rect x="49" y="71" width="28" height="18" rx="3" fill="url(#glow)" filter="url(#eyeglow)"/>
-  <rect x="113" y="71" width="28" height="18" rx="3" fill="url(#glow)" filter="url(#eyeglow)"/>
+  <!-- Eyes -->
+  <rect x="191" y="63" width="34" height="24" rx="5" fill="#2D1B0E"/>
+  <rect x="255" y="63" width="34" height="24" rx="5" fill="#2D1B0E"/>
+  <rect x="194" y="66" width="28" height="18" rx="3" fill="url(#glow)" filter="url(#eyeglow)"/>
+  <rect x="258" y="66" width="28" height="18" rx="3" fill="url(#glow)" filter="url(#eyeglow)"/>
 
-  <!-- Mouth - straight line, stoic golem expression -->
-  <rect x="62" y="120" width="66" height="7" rx="3" fill="#5C3D2E"/>
+  <!-- Mouth -->
+  <rect x="207" y="115" width="66" height="7" rx="3" fill="#5C3D2E"/>
 
-  <!-- Hebrew-inspired mark on forehead (aleph) -->
-  <text x="95" y="56" text-anchor="middle" font-family="serif" font-size="20" font-weight="bold" fill="#5C3D2E" opacity="0.7">&#x05D0;</text>
+  <!-- Hebrew mark -->
+  <text x="240" y="51" text-anchor="middle" font-family="serif" font-size="20" font-weight="bold" fill="#5C3D2E" opacity="0.7">&#x05D0;</text>
 
-  <!-- Text: GolemBot (one word, no gap) -->
-  <text x="200" y="90" font-family="'SF Mono', 'Fira Code', 'Consolas', monospace" font-size="58" font-weight="700" fill="#1F2328">GolemBot</text>
-  <!-- Overlay just "Bot" portion with glow color -->
-  <text x="200" y="90" font-family="'SF Mono', 'Fira Code', 'Consolas', monospace" font-size="58" font-weight="700">
-    <tspan fill="transparent">Golem</tspan><tspan fill="url(#glow)" filter="url(#textglow)">Bot</tspan>
+  <!-- GolemBot text - centered below head -->
+  <text x="240" y="210" text-anchor="middle" font-family="'SF Mono', 'Fira Code', 'Consolas', monospace" font-size="54" font-weight="700" fill="#1F2328">GolemBot</text>
+  <text x="240" y="210" text-anchor="middle" font-family="'SF Mono', 'Fira Code', 'Consolas', monospace" font-size="54" font-weight="700">
+    <tspan fill="transparent">Golem</tspan><tspan fill="url(#glow)">Bot</tspan>
   </text>
 
   <!-- Tagline -->
-  <text x="200" y="120" font-family="'SF Mono', 'Fira Code', 'Consolas', monospace" font-size="15" fill="#656D76">Coding Agent = soul, GolemBot = body of clay</text>
+  <text x="240" y="245" text-anchor="middle" font-family="'SF Mono', 'Fira Code', 'Consolas', monospace" font-size="14" fill="#656D76">Coding Agent = soul, GolemBot = body of clay</text>
 
-  <!-- Terminal cursor blinking effect -->
-  <rect x="200" y="138" width="10" height="20" rx="1" fill="url(#glow)" opacity="0.8">
+  <!-- Terminal cursor -->
+  <rect x="235" y="265" width="10" height="18" rx="1" fill="url(#glow)" opacity="0.8">
     <animate attributeName="opacity" values="0.8;0;0.8" dur="1.2s" repeatCount="indefinite"/>
   </rect>
 </svg>
