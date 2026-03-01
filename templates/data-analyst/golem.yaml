@@ -1,0 +1,6 @@
+name: data-analyst
+engine: claude-code
+# model: openrouter/anthropic/claude-sonnet-4
+
+gateway:
+  port: 3000

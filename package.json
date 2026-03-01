@@ -1,0 +1,75 @@
+{
+  "name": "golem-ai",
+  "version": "0.1.0",
+  "description": "Local-first AI assistant powered by Coding Agent CLI engines",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "bin": {
+    "golem-ai": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "tsx examples/e2e-test.ts",
+    "e2e:headless": "tsx examples/e2e-headless.ts",
+    "e2e:claude-code": "tsx examples/e2e-claude-code.ts",
+    "e2e:opencode": "tsx examples/e2e-opencode.ts",
+    "prepublishOnly": "pnpm run build"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "templates"
+  ],
+  "keywords": [
+    "ai",
+    "agent",
+    "assistant",
+    "cursor",
+    "claude-code",
+    "opencode",
+    "coding-agent",
+    "cli"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^13.0.0",
+    "inquirer": "^12.0.0",
+    "js-yaml": "^4.1.0",
+    "node-pty": "^1.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "node-pty"
+    ]
+  },
+  "peerDependencies": {
+    "@larksuiteoapi/node-sdk": "^1.24.0",
+    "dingtalk-stream": "^1.0.0",
+    "@wecom/crypto": "^1.0.0",
+    "xml2js": "^0.6.0"
+  },
+  "peerDependenciesMeta": {
+    "@larksuiteoapi/node-sdk": { "optional": true },
+    "dingtalk-stream": { "optional": true },
+    "@wecom/crypto": { "optional": true },
+    "xml2js": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
+  }
+}

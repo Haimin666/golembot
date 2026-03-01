@@ -1,0 +1,256 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtemp, rm, readFile, writeFile, mkdir, stat } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import {
+  loadConfig,
+  writeConfig,
+  scanSkills,
+  generateAgentsMd,
+  ensureReady,
+  initWorkspace,
+} from '../workspace.js';
+
+describe('workspace', () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'golem-test-ws-'));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  // ── loadConfig ────────────────────────────────────
+
+  describe('loadConfig', () => {
+    it('reads a minimal golem.yaml', async () => {
+      await writeFile(join(dir, 'golem.yaml'), 'name: bot\nengine: cursor\n');
+      const cfg = await loadConfig(dir);
+      expect(cfg).toEqual({ name: 'bot', engine: 'cursor', model: undefined });
+    });
+
+    it('reads golem.yaml with model field', async () => {
+      await writeFile(join(dir, 'golem.yaml'), 'name: bot\nengine: cursor\nmodel: claude-sonnet\n');
+      const cfg = await loadConfig(dir);
+      expect(cfg).toEqual({ name: 'bot', engine: 'cursor', model: 'claude-sonnet' });
+    });
+
+    it('throws when golem.yaml is missing', async () => {
+      await expect(loadConfig(dir)).rejects.toThrow();
+    });
+
+    it('throws when golem.yaml is missing required fields', async () => {
+      await writeFile(join(dir, 'golem.yaml'), 'name: bot\n');
+      await expect(loadConfig(dir)).rejects.toThrow('engine');
+    });
+
+    it('throws on empty YAML', async () => {
+      await writeFile(join(dir, 'golem.yaml'), '');
+      await expect(loadConfig(dir)).rejects.toThrow();
+    });
+  });
+
+  // ── writeConfig ───────────────────────────────────
+
+  describe('writeConfig', () => {
+    it('writes config that can be read back', async () => {
+      await writeConfig(dir, { name: 'test', engine: 'cursor', model: 'gpt-4' });
+      const cfg = await loadConfig(dir);
+      expect(cfg).toEqual({ name: 'test', engine: 'cursor', model: 'gpt-4' });
+    });
+
+    it('omits model when undefined', async () => {
+      await writeConfig(dir, { name: 'test', engine: 'cursor' });
+      const raw = await readFile(join(dir, 'golem.yaml'), 'utf-8');
+      expect(raw).not.toContain('model');
+    });
+  });
+
+  // ── scanSkills ────────────────────────────────────
+
+  describe('scanSkills', () => {
+    it('returns empty array when skills/ does not exist', async () => {
+      const skills = await scanSkills(dir);
+      expect(skills).toEqual([]);
+    });
+
+    it('returns empty array when skills/ is empty', async () => {
+      await mkdir(join(dir, 'skills'));
+      const skills = await scanSkills(dir);
+      expect(skills).toEqual([]);
+    });
+
+    it('discovers a skill with YAML front matter', async () => {
+      const skillDir = join(dir, 'skills', 'ops-xhs');
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(
+        join(skillDir, 'SKILL.md'),
+        '---\nname: ops-xhs\ndescription: Xiaohongshu ops assistant\n---\n\n# XHS\n',
+      );
+
+      const skills = await scanSkills(dir);
+      expect(skills).toHaveLength(1);
+      expect(skills[0].name).toBe('ops-xhs');
+      expect(skills[0].description).toBe('Xiaohongshu ops assistant');
+      expect(skills[0].path).toBe(skillDir);
+    });
+
+    it('falls back to directory name when no front matter', async () => {
+      const skillDir = join(dir, 'skills', 'my-skill');
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, 'SKILL.md'), '# My Skill\nSome content.\n');
+
+      const skills = await scanSkills(dir);
+      expect(skills).toHaveLength(1);
+      expect(skills[0].description).toBe('my-skill');
+    });
+
+    it('skips directories without SKILL.md', async () => {
+      const withSkill = join(dir, 'skills', 'valid');
+      const withoutSkill = join(dir, 'skills', 'nofile');
+      await mkdir(withSkill, { recursive: true });
+      await mkdir(withoutSkill, { recursive: true });
+      await writeFile(join(withSkill, 'SKILL.md'), '---\nname: valid\n---\n');
+
+      const skills = await scanSkills(dir);
+      expect(skills).toHaveLength(1);
+      expect(skills[0].name).toBe('valid');
+    });
+
+    it('discovers multiple skills', async () => {
+      for (const name of ['alpha', 'beta', 'gamma']) {
+        const skillDir = join(dir, 'skills', name);
+        await mkdir(skillDir, { recursive: true });
+        await writeFile(
+          join(skillDir, 'SKILL.md'),
+          `---\nname: ${name}\ndescription: ${name} skill\n---\n`,
+        );
+      }
+
+      const skills = await scanSkills(dir);
+      expect(skills).toHaveLength(3);
+      const names = skills.map(s => s.name).sort();
+      expect(names).toEqual(['alpha', 'beta', 'gamma']);
+    });
+
+    it('ignores files (not directories) in skills/', async () => {
+      await mkdir(join(dir, 'skills'));
+      await writeFile(join(dir, 'skills', 'README.md'), 'hello');
+      const skills = await scanSkills(dir);
+      expect(skills).toEqual([]);
+    });
+  });
+
+  // ── generateAgentsMd ─────────────────────────────
+
+  describe('generateAgentsMd', () => {
+    it('generates AGENTS.md with skill list', async () => {
+      await generateAgentsMd(dir, [
+        { name: 'general', path: '/tmp/x', description: 'General assistant' },
+        { name: 'ops-xhs', path: '/tmp/y', description: 'Xiaohongshu operations' },
+      ]);
+
+      const content = await readFile(join(dir, 'AGENTS.md'), 'utf-8');
+      expect(content).toContain('- general: General assistant');
+      expect(content).toContain('- ops-xhs: Xiaohongshu operations');
+      expect(content).toContain('auto-generated by Golem');
+    });
+
+    it('handles empty skill list', async () => {
+      await generateAgentsMd(dir, []);
+      const content = await readFile(join(dir, 'AGENTS.md'), 'utf-8');
+      expect(content).toContain('no skills installed');
+    });
+  });
+
+  // ── ensureReady ───────────────────────────────────
+
+  describe('ensureReady', () => {
+    it('full flow: reads config, scans skills, generates AGENTS.md', async () => {
+      await writeFile(join(dir, 'golem.yaml'), 'name: assistant\nengine: cursor\n');
+      const skillDir = join(dir, 'skills', 'demo');
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(
+        join(skillDir, 'SKILL.md'),
+        '---\nname: demo\ndescription: demo skill\n---\n',
+      );
+
+      const { config, skills } = await ensureReady(dir);
+      expect(config.name).toBe('assistant');
+      expect(config.engine).toBe('cursor');
+      expect(skills).toHaveLength(1);
+      expect(skills[0].name).toBe('demo');
+
+      const agentsMd = await readFile(join(dir, 'AGENTS.md'), 'utf-8');
+      expect(agentsMd).toContain('demo: demo skill');
+    });
+  });
+
+  // ── initWorkspace ─────────────────────────────────
+
+  describe('initWorkspace', () => {
+    it('creates a fully initialized assistant directory', async () => {
+      // Use project's built-in skills as source
+      const builtinDir = join(__dirname, '..', '..', 'skills');
+      await initWorkspace(
+        dir,
+        { name: 'my-bot', engine: 'cursor' },
+        builtinDir,
+      );
+
+      // golem.yaml created
+      const cfg = await loadConfig(dir);
+      expect(cfg.name).toBe('my-bot');
+      expect(cfg.engine).toBe('cursor');
+
+      // skills/general/SKILL.md copied
+      const skillMd = await readFile(join(dir, 'skills', 'general', 'SKILL.md'), 'utf-8');
+      expect(skillMd).toContain('General');
+
+      // .golem/ created
+      const golemStat = await stat(join(dir, '.golem'));
+      expect(golemStat.isDirectory()).toBe(true);
+
+      // AGENTS.md generated
+      const agentsMd = await readFile(join(dir, 'AGENTS.md'), 'utf-8');
+      expect(agentsMd).toContain('general');
+
+      // .gitignore created
+      const gitignore = await readFile(join(dir, '.gitignore'), 'utf-8');
+      expect(gitignore).toContain('.golem/');
+    });
+
+    it('throws when golem.yaml already exists (prevent double init)', async () => {
+      await writeFile(join(dir, 'golem.yaml'), 'name: old\nengine: cursor\n');
+      await expect(
+        initWorkspace(dir, { name: 'new', engine: 'cursor' }, '/tmp'),
+      ).rejects.toThrow('already exists');
+    });
+
+    it('falls back to default SKILL.md when builtin source missing', async () => {
+      await initWorkspace(
+        dir,
+        { name: 'fallback-bot', engine: 'cursor' },
+        '/tmp/nonexistent-builtin-path',
+      );
+
+      const skillMd = await readFile(join(dir, 'skills', 'general', 'SKILL.md'), 'utf-8');
+      expect(skillMd).toContain('General');
+    });
+
+    it('does not overwrite existing .gitignore', async () => {
+      await writeFile(join(dir, '.gitignore'), 'node_modules/\ncustom/\n');
+      await initWorkspace(
+        dir,
+        { name: 'bot', engine: 'cursor' },
+        '/tmp/nonexistent',
+      );
+
+      const gitignore = await readFile(join(dir, '.gitignore'), 'utf-8');
+      expect(gitignore).toContain('custom/');
+      expect(gitignore).not.toContain('.golem/');
+    });
+  });
+});

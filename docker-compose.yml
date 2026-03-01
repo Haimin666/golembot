@@ -1,0 +1,12 @@
+services:
+  golem:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./:/assistant
+    env_file:
+      - .env
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production

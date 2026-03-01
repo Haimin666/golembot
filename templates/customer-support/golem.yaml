@@ -1,0 +1,11 @@
+name: customer-support
+engine: claude-code
+# model: openrouter/anthropic/claude-sonnet-4
+
+channels:
+  feishu:
+    appId: ${FEISHU_APP_ID}
+    appSecret: ${FEISHU_APP_SECRET}
+
+gateway:
+  port: 3000
