@@ -63,16 +63,19 @@ Switch engines by changing one line in `golem.yaml` — the [StreamEvent](/api/s
 
 <div class="engines-grid">
   <div class="engine-card">
+    <svg class="engine-icon engine-icon-cursor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg>
     <div class="engine-name">Cursor</div>
     <div class="engine-desc">Cursor IDE's agent CLI</div>
     <code>CURSOR_API_KEY</code>
   </div>
   <div class="engine-card">
+    <svg class="engine-icon engine-icon-claude" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>
     <div class="engine-name">Claude Code</div>
     <div class="engine-desc">Anthropic's coding agent</div>
     <code>ANTHROPIC_API_KEY</code>
   </div>
   <div class="engine-card">
+    <svg class="engine-icon engine-icon-opencode" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 300" fill="currentColor"><path d="M180 240H60V120H180V240Z" opacity="0.4"/><path fill-rule="evenodd" clip-rule="evenodd" d="M180 60H60V240H180V60ZM240 300H0V0H240V300Z"/></svg>
     <div class="engine-name">OpenCode</div>
     <div class="engine-desc">Open-source, multi-provider</div>
     <code>OPENAI_API_KEY / ANTHROPIC_API_KEY / ...</code>
@@ -85,22 +88,22 @@ Connect to your team's chat platform — no public IP needed for Feishu and Ding
 
 <div class="channels-grid">
   <div class="channel-card">
-    <svg class="channel-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><g fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"><path d="M41.07 5.99L3.31 16.52l9.08 9.29 8.41.15 9.68-9.44a3.6 3.6 0 0 1-.38-1.32c0-.79.31-1.42.8-1.87a2.66 2.66 0 0 1 2.99-.34z"/><path d="M42.1 6.73L31.58 44.49l-9.3-9.08-.14-8.41 9.37-9.52a2.54 2.54 0 0 0 1.66.5c.9-.05 1.49-.6 1.76-.92.27-.32.59-.85.57-1.65a2.57 2.57 0 0 0-.52-1.46z"/></g></svg>
+    <img class="channel-icon" src="/icons/feishu.svg" alt="Feishu" />
     <div class="channel-name">Feishu (Lark)</div>
     <div class="channel-transport">WebSocket</div>
   </div>
   <div class="channel-card">
-    <svg class="channel-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M573.7 252.5C422.5 197.4 201.3 96.7 201.3 96.7c-15.7-4.1-17.9 11.1-17.9 11.1c-5 61.1 33.6 160.5 53.6 182.8c19.9 22.3 319.1 113.7 319.1 113.7S326 357.9 270.5 341.9c-55.6-16-37.9 17.8-37.9 17.8c11.4 61.7 64.9 131.8 107.2 138.4c42.2 6.6 220.1 4 220.1 4s-35.5 4.1-93.2 11.9c-42.7 5.8-97 12.5-111.1 17.8c-33.1 12.5 24 62.6 24 62.6c84.7 76.8 129.7 50.5 129.7 50.5c33.3-10.7 61.4-18.5 85.2-24.2L565 743.1h84.6L603 928l205.3-271.9H700.8l22.3-38.7c.3.5.4.8.4.8S799.8 496.1 829 433.8l.6-1h-.1c5-10.8 8.6-19.7 10-25.8c17-71.3-114.5-99.4-265.8-154.5"/></svg>
+    <img class="channel-icon" src="/icons/dingtalk.svg" alt="DingTalk" />
     <div class="channel-name">DingTalk</div>
     <div class="channel-transport">Stream</div>
   </div>
   <div class="channel-card">
-    <svg class="channel-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" fill-rule="evenodd" d="M909.8 729.6a136 136 0 0 0-47 19a114.2 114.2 0 0 1-51.4 31.1c2.6-17.6 11.3-33.6 24.5-45.4a169.3 169.3 0 0 0 23.4-55c-.1-27.8 22.4-50.5 50.3-50.5 27.8-.1 50.4 22.4 50.5 50.3.1 27.8-22.4 50.5-50.2 50.6zM817.6 608.8a168.8 168.8 0 0 0-54.8-23.7c-27.8 0-50.4-22.6-50.4-50.4s22.6-50.4 50.4-50.4 50.4 22.6 50.4 50.4a137.5 137.5 0 0 0 18.8 47.2 114.8 114.8 0 0 1 30.8 51.7 76.1 76.1 0 0 1-45-24.8zM734.5 431.1C719.3 303.8 587.5 204 428.1 204c-169.9 0-308.1 113.1-308.1 252.2 2.7 78.1 43.9 149.8 110.1 191.4a311 311 0 0 0 33.6 21.6l-13.7 54.6c4.9 2.3 9.7 4.8 14.7 6.9l69-34.5c10.1 2.6 20.7 4.3 31.2 6.1 6.7 1.2 13.4 2.4 20.4 3.3a354.8 354.8 0 0 0 128.8-7.4 249 249 0 0 0 10.2 55.1 425.6 425.6 0 0 1-96.2 11.2 418 418 0 0 1-86.4-9.5l-125.2 62.5a27.6 27.6 0 0 1-30-3.1 28 28 0 0 1-9.7-28.6l22.4-90.2C117.2 643.2 66.5 553.5 64 456.2 64 286 227 148 428.1 148c190.9 0 347.3 124.5 362.5 282.8a245 245 0 0 0-26.5-2.6c-9.9.4-19.8 1.3-29.6 2.9zM618.2 629.9c16.8-3.4 32.7-9.8 47-19a114.2 114.2 0 0 1 51.4-31 76.5 76.5 0 0 1-24.5 45.3c-11 16.8-18.9 35.5-23.4 55.1.1 27.8-22.5 50.4-50.3 50.5s-50.4-22.4-50.5-50.3c-.1-27.8 22.4-50.5 50.2-50.6zm90.8 121.3c16.7 11.2 35.2 19.2 54.7 23.9 20.4 0 38.8 12.3 46.6 31.1s3.5 40.5-10.9 55a50.4 50.4 0 0 1-54.9 10.9c-18.8-7.8-31.1-26.2-31.1-46.6a136.7 136.7 0 0 0-18.7-47.3 114.7 114.7 0 0 1-30.5-51.8 76 76 0 0 1 45 25.1z"/></svg>
+    <img class="channel-icon" src="/icons/wecom.svg" alt="WeCom" />
     <div class="channel-name">WeCom</div>
     <div class="channel-transport">Webhook</div>
   </div>
   <div class="channel-card">
-    <svg class="channel-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="M3 15a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><circle cx="7" cy="8" r=".5" fill="currentColor"/><circle cx="7" cy="16" r=".5" fill="currentColor"/></svg>
+    <svg class="channel-icon channel-icon-http" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="M3 15a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><circle cx="7" cy="8" r=".5" fill="currentColor"/><circle cx="7" cy="16" r=".5" fill="currentColor"/></svg>
     <div class="channel-name">HTTP API</div>
     <div class="channel-transport">SSE</div>
   </div>
@@ -152,6 +155,20 @@ Connect to your team's chat platform — no public IP needed for Feishu and Ding
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
+.engine-icon {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 12px;
+}
+
+.engine-icon-cursor { color: #000; }
+.dark .engine-icon-cursor { color: #fff; }
+
+.engine-icon-claude { color: #D97757; }
+
+.engine-icon-opencode { color: #211E1E; }
+.dark .engine-icon-opencode { color: #F1ECEC; }
+
 .engine-name,
 .channel-name {
   font-size: 18px;
@@ -177,8 +194,9 @@ Connect to your team's chat platform — no public IP needed for Feishu and Ding
   width: 36px;
   height: 36px;
   margin: 0 auto 12px;
-  color: var(--vp-c-brand-1);
 }
+
+.channel-icon-http { color: var(--vp-c-text-2); }
 
 .channel-transport {
   font-size: 13px;
