@@ -1,0 +1,172 @@
+# HTTP API
+
+GolemBot includes a built-in HTTP server with SSE streaming, accessible via `golembot serve` or `createGolemServer()`.
+
+## Endpoints
+
+### `POST /chat`
+
+Send a message and receive a Server-Sent Events (SSE) stream.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "message": "Analyze the sales data",
+  "sessionKey": "user-123"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `message` | `string` | Yes | The user's message |
+| `sessionKey` | `string` | No | Session identifier (default: `"default"`) |
+
+**Response:** `text/event-stream`
+
+```
+data: {"type":"text","content":"Let me look at "}
+
+data: {"type":"text","content":"the data..."}
+
+data: {"type":"tool_call","name":"readFile","args":"{\"path\":\"sales.csv\"}"}
+
+data: {"type":"tool_result","content":"date,revenue\n2026-01,..."}
+
+data: {"type":"text","content":"Here's the analysis..."}
+
+data: {"type":"done","sessionId":"abc-123","durationMs":8500}
+
+```
+
+Each event is a JSON-encoded [StreamEvent](/api/stream-events).
+
+### `POST /reset`
+
+Clear a session.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "sessionKey": "user-123"
+}
+```
+
+**Response:**
+```json
+{ "ok": true }
+```
+
+### `GET /health`
+
+Health check endpoint (no authentication required).
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-03-01T12:00:00.000Z"
+}
+```
+
+## Authentication
+
+All endpoints except `/health` require a Bearer token:
+
+```
+Authorization: Bearer <token>
+```
+
+The token is configured via:
+- `--token` CLI flag
+- `GOLEM_TOKEN` environment variable
+- `gateway.token` in `golem.yaml`
+
+## CORS
+
+The server allows all origins with `GET`, `POST`, `OPTIONS` methods and `Content-Type` + `Authorization` headers.
+
+## Using the Server Programmatically
+
+### `createGolemServer()`
+
+```typescript
+import { createAssistant, createGolemServer } from 'golembot';
+
+const assistant = createAssistant({ dir: './my-bot' });
+const server = createGolemServer(assistant, {
+  port: 3000,
+  token: 'my-secret',
+  hostname: '127.0.0.1',
+});
+```
+
+### `startServer()`
+
+```typescript
+import { createAssistant, startServer } from 'golembot';
+
+const assistant = createAssistant({ dir: './my-bot' });
+await startServer(assistant, { port: 3000, token: 'my-secret' });
+```
+
+### `ServerOpts`
+
+```typescript
+interface ServerOpts {
+  port?: number;       // default: 3000 or GOLEM_PORT env
+  token?: string;      // bearer token; also reads GOLEM_TOKEN env
+  hostname?: string;   // default: '127.0.0.1'
+}
+```
+
+## SSE Client Example
+
+### curl
+
+```bash
+curl -N -X POST http://localhost:3000/chat \
+  -H "Authorization: Bearer my-secret" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello"}'
+```
+
+### JavaScript
+
+```javascript
+const response = await fetch('http://localhost:3000/chat', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer my-secret',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ message: 'Hello' }),
+});
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  const text = decoder.decode(value);
+  // Parse SSE lines: "data: {...}\n\n"
+  for (const line of text.split('\n')) {
+    if (line.startsWith('data: ')) {
+      const event = JSON.parse(line.slice(6));
+      console.log(event);
+    }
+  }
+}
+```

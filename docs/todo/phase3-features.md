@@ -1,6 +1,6 @@
 # Phase 3 Feature Plans
 
-See [docs/architecture.md](../architecture.md) Chapter 9 "Evolution Roadmap" for reference.
+See [docs/architecture.md](../reference/architecture.md) Chapter 9 "Evolution Roadmap" for reference.
 
 ## Multi-Engine Support
 

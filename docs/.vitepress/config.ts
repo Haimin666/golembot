@@ -1,0 +1,190 @@
+import { defineConfig } from 'vitepress'
+
+const sidebarEn = [
+  {
+    text: 'Guide',
+    items: [
+      { text: 'Getting Started', link: '/guide/getting-started' },
+      { text: 'Onboard Wizard', link: '/guide/onboard-wizard' },
+      { text: 'Configuration', link: '/guide/configuration' },
+      { text: 'CLI Commands', link: '/guide/cli-commands' },
+      { text: 'Docker Deployment', link: '/guide/docker' },
+    ],
+  },
+  {
+    text: 'Engines',
+    items: [
+      { text: 'Overview', link: '/engines/overview' },
+      { text: 'Cursor', link: '/engines/cursor' },
+      { text: 'Claude Code', link: '/engines/claude-code' },
+      { text: 'OpenCode', link: '/engines/opencode' },
+    ],
+  },
+  {
+    text: 'Channels',
+    items: [
+      { text: 'Overview', link: '/channels/overview' },
+      { text: 'Feishu (Lark)', link: '/channels/feishu' },
+      { text: 'DingTalk', link: '/channels/dingtalk' },
+      { text: 'WeCom', link: '/channels/wecom' },
+    ],
+  },
+  {
+    text: 'Skills',
+    items: [
+      { text: 'Overview', link: '/skills/overview' },
+      { text: 'Built-in Skills', link: '/skills/builtin' },
+      { text: 'Create a Skill', link: '/skills/create-skill' },
+    ],
+  },
+  {
+    text: 'API Reference',
+    items: [
+      { text: 'createAssistant()', link: '/api/create-assistant' },
+      { text: 'StreamEvent', link: '/api/stream-events' },
+      { text: 'HTTP API', link: '/api/http-api' },
+      { text: 'Channel Adapter', link: '/api/channel-adapter' },
+    ],
+  },
+  {
+    text: 'More',
+    items: [
+      { text: 'FAQ', link: '/faq' },
+      { text: 'Architecture', link: '/reference/architecture' },
+      { text: 'Coding CLI Docs', link: '/reference/coding-cli-docs' },
+    ],
+  },
+]
+
+const sidebarZh = [
+  {
+    text: '指南',
+    items: [
+      { text: '快速开始', link: '/zh/guide/getting-started' },
+      { text: '引导向导', link: '/zh/guide/onboard-wizard' },
+      { text: '配置说明', link: '/zh/guide/configuration' },
+      { text: 'CLI 命令', link: '/zh/guide/cli-commands' },
+      { text: 'Docker 部署', link: '/zh/guide/docker' },
+    ],
+  },
+  {
+    text: '引擎',
+    items: [
+      { text: '概览', link: '/zh/engines/overview' },
+      { text: 'Cursor', link: '/zh/engines/cursor' },
+      { text: 'Claude Code', link: '/zh/engines/claude-code' },
+      { text: 'OpenCode', link: '/zh/engines/opencode' },
+    ],
+  },
+  {
+    text: 'IM 通道',
+    items: [
+      { text: '概览', link: '/zh/channels/overview' },
+      { text: '飞书', link: '/zh/channels/feishu' },
+      { text: '钉钉', link: '/zh/channels/dingtalk' },
+      { text: '企业微信', link: '/zh/channels/wecom' },
+    ],
+  },
+  {
+    text: 'Skill 技能',
+    items: [
+      { text: '概览', link: '/zh/skills/overview' },
+      { text: '内置技能', link: '/zh/skills/builtin' },
+      { text: '创建技能', link: '/zh/skills/create-skill' },
+    ],
+  },
+  {
+    text: 'API 参考',
+    items: [
+      { text: 'createAssistant()', link: '/zh/api/create-assistant' },
+      { text: 'StreamEvent', link: '/zh/api/stream-events' },
+      { text: 'HTTP API', link: '/zh/api/http-api' },
+      { text: 'Channel Adapter', link: '/zh/api/channel-adapter' },
+    ],
+  },
+  {
+    text: '更多',
+    items: [
+      { text: 'FAQ', link: '/zh/faq' },
+      { text: '架构设计', link: '/reference/architecture' },
+      { text: 'Coding CLI 文档', link: '/reference/coding-cli-docs' },
+    ],
+  },
+]
+
+export default defineConfig({
+  title: 'GolemBot',
+  description: 'Run your Coding Agent everywhere — IM, HTTP, or embedded in your product.',
+  base: '/golembot/',
+
+  head: [
+    ['link', { rel: 'icon', href: '/golembot/logo-icon-dark.svg' }],
+  ],
+
+  locales: {
+    root: {
+      label: 'English',
+      lang: 'en',
+    },
+    zh: {
+      label: '简体中文',
+      lang: 'zh-CN',
+      description: '让你的 Coding Agent 随处运行 — IM、HTTP 或嵌入到你的产品中。',
+      themeConfig: {
+        nav: [
+          { text: '文档', link: '/zh/guide/getting-started' },
+          { text: 'API', link: '/zh/api/create-assistant' },
+          { text: 'FAQ', link: '/zh/faq' },
+        ],
+        sidebar: sidebarZh,
+        editLink: {
+          pattern: 'https://github.com/0xranx/golembot/edit/main/docs/:path',
+          text: '在 GitHub 上编辑此页',
+        },
+        footer: {
+          message: '基于 <a href="https://github.com/0xranx/golembot/blob/main/LICENSE">MIT 协议</a> 发布。',
+          copyright: 'Coding Agent = 灵魂，GolemBot = 泥土之躯。',
+        },
+        docFooter: { prev: '上一页', next: '下一页' },
+        outline: { label: '页面导航' },
+        lastUpdated: { text: '最后更新于' },
+        returnToTopLabel: '回到顶部',
+        sidebarMenuLabel: '菜单',
+        darkModeSwitchLabel: '主题',
+      },
+    },
+  },
+
+  themeConfig: {
+    logo: {
+      light: '/logo-icon-light.svg',
+      dark: '/logo-icon-dark.svg',
+    },
+
+    nav: [
+      { text: 'Docs', link: '/guide/getting-started' },
+      { text: 'API', link: '/api/create-assistant' },
+      { text: 'FAQ', link: '/faq' },
+    ],
+
+    sidebar: sidebarEn,
+
+    socialLinks: [
+      { icon: 'github', link: 'https://github.com/0xranx/golembot' },
+      { icon: 'npm', link: 'https://www.npmjs.com/package/golembot' },
+    ],
+
+    editLink: {
+      pattern: 'https://github.com/0xranx/golembot/edit/main/docs/:path',
+    },
+
+    footer: {
+      message: 'Released under the <a href="https://github.com/0xranx/golembot/blob/main/LICENSE">MIT License</a>.',
+      copyright: 'Coding Agent = soul, GolemBot = body of clay.',
+    },
+
+    search: {
+      provider: 'local',
+    },
+  },
+})

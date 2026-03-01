@@ -23,6 +23,9 @@
     "e2e:headless": "tsx examples/e2e-headless.ts",
     "e2e:claude-code": "tsx examples/e2e-claude-code.ts",
     "e2e:opencode": "tsx examples/e2e-opencode.ts",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "prepublishOnly": "pnpm run build"
   },
   "files": [
@@ -86,6 +89,7 @@
     "@types/xml2js": "^0.4.14",
     "tsx": "^4.0.0",
     "typescript": "^5.7.0",
+    "vitepress": "^1.6.4",
     "vitest": "^4.0.18"
   }
 }
