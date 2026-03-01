@@ -13,7 +13,6 @@ export class DingtalkAdapter implements ChannelAdapter {
   async start(onMessage: (msg: ChannelMessage) => void): Promise<void> {
     let sdk: any;
     try {
-      // @ts-expect-error optional peer dependency
       sdk = await import('dingtalk-stream');
     } catch {
       throw new Error(

@@ -41,7 +41,6 @@ export class WecomAdapter implements ChannelAdapter {
     let wecomCrypto: any;
     let xml2js: any;
     try {
-      // @ts-expect-error optional peer dependency
       wecomCrypto = await import('@wecom/crypto');
     } catch {
       throw new Error(
@@ -49,7 +48,6 @@ export class WecomAdapter implements ChannelAdapter {
       );
     }
     try {
-      // @ts-expect-error optional peer dependency
       xml2js = await import('xml2js');
     } catch {
       throw new Error(

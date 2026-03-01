@@ -14,7 +14,6 @@ export class FeishuAdapter implements ChannelAdapter {
   async start(onMessage: (msg: ChannelMessage) => void): Promise<void> {
     let lark: any;
     try {
-      // @ts-expect-error optional peer dependency
       lark = await import('@larksuiteoapi/node-sdk');
     } catch {
       throw new Error(
