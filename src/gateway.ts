@@ -9,6 +9,8 @@ const CHANNEL_LIMITS: Record<string, number> = {
   feishu: 4000,
   dingtalk: 4000,
   wecom: 2048,
+  slack: 4000,
+  telegram: 4096,
 };
 
 export function splitMessage(text: string, maxLen: number): string[] {
@@ -59,6 +61,14 @@ async function createChannelAdapter(
     case 'wecom': {
       const { WecomAdapter } = await import('./channels/wecom.js');
       return new WecomAdapter(channelConfig as any);
+    }
+    case 'slack': {
+      const { SlackAdapter } = await import('./channels/slack.js');
+      return new SlackAdapter(channelConfig as any);
+    }
+    case 'telegram': {
+      const { TelegramAdapter } = await import('./channels/telegram.js');
+      return new TelegramAdapter(channelConfig as any);
     }
     default:
       throw new Error(`Unknown channel type: ${type}`);

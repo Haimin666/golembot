@@ -21,10 +21,21 @@ export interface WecomChannelConfig {
   port?: number;
 }
 
+export interface SlackChannelConfig {
+  botToken: string;
+  appToken: string;
+}
+
+export interface TelegramChannelConfig {
+  botToken: string;
+}
+
 export interface ChannelsConfig {
   feishu?: FeishuChannelConfig;
   dingtalk?: DingtalkChannelConfig;
   wecom?: WecomChannelConfig;
+  slack?: SlackChannelConfig;
+  telegram?: TelegramChannelConfig;
 }
 
 export interface GatewayConfig {

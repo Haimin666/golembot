@@ -29,6 +29,8 @@ const sidebarEn = [
       { text: 'Feishu (Lark)', link: '/channels/feishu' },
       { text: 'DingTalk', link: '/channels/dingtalk' },
       { text: 'WeCom', link: '/channels/wecom' },
+      { text: 'Slack', link: '/channels/slack' },
+      { text: 'Telegram', link: '/channels/telegram' },
     ],
   },
   {
@@ -98,6 +100,8 @@ const sidebarZh = [
       { text: '飞书', link: '/zh/channels/feishu' },
       { text: '钉钉', link: '/zh/channels/dingtalk' },
       { text: '企业微信', link: '/zh/channels/wecom' },
+      { text: 'Slack', link: '/zh/channels/slack' },
+      { text: 'Telegram', link: '/zh/channels/telegram' },
     ],
   },
   {
