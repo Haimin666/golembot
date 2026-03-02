@@ -1016,81 +1016,359 @@ Configuration precedence (later overrides earlier): remote config → global →
 
 ---
 
-## Three-Engine Comparison Matrix (Cursor vs Claude Code vs OpenCode)
+## Codex CLI
+
+### Official Documentation
+
+- **Docs Root:** https://developers.openai.com/codex
+- **GitHub:** https://github.com/openai/codex
+- **Non-interactive (exec) guide:** https://developers.openai.com/codex/noninteractive/
+- **CLI reference:** https://developers.openai.com/codex/cli/reference/
+- **AGENTS.md guide:** https://developers.openai.com/codex/guides/agents-md/
+- **Authentication:** https://developers.openai.com/codex/auth/
+- **Security / Sandboxing:** https://developers.openai.com/codex/security
+- **Models:** https://developers.openai.com/codex/models/
+- **SDK:** https://developers.openai.com/codex/sdk/
+- **App Server protocol:** https://developers.openai.com/codex/app-server/
+- **Changelog:** https://developers.openai.com/codex/changelog/
+
+OpenAI Codex CLI is an open-source (Rust, 96%) terminal-based coding agent. It can read, edit, and run code on your machine within a selected directory. Released April 2025. Available on macOS and Linux; Windows experimental (via WSL).
+
+### Installation
+
+```bash
+# npm (global)
+npm install -g @openai/codex
+
+# Homebrew (macOS)
+brew install codex
+
+# GitHub Releases platform binaries
+# macOS Apple Silicon: codex-aarch64-apple-darwin.tar.gz
+# macOS x86_64:        codex-x86_64-apple-darwin.tar.gz
+# Linux x86_64 (musl): codex-x86_64-unknown-linux-musl.tar.gz
+# Linux arm64 (musl):  codex-aarch64-unknown-linux-musl.tar.gz
+```
+
+Binary name: `codex`. npm package: `@openai/codex`.
+
+### Actual Invocation Method (Verified for GolemBot)
+
+Non-interactive headless invocation for GolemBot integration:
+
+```bash
+codex exec --json --full-auto --model codex-mini-latest "prompt here"
+```
+
+Key flags:
+
+| Flag | Purpose |
+|------|---------|
+| `--json` | Emit JSONL event stream to stdout (machine-readable) |
+| `--full-auto` | Shortcut: `--sandbox workspace-write --ask-for-approval on-request` |
+| `--dangerously-bypass-approvals-and-sandbox` / `--yolo` | Disable ALL safety checks — use only inside isolated containers |
+| `--model <id>` | Override model |
+| `--cd <path>` | Set working directory before processing |
+| `--ephemeral` | Skip session persistence |
+
+**Flag placement:** Global flags must appear **after** the subcommand:
+```bash
+codex exec --json --full-auto "prompt"   # ✅ correct
+codex --json exec "prompt"               # ❌ wrong
+```
+
+**stdout vs stderr split (critical for integration):**
+- `stdout` — pure JSONL events (only when `--json` is set)
+- `stderr` — config summary, progress indicators, warnings
+
+Spawn with `stdio: ['pipe', 'pipe', 'pipe']` and consume stdout/stderr independently.
+
+### stream-json Output Format
+
+`codex exec --json` emits one complete JSON object per line to stdout (NDJSON). Events are **not** SSE, just newline-delimited JSON.
+
+#### Event Type Overview
+
+| Type | Description |
+|------|-------------|
+| `thread.started` | Session initialized; contains `thread_id` |
+| `turn.started` | New conversation turn begun |
+| `turn.completed` | Turn finished; contains `usage` (input/output tokens) |
+| `turn.failed` | Turn encountered an error |
+| `item.started` | A work item has started |
+| `item.updated` | Work item streaming delta |
+| `item.completed` | Work item finished; contains final content |
+| `error` | Top-level error event |
+
+#### `item.type` Values (inside `item.started` / `item.completed`)
+
+| Item type | Description |
+|-----------|-------------|
+| `agent_message` | User-facing text response — read `item.text` |
+| `reasoning` | Internal model reasoning |
+| `command_execution` | Shell command executed by the agent |
+| `file_change` | File modified by the agent |
+| `mcp_tool_call` | MCP server tool invocation |
+| `web_search` | Live web search (requires `--search` flag) |
+| `todo_list` | Plan/task list update |
+| `error` | Error within an item |
+
+#### Example Events (exact field names)
+
+```json
+{"type":"thread.started","thread_id":"0199a213-81c0-7800-8aa1-bbab2a035a53"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"bash -lc ls","status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"Here is the analysis..."}}
+{"type":"turn.completed","usage":{"input_tokens":24763,"cached_input_tokens":24448,"output_tokens":122}}
+```
+
+#### GolemBot Parsing Strategy
+
+```
+thread.started  → extract thread_id → save as sessionId
+item.completed + item.type === "agent_message" → yield { type: 'text', content: item.text }
+item.completed + item.type === "command_execution" → yield { type: 'tool_call', name: item.command, args: '' }
+turn.completed  → yield { type: 'done', sessionId, costUsd (from usage tokens * rate) }
+turn.failed / error → yield { type: 'error', message: ... }
+```
+
+**Known limitation (GitHub issue #5028, PR #4525):** `mcp_tool_call` items do **not** include tool arguments or results in the `--json` output — only the server/tool name. This was a deliberate change that broke some integrations. Full tool traces are only available via the App Server protocol.
+
+### Session Resume
+
+Sessions stored under `~/.codex/sessions/` (or `$CODEX_HOME/sessions/`).
+
+```bash
+# Resume specific session (non-interactive)
+codex exec resume <SESSION_ID> "continue the refactor"
+
+# Resume most recent session (non-interactive)
+codex exec resume --last "next step"
+
+# Also consider all directories (not just cwd)
+codex exec resume --last --all "next step"
+```
+
+**Capturing the session ID:** The `thread_id` from `thread.started` event is the only programmatic way to obtain the session ID. There is no separate env var or flag for it (open feature request: issue #8923).
+
+**Resume prefix for GolemBot:** When sessionId is known, invoke:
+```bash
+codex exec --json --full-auto resume <SESSION_ID> "prompt"
+```
+
+### Authentication Methods
+
+Two auth paths:
+
+| Method | Use case | Billing |
+|--------|---------|---------|
+| ChatGPT OAuth (browser) | Interactive use, ChatGPT subscribers | ChatGPT subscription |
+| API key | CI/CD, headless, programmatic | OpenAI API pay-per-token |
+
+Note: Codex Cloud tasks are only available with ChatGPT auth, not API key.
+
+**Environment variables:**
+
+| Variable | Purpose |
+|----------|---------|
+| `OPENAI_API_KEY` | Primary API key for API-auth mode |
+| `CODEX_API_KEY` | Alternate accepted by CI/CD docs |
+| `OPENAI_BASE_URL` | Override API endpoint (proxy / Azure) |
+| `CODEX_HOME` | Override default `~/.codex` state directory |
+
+**Headless / CI authentication:**
+```bash
+# Pre-login with API key (stored in ~/.codex/auth.json)
+printenv OPENAI_API_KEY | codex login --with-api-key
+
+# Inline for single run
+CODEX_API_KEY="sk-..." codex exec --json "run tests"
+
+# Device code flow for remote machines
+codex login --device-code
+```
+
+**Known quirk (issues #2638, #3286):** If both ChatGPT session and `OPENAI_API_KEY` are present, behavior may be inconsistent across versions. For CI/CD, explicitly log in with API key to avoid ambiguity.
+
+### Skill Auto-Discovery Mechanism (AGENTS.md)
+
+Codex reads `AGENTS.md` files before doing any work. Discovery order:
+
+1. **Global** (`~/.codex/`): `AGENTS.override.md` → `AGENTS.md`
+2. **Project** (Git root down to cwd): walks each level, reads `AGENTS.override.md` → `AGENTS.md` → configured fallback filenames
+3. **Merge**: files concatenate root → innermost; inner overrides outer
+
+Configuration in `~/.codex/config.toml`:
+```toml
+project_doc_fallback_filenames = ["TEAM_GUIDE.md", ".agents.md"]
+project_doc_max_bytes = 65536    # default 32 KiB per file
+```
+
+**For GolemBot:** Place the generated `AGENTS.md` (assembled from skill SKILL.md files) in the workspace root — Codex will auto-discover it.
+
+**Protected directories (always read-only, even in workspace-write mode):**
+- `.git/`
+- `.agents/`
+- `.codex/`
+
+### Permissions System
+
+#### Sandbox Modes (physical capability)
+
+| Mode | Description |
+|------|-------------|
+| `read-only` | Default for `codex exec`. Browse files, no writes, no network |
+| `workspace-write` | Read + write within working directory. No network by default |
+| `danger-full-access` | Unrestricted, including network. Use only in isolated containers |
+
+#### Approval Policy (when to pause)
+
+| Policy | Behavior |
+|--------|---------|
+| `untrusted` | Only known-safe read-only commands auto-run; all others prompt |
+| `on-request` | Model decides when to ask for approval |
+| `never` | Never prompts — used with `danger-full-access` for full automation |
+
+**`--full-auto`** = `--sandbox workspace-write` + `--ask-for-approval on-request`
+**`--yolo`** = disables all sandboxing and approvals (use inside Docker/isolated env only)
+
+**Default for `codex exec` (headless):** Approval policy defaults to `never`, which **auto-cancels** all elicitation requests (MCP approval prompts, sandbox escalation). With `--full-auto`, policy shifts to `on-request`, which auto-approves commands instead of canceling.
+
+#### Sandbox Implementation by OS
+
+| OS | Mechanism |
+|----|----------|
+| macOS | `sandbox-exec` (Seatbelt policies) |
+| Linux | Landlock + seccomp; optional `bwrap` for network proxy |
+| Windows (WSL) | Linux mechanism inside WSL |
+
+### Model Configuration
+
+Models as of early 2026 (subject to change; check https://developers.openai.com/codex/models/):
+
+| Model ID | Description |
+|----------|-------------|
+| `codex-1` | o3-based, tuned for software engineering (initial release model) |
+| `codex-mini-latest` | o4-mini-based, low-latency, cost-effective |
+
+Newer model IDs (may vary; verify from live docs):
+- `gpt-5.2-codex`, `gpt-5.3-codex` — advanced agentic coding
+- `gpt-5.1-codex-max` — long-horizon tasks
+
+**Switching model:**
+```bash
+codex exec --model codex-mini-latest --json "your task"
+```
+
+Or in `~/.codex/config.toml`:
+```toml
+model = "codex-mini-latest"
+```
+
+### Known Pitfalls & GolemBot Adaptation Notes
+
+1. **`--json` flag placement**: Must come after `exec` subcommand — `codex exec --json`, not `codex --json exec`.
+
+2. **Tool call args missing (#5028)**: `mcp_tool_call` items in `--json` output don't include arguments or results. Only tool name is available. Use App Server protocol for full traces.
+
+3. **Session ID only in JSONL stream**: `thread_id` from `thread.started` event is the only way to capture session ID programmatically. No env var for it (issue #8923).
+
+4. **Auth conflict with dual credentials**: Both ChatGPT session + `OPENAI_API_KEY` can cause unpredictable auth behavior. For CI, use `codex login --with-api-key` explicitly.
+
+5. **`codex exec` default auto-cancels approvals**: Without `--full-auto`, the agent auto-cancels any permission escalation requests in headless mode — tasks requiring elevated permissions silently fail. Always use `--full-auto` for GolemBot integration.
+
+6. **No `--session-key` concept**: Sessions are identified by internal UUIDs stored in `~/.codex/sessions/`. GolemBot must capture `thread_id` from `thread.started` and persist it as sessionId.
+
+7. **TTY echo bug (#3646)**: Interactive `sudo` prompts inside agent-executed commands can hang the terminal. Avoid sudo in prompts.
+
+8. **Sandbox bypass in zsh (patched v0.106.0)**: A `zsh-fork` execution path could drop sandbox wrappers. Patched in Feb 2026.
+
+9. **Input size cap**: Shared ~1M-character input cap as of v0.106.0 to prevent hangs on oversized inputs.
+
+10. **Rapid release pace**: Codex CLI iterates fast; verify flag syntax against the installed version's `codex exec --help` output before relying on it in CI.
+
+---
+
+## Four-Engine Comparison Matrix (Cursor vs Claude Code vs OpenCode vs Codex)
 
 ### Basic Properties
 
-| Dimension | Cursor Agent | Claude Code | OpenCode |
-|-----------|-------------|-------------|----------|
-| Type | IDE companion CLI | Official CLI Agent | Standalone open-source Agent |
-| Open source | No | No | Yes (Apache-2.0) |
-| LLM support | Cursor backend (with routing) | Anthropic models only | 75+ Providers |
-| Installation | `curl https://cursor.com/install -fsS \| bash` | `npm i -g @anthropic-ai/claude-code` | `npm i -g opencode-ai` |
-| Binary name | `agent` | `claude` | `opencode` |
-| PTY requirement | Not needed (`child_process.spawn`) | Not needed (`child_process.spawn`) | Not needed (`child_process.spawn`) |
+| Dimension | Cursor Agent | Claude Code | OpenCode | Codex CLI |
+|-----------|-------------|-------------|----------|-----------|
+| Type | IDE companion CLI | Official CLI Agent | Standalone open-source Agent | OpenAI official CLI Agent |
+| Open source | No | No | Yes (Apache-2.0) | Yes (Apache-2.0, Rust) |
+| LLM support | Cursor backend (with routing) | Anthropic models only | 75+ Providers | OpenAI models (codex-1, codex-mini-latest, etc.) |
+| Installation | `curl https://cursor.com/install -fsS \| bash` | `npm i -g @anthropic-ai/claude-code` | `npm i -g opencode-ai` | `npm i -g @openai/codex` |
+| Binary name | `agent` | `claude` | `opencode` | `codex` |
+| PTY requirement | Not needed (`child_process.spawn`) | Not needed (`child_process.spawn`) | Not needed (`child_process.spawn`) | Not needed (`child_process.spawn`) |
 
 ### Invocation Methods
 
-| Dimension | Cursor Agent | Claude Code | OpenCode |
-|-----------|-------------|-------------|----------|
-| Non-interactive command | `agent -p "prompt"` | `claude -p "prompt"` | `opencode run "prompt"` |
-| JSON output | `--output-format stream-json` | `--output-format stream-json` | `--format json` |
-| Model selection | `--model <alias>` | `--model <alias>` | `--model provider/model` |
-| Permission bypass | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | Default allow (`opencode.json` config) |
-| Core headless params | `--approve-mcps` | `--dangerously-skip-permissions` | Permission config `"*": "allow"` |
-| Verbose output | Default | `--verbose` (required) | Default |
+| Dimension | Cursor Agent | Claude Code | OpenCode | Codex CLI |
+|-----------|-------------|-------------|----------|-----------|
+| Non-interactive command | `agent -p "prompt"` | `claude -p "prompt"` | `opencode run "prompt"` | `codex exec "prompt"` |
+| JSON output flag | `--output-format stream-json` | `--output-format stream-json` | `--format json` | `--json` (flag after `exec`) |
+| Model selection | `--model <alias>` | `--model <alias>` | `--model provider/model` | `--model <id>` |
+| Permission bypass | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | Permission config `"*": "allow"` | `--full-auto` or `--yolo` |
+| Core headless params | `--approve-mcps` | `--dangerously-skip-permissions` | Permission config `"*": "allow"` | `--full-auto` |
+| Verbose output | Default | `--verbose` (required) | Default | Goes to stderr automatically |
 
 ### Session Management
 
-| Dimension | Cursor Agent | Claude Code | OpenCode |
-|-----------|-------------|-------------|----------|
-| Resume specific session | `--resume <uuid>` | `--resume <uuid>` | `--session <ses_xxx>` |
-| Resume most recent | `--resume` | `--continue` | `--continue` |
-| Fork session | Not supported | `--fork-session` | `--fork` |
-| Export session | Not supported | Not supported | `opencode export <id>` |
-| Session ID format | UUID | UUID | `ses_XXXXXXXX` |
-| Session storage | `~/.cursor/` | `~/.claude/` | `~/.local/share/opencode/` |
+| Dimension | Cursor Agent | Claude Code | OpenCode | Codex CLI |
+|-----------|-------------|-------------|----------|-----------|
+| Resume specific session | `--resume <uuid>` | `--resume <uuid>` | `--session <ses_xxx>` | `codex exec resume <thread_id> "prompt"` |
+| Resume most recent | `--resume` | `--continue` | `--continue` | `codex exec resume --last "prompt"` |
+| Fork session | Not supported | `--fork-session` | `--fork` | `codex fork` (TUI only) |
+| Export session | Not supported | Not supported | `opencode export <id>` | Not supported |
+| Session ID format | UUID | UUID | `ses_XXXXXXXX` | UUID (`thread_id` from `thread.started` event) |
+| Session storage | `~/.cursor/` | `~/.claude/` | `~/.local/share/opencode/` | `~/.codex/sessions/` |
+| Skip persistence | Not supported | Not supported | Not supported | `--ephemeral` |
 
 ### Authentication
 
-| Dimension | Cursor Agent | Claude Code | OpenCode |
-|-----------|-------------|-------------|----------|
-| API Key variable | `CURSOR_API_KEY` | `ANTHROPIC_API_KEY` | Depends on Provider |
-| Local login | `agent login` (browser OAuth) | `claude auth login` | `opencode auth login` |
-| Max subscription support | Native (Cursor Pro) | OAuth + `apiKeyHelper` | Not applicable |
-| CI/CD auth | `CURSOR_API_KEY` | `ANTHROPIC_API_KEY` | Provider-specific env var |
-| OpenRouter | Not supported | Not natively supported | Natively supported (`OPENROUTER_API_KEY`) |
+| Dimension | Cursor Agent | Claude Code | OpenCode | Codex CLI |
+|-----------|-------------|-------------|----------|-----------|
+| API Key variable | `CURSOR_API_KEY` | `ANTHROPIC_API_KEY` | Depends on Provider | `OPENAI_API_KEY` / `CODEX_API_KEY` |
+| Local login | `agent login` (browser OAuth) | `claude auth login` | `opencode auth login` | `codex login` (browser or `--with-api-key`) |
+| Max subscription support | Native (Cursor Pro) | OAuth + `apiKeyHelper` | Not applicable | ChatGPT subscription (OAuth) |
+| CI/CD auth | `CURSOR_API_KEY` | `ANTHROPIC_API_KEY` | Provider-specific env var | `printenv OPENAI_API_KEY \| codex login --with-api-key` |
+| OpenRouter | Not supported | Not natively supported | Natively supported (`OPENROUTER_API_KEY`) | Not supported |
 
 ### Skill / Rules System
 
-| Dimension | Cursor Agent | Claude Code | OpenCode |
-|-----------|-------------|-------------|----------|
-| Skill path | `.cursor/skills/` | `.claude/skills/` | `.opencode/skills/` + `.claude/skills/` + `.agents/skills/` |
-| Rules file | `.cursor/rules/*.mdc` | `CLAUDE.md` | `AGENTS.md` (preferred) / `CLAUDE.md` |
-| Skill format | `SKILL.md` | `SKILL.md` | `SKILL.md` (with frontmatter) |
-| On-demand loading | Yes (Agent auto) | Yes (Agent auto) | Yes (via `skill()` tool) |
-| Global skills | `~/.cursor/skills/` | `~/.claude/skills/` | `~/.config/opencode/skills/` |
+| Dimension | Cursor Agent | Claude Code | OpenCode | Codex CLI |
+|-----------|-------------|-------------|----------|-----------|
+| Skill path | `.cursor/skills/` | `.claude/skills/` | `.opencode/skills/` + `.claude/skills/` + `.agents/skills/` | No dedicated skill path |
+| Rules file | `.cursor/rules/*.mdc` | `CLAUDE.md` | `AGENTS.md` (preferred) / `CLAUDE.md` | `AGENTS.md` (auto-discovered root → cwd) |
+| Rules fallback config | Not supported | Not supported | Not supported | `project_doc_fallback_filenames` in `config.toml` |
+| Skill format | `SKILL.md` | `SKILL.md` | `SKILL.md` (with frontmatter) | No dedicated format (embed in AGENTS.md) |
+| On-demand loading | Yes (Agent auto) | Yes (Agent auto) | Yes (via `skill()` tool) | Not applicable |
+| Global skills | `~/.cursor/skills/` | `~/.claude/skills/` | `~/.config/opencode/skills/` | `~/.codex/AGENTS.md` |
 
 ### Tools & Extensions
 
-| Dimension | Cursor Agent | Claude Code | OpenCode |
-|-----------|-------------|-------------|----------|
-| Built-in tools | IDE integrated | bash/read/write/edit/grep, etc. | bash/read/write/edit/grep/glob, etc. |
-| MCP support | `.cursor/mcp.json` | `.claude/mcp.json` | `opencode.json` |
-| Custom tools | Not supported | Not supported | `.opencode/tools/*.ts` |
-| Plugin system | Not supported | Not supported | `.opencode/plugins/*.ts` |
-| Subagents | Not supported | Not supported | `explore`, `general` (parallelizable) |
-| GitHub Actions | Supported (`curl https://cursor.com/install`) | Supported (official Action) | Supported (official Action) |
-| HTTP Server API | Not supported | Not supported | Full OpenAPI (`opencode serve`) |
+| Dimension | Cursor Agent | Claude Code | OpenCode | Codex CLI |
+|-----------|-------------|-------------|----------|-----------|
+| Built-in tools | IDE integrated | bash/read/write/edit/grep, etc. | bash/read/write/edit/grep/glob, etc. | bash/read/write/edit, etc. |
+| MCP support | `.cursor/mcp.json` | `.claude/mcp.json` | `opencode.json` | `~/.codex/config.toml` (via `mcp` command) |
+| Web search | Not supported | Not supported | Not supported | `--search` flag |
+| Image input | Not supported | Not supported | Not supported | `--image <path>` |
+| Subagents | Not supported | Not supported | `explore`, `general` (parallelizable) | Codex Cloud (async tasks) |
+| GitHub Actions | Supported (`curl https://cursor.com/install`) | Supported (official Action) | Supported (official Action) | Supported (`npm i -g @openai/codex`) |
+| HTTP Server API | Not supported | Not supported | Full OpenAPI (`opencode serve`) | App Server (JSON-RPC 2.0 over stdio) |
+| TypeScript SDK | Not supported | Not supported | Not supported | `@openai/codex-sdk` (Node 18+) |
 
 ### GolemBot Engine Integration Methods
 
-| Dimension | CursorEngine | ClaudeCodeEngine | OpenCodeEngine |
-|-----------|-------------|-----------------|----------------------|
-| Spawn method | `child_process.spawn` | `child_process.spawn` | `child_process.spawn` |
-| Parser function | `parseStreamLine()` | `parseClaudeStreamLine()` | `parseOpenCodeStreamLine()` |
-| Skill injection | symlink → `.cursor/skills/` | symlink → `.claude/skills/` + `CLAUDE.md` | symlink → `.opencode/skills/` |
-| Config generation | `.cursor/cli.json` | `CLAUDE.md` | `opencode.json` |
-| API Key injection | `CURSOR_API_KEY` | `ANTHROPIC_API_KEY` | Provider-specific env var |
-| Cold start | Fast (~1s) | Moderate (~2-3s) | Slow (5-10s, HTTP serve mode recommended) |
-| Cost tracking | `duration_ms` | `total_cost_usd` + `num_turns` | `cost` + `tokens` (with cache breakdown) |
+| Dimension | CursorEngine | ClaudeCodeEngine | OpenCodeEngine | CodexEngine |
+|-----------|-------------|-----------------|----------------|-------------|
+| Spawn method | `child_process.spawn` | `child_process.spawn` | `child_process.spawn` | `child_process.spawn` |
+| Parser function | `parseStreamLine()` | `parseClaudeStreamLine()` | `parseOpenCodeStreamLine()` | `parseCodexStreamLine()` |
+| Skill injection | symlink → `.cursor/skills/` | symlink → `.claude/skills/` + `CLAUDE.md` | symlink → `.opencode/skills/` | Embed skills content into `AGENTS.md` at workspace root |
+| Config generation | `.cursor/cli.json` | `CLAUDE.md` | `opencode.json` | `~/.codex/config.toml` (optional) |
+| API Key injection | `CURSOR_API_KEY` | `ANTHROPIC_API_KEY` | Provider-specific env var | `OPENAI_API_KEY` |
+| Session ID source | `done` event `sessionId` field | `done` event `sessionId` field | `done` event `sessionId` field | `thread.started` event `thread_id` field |
+| Cold start | Fast (~1s) | Moderate (~2-3s) | Slow (5-10s, HTTP serve mode recommended) | Moderate (~2-3s) |
+| Cost tracking | `duration_ms` | `total_cost_usd` + `num_turns` | `cost` + `tokens` (with cache breakdown) | `turn.completed` `usage.input_tokens` + `usage.output_tokens` |
