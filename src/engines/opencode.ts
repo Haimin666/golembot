@@ -144,6 +144,20 @@ export async function ensureOpenCodeConfig(workspace: string, model?: string): P
     existing.model = model;
   }
 
+  // Register provider block so OpenCode can authenticate with the chosen provider.
+  // Without this, OpenCode throws ProviderModelNotFoundError even when the env var is set.
+  if (model) {
+    const providerPrefix = model.split('/')[0];
+    const envVar = providerPrefix ? OPENCODE_PROVIDER_ENV[providerPrefix] : undefined;
+    if (envVar) {
+      const providerConfig = (existing.provider ?? {}) as Record<string, unknown>;
+      if (!providerConfig[providerPrefix]) {
+        providerConfig[providerPrefix] = { options: { apiKey: `{env:${envVar}}` } };
+        existing.provider = providerConfig;
+      }
+    }
+  }
+
   await writeFile(configPath, JSON.stringify(existing, null, 2) + '\n', 'utf-8');
 }
 
