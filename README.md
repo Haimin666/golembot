@@ -17,6 +17,10 @@
 
 <p align="center"><strong>Your Coding Agent is trapped in a terminal. GolemBot sets it free.</strong></p>
 
+<p align="center">
+  📖 <a href="https://0xranx.github.io/golembot/"><strong>Documentation & Guides → 0xranx.github.io/golembot</strong></a>
+</p>
+
 ---
 
 Cursor, Claude Code, OpenCode, Codex — these Coding Agents can already write code, run scripts, analyze data, and reason through complex tasks. But they're stuck in an IDE or a terminal window.
@@ -110,12 +114,14 @@ name: my-assistant
 engine: claude-code
 
 channels:
+  slack:
+    botToken: ${SLACK_BOT_TOKEN}
+    appToken: ${SLACK_APP_TOKEN}
+  telegram:
+    botToken: ${TELEGRAM_BOT_TOKEN}
   feishu:
     appId: ${FEISHU_APP_ID}
     appSecret: ${FEISHU_APP_SECRET}
-  dingtalk:
-    clientId: ${DINGTALK_CLIENT_ID}
-    clientSecret: ${DINGTALK_CLIENT_SECRET}
 
 gateway:
   port: 3000
@@ -159,7 +165,7 @@ git clone https://github.com/0xranx/golembot.git
 cd golembot
 pnpm install
 pnpm run build
-pnpm run test          # Unit tests (676+)
+pnpm run test          # Unit tests (716+)
 pnpm run e2e:opencode  # End-to-end tests (OpenCode)
 pnpm run e2e:codex     # End-to-end tests (Codex)
 ```

@@ -17,6 +17,10 @@
 
 <p align="center"><strong>你的 Coding Agent 被困在终端里。GolemBot 把它释放出来。</strong></p>
 
+<p align="center">
+  📖 <a href="https://0xranx.github.io/golembot/"><strong>文档与指南 → 0xranx.github.io/golembot</strong></a>
+</p>
+
 ---
 
 Cursor、Claude Code、OpenCode、Codex —— 这些 Coding Agent 已经能写代码、跑脚本、分析数据、进行复杂推理。但它们被困在 IDE 或终端窗口里。
@@ -110,12 +114,14 @@ name: my-assistant
 engine: claude-code
 
 channels:
+  slack:
+    botToken: ${SLACK_BOT_TOKEN}
+    appToken: ${SLACK_APP_TOKEN}
+  telegram:
+    botToken: ${TELEGRAM_BOT_TOKEN}
   feishu:
     appId: ${FEISHU_APP_ID}
     appSecret: ${FEISHU_APP_SECRET}
-  dingtalk:
-    clientId: ${DINGTALK_CLIENT_ID}
-    clientSecret: ${DINGTALK_CLIENT_SECRET}
 
 gateway:
   port: 3000
@@ -159,7 +165,7 @@ git clone https://github.com/0xranx/golembot.git
 cd golembot
 pnpm install
 pnpm run build
-pnpm run test          # 单元测试 (676+)
+pnpm run test          # 单元测试 (716+)
 pnpm run e2e:opencode  # 端到端测试（OpenCode）
 pnpm run e2e:codex     # 端到端测试（Codex）
 ```
