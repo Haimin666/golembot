@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { createAssistant, type Assistant } from './index.js';
-import { createGolemServer, type ServerOpts } from './server.js';
+import { createGolemServer, type ServerOpts, type GolemServer } from './server.js';
 import { loadConfig, type GolemConfig, type ChannelsConfig } from './workspace.js';
 import { buildSessionKey, stripMention, type ChannelAdapter, type ChannelMessage } from './channel.js';
 
@@ -70,7 +70,13 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
   const config: GolemConfig = await loadConfig(dir);
   const verbose = opts.verbose ?? false;
 
-  const assistant: Assistant = createAssistant({ dir, apiKey: opts.apiKey });
+  const assistant: Assistant = createAssistant({
+    dir,
+    apiKey: opts.apiKey,
+    maxConcurrent: config.maxConcurrent,
+    maxQueuePerSession: config.maxQueuePerSession,
+    timeoutMs: config.timeout ? config.timeout * 1000 : undefined,
+  });
 
   const gatewayConfig = config.gateway || {};
   const port = opts.port ?? gatewayConfig.port ?? 3000;
@@ -78,7 +84,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
   const token = opts.token ?? gatewayConfig.token;
 
   const serverOpts: ServerOpts = { port, token, hostname: host };
-  const httpServer = createGolemServer(assistant, serverOpts);
+  const httpServer: GolemServer = createGolemServer(assistant, serverOpts);
 
   httpServer.listen(port, host, () => {
     const tokenStatus = token ? 'enabled' : 'disabled';
@@ -167,7 +173,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
         // best effort
       }
     }
-    httpServer.close();
+    httpServer.forceClose();
     process.exit(0);
   };
 

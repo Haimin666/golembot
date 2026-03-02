@@ -47,7 +47,7 @@ vi.mock('../engine.js', async (importOriginal) => {
 
 import { createAssistant } from '../index.js';
 import { createEngine } from '../engine.js';
-import { loadSession } from '../session.js';
+import { loadSession, appendHistory } from '../session.js';
 
 const mockedCreateEngine = vi.mocked(createEngine);
 
@@ -332,6 +332,92 @@ describe('createAssistant', () => {
       for await (const _ of assistant.chat('hello')) {}
 
       expect(capturedSkipPermissions).toBeUndefined();
+    });
+  });
+
+  // ── rate limiting ─────────────────────────────────
+
+  describe('rate limiting', () => {
+    it('rejects immediately when maxConcurrent is 0', async () => {
+      const assistant = createAssistant({ dir, maxConcurrent: 0, timeoutMs: 5000 });
+      const events: StreamEvent[] = [];
+      for await (const evt of assistant.chat('hello')) events.push(evt);
+      expect(events[0]).toMatchObject({ type: 'error', message: /too many concurrent/i });
+    });
+
+    it('rejects per-session queue when maxQueuePerSession is 0 and session is busy', async () => {
+      // Slow engine: holds the session lock for 200ms
+      mockedCreateEngine.mockReturnValue({
+        async *invoke() {
+          await new Promise(r => setTimeout(r, 200));
+          yield { type: 'done', sessionId: 'slow' } as StreamEvent;
+        },
+      });
+
+      const assistant = createAssistant({ dir, maxQueuePerSession: 0, maxConcurrent: 10, timeoutMs: 5000 });
+
+      // Start A (slow) — don't await yet
+      const aEvents: StreamEvent[] = [];
+      const aPromise = (async () => {
+        for await (const evt of assistant.chat('A', { sessionKey: 'k' })) aEvents.push(evt);
+      })();
+
+      // Give A a moment to acquire the mutex
+      await new Promise(r => setTimeout(r, 20));
+
+      // B should be rejected because queue is full (maxQueuePerSession=0)
+      const bEvents: StreamEvent[] = [];
+      for await (const evt of assistant.chat('B', { sessionKey: 'k' })) bEvents.push(evt);
+
+      expect(bEvents[0]).toMatchObject({ type: 'error', message: /too many pending/i });
+
+      await aPromise;
+      expect(aEvents.some(e => e.type === 'done')).toBe(true);
+    });
+  });
+
+  // ── timeout ───────────────────────────────────────
+
+  describe('timeout', () => {
+    it('aborts engine and yields error when timeoutMs is exceeded', async () => {
+      mockedCreateEngine.mockReturnValue({
+        async *invoke(_p: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
+          // Hang until abort signal fires
+          await new Promise<void>(resolve => {
+            if (opts.signal?.aborted) return resolve();
+            opts.signal?.addEventListener('abort', () => resolve(), { once: true });
+          });
+          yield { type: 'error', message: 'Agent invocation timed out' };
+        },
+      });
+
+      const assistant = createAssistant({ dir, timeoutMs: 50 });
+      const events: StreamEvent[] = [];
+      for await (const evt of assistant.chat('slow task')) events.push(evt);
+
+      expect(events.some(e => e.type === 'error' && e.message.includes('timed out'))).toBe(true);
+    }, 5000);
+  });
+
+  // ── conversation history ───────────────────────────
+
+  describe('conversation history', () => {
+    it('writes user and assistant entries to history.jsonl', async () => {
+      mockedCreateEngine.mockReturnValue({
+        async *invoke() {
+          yield { type: 'text', content: 'world' } as StreamEvent;
+          yield { type: 'done', sessionId: 'h-sess', durationMs: 100, costUsd: 0.005 } as StreamEvent;
+        },
+      });
+
+      const assistant = createAssistant({ dir, timeoutMs: 5000 });
+      for await (const _ of assistant.chat('hello', { sessionKey: 'hist-key' })) {}
+
+      const raw = await readFile(join(dir, '.golem', 'history.jsonl'), 'utf-8');
+      const lines = raw.trim().split('\n').map(l => JSON.parse(l));
+
+      expect(lines[0]).toMatchObject({ role: 'user', content: 'hello', sessionKey: 'hist-key' });
+      expect(lines[1]).toMatchObject({ role: 'assistant', content: 'world', durationMs: 100, costUsd: 0.005 });
     });
   });
 

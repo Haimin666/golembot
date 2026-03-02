@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { loadSession, saveSession, clearSession } from '../session.js';
+import { loadSession, saveSession, clearSession, pruneExpiredSessions, appendHistory } from '../session.js';
 
 describe('session', () => {
   let dir: string;
@@ -105,6 +105,69 @@ describe('session', () => {
       await clearSession(dir);
       expect(await loadSession(dir)).toBeUndefined();
       expect(await loadSession(dir, 'named')).toBe('named-sess');
+    });
+  });
+
+  describe('lastUsed timestamp', () => {
+    it('saveSession records lastUsed', async () => {
+      const before = Date.now();
+      await saveSession(dir, 'ts-sess');
+      const after = Date.now();
+
+      const raw = JSON.parse(await readFile(join(dir, '.golem', 'sessions.json'), 'utf-8'));
+      const entry = raw['default'];
+      expect(entry.lastUsed).toBeGreaterThanOrEqual(before);
+      expect(entry.lastUsed).toBeLessThanOrEqual(after);
+    });
+  });
+
+  describe('pruneExpiredSessions', () => {
+    it('removes sessions older than maxAgeDays', async () => {
+      const longAgo = Date.now() - 31 * 24 * 60 * 60 * 1000; // 31 days ago
+      const store = {
+        old: { engineSessionId: 'old-sess', lastUsed: longAgo },
+        fresh: { engineSessionId: 'fresh-sess', lastUsed: Date.now() },
+      };
+      await mkdir(join(dir, '.golem'), { recursive: true });
+      await writeFile(join(dir, '.golem', 'sessions.json'), JSON.stringify(store) + '\n');
+
+      await pruneExpiredSessions(dir, 30);
+
+      expect(await loadSession(dir, 'old')).toBeUndefined();
+      expect(await loadSession(dir, 'fresh')).toBe('fresh-sess');
+    });
+
+    it('keeps sessions without lastUsed (legacy)', async () => {
+      const store = { legacy: { engineSessionId: 'leg-sess' } };
+      await mkdir(join(dir, '.golem'), { recursive: true });
+      await writeFile(join(dir, '.golem', 'sessions.json'), JSON.stringify(store) + '\n');
+
+      await pruneExpiredSessions(dir, 1);
+
+      expect(await loadSession(dir, 'legacy')).toBe('leg-sess');
+    });
+
+    it('no-ops when no sessions file exists', async () => {
+      await expect(pruneExpiredSessions(dir, 30)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('appendHistory', () => {
+    it('appends user and assistant entries as JSONL', async () => {
+      await appendHistory(dir, { ts: '2026-01-01T00:00:00Z', sessionKey: 'k', role: 'user', content: 'hi' });
+      await appendHistory(dir, { ts: '2026-01-01T00:00:01Z', sessionKey: 'k', role: 'assistant', content: 'hello', durationMs: 500, costUsd: 0.01 });
+
+      const raw = await readFile(join(dir, '.golem', 'history.jsonl'), 'utf-8');
+      const lines = raw.trim().split('\n').map(l => JSON.parse(l));
+      expect(lines).toHaveLength(2);
+      expect(lines[0]).toEqual({ ts: '2026-01-01T00:00:00Z', sessionKey: 'k', role: 'user', content: 'hi' });
+      expect(lines[1]).toMatchObject({ role: 'assistant', content: 'hello', durationMs: 500, costUsd: 0.01 });
+    });
+
+    it('creates .golem dir if missing', async () => {
+      await appendHistory(dir, { ts: 'ts', sessionKey: 'k', role: 'user', content: 'test' });
+      const raw = await readFile(join(dir, '.golem', 'history.jsonl'), 'utf-8');
+      expect(raw).toContain('test');
     });
   });
 

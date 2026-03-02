@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import http from 'node:http';
 import type { StreamEvent, InvokeOpts } from '../engine.js';
+import type { GolemServer } from '../server.js';
+import { createEngine } from '../engine.js';
 
 vi.mock('../engine.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../engine.js')>();
@@ -46,7 +48,7 @@ function request(
 
 describe('Golem HTTP Server', () => {
   let dir: string;
-  let server: http.Server;
+  let server: GolemServer;
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), 'golem-test-server-'));
@@ -191,5 +193,46 @@ describe('Golem HTTP Server', () => {
       expect(res.status).toBe(204);
       expect(res.headers['access-control-allow-origin']).toBe('*');
     });
+  });
+
+  describe('forceClose', () => {
+    it('closes active SSE connections with shutdown error event', async () => {
+      // Use a slow engine so the SSE connection stays open
+      vi.mocked(createEngine).mockReturnValue({
+        async *invoke(): AsyncIterable<StreamEvent> {
+          await new Promise(r => setTimeout(r, 2000)); // hang
+          yield { type: 'done', sessionId: 's' };
+        },
+      } as any);
+
+      await startServer();
+      const addr = server.address() as { port: number };
+
+      // Collect SSE data without waiting for the connection to close
+      const received: string[] = [];
+      const connectionClosed = new Promise<void>((resolve) => {
+        const req = http.request(
+          { hostname: '127.0.0.1', port: addr.port, path: '/chat', method: 'POST', headers: { 'Content-Type': 'application/json' } },
+          (res) => {
+            res.on('data', (chunk: Buffer) => received.push(chunk.toString()));
+            res.on('end', resolve);
+          },
+        );
+        req.write(JSON.stringify({ message: 'slow' }));
+        req.end();
+      });
+
+      // Give the SSE connection time to be established
+      await new Promise(r => setTimeout(r, 50));
+
+      // Force close all connections
+      server.forceClose();
+
+      await connectionClosed;
+
+      const combined = received.join('');
+      expect(combined).toContain('"type":"error"');
+      expect(combined).toContain('shutting down');
+    }, 5000);
   });
 });

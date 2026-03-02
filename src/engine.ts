@@ -19,6 +19,7 @@ export interface InvokeOpts {
   model?: string;
   apiKey?: string;
   skipPermissions?: boolean;
+  signal?: AbortSignal;
 }
 
 export interface AgentEngine {
@@ -245,6 +246,16 @@ export class CursorEngine implements AgentEngine {
 
         enqueue(evt);
       }
+    }
+
+    if (opts.signal) {
+      const abortHandler = () => {
+        try { child.kill(); } catch { /* already dead */ }
+        enqueue({ type: 'error', message: 'Agent invocation timed out' });
+        enqueue(null);
+      };
+      opts.signal.addEventListener('abort', abortHandler, { once: true });
+      child.once('close', () => opts.signal!.removeEventListener('abort', abortHandler));
     }
 
     child.stdout!.on('data', (chunk: Buffer) => {
@@ -490,6 +501,16 @@ export class ClaudeCodeEngine implements AgentEngine {
       }
     }
 
+    if (opts.signal) {
+      const abortHandler = () => {
+        try { child.kill(); } catch { /* already dead */ }
+        enqueue({ type: 'error', message: 'Agent invocation timed out' });
+        enqueue(null);
+      };
+      opts.signal.addEventListener('abort', abortHandler, { once: true });
+      child.once('close', () => opts.signal!.removeEventListener('abort', abortHandler));
+    }
+
     child.stdout!.on('data', (chunk: Buffer) => {
       buffer += chunk.toString();
       processBuffer();
@@ -718,6 +739,16 @@ export class OpenCodeEngine implements AgentEngine {
     let resolver: (() => void) | null = null;
     let buffer = '';
     let stderrChunks: string[] = [];
+
+    if (opts.signal) {
+      const abortHandler = () => {
+        try { child.kill(); } catch { /* already dead */ }
+        enqueue({ type: 'error', message: 'Agent invocation timed out' });
+        enqueue(null);
+      };
+      opts.signal.addEventListener('abort', abortHandler, { once: true });
+      child.once('close', () => opts.signal!.removeEventListener('abort', abortHandler));
+    }
     // OpenCode emits step_finish per step; accumulate cost and session from done events,
     // yield text/tool events as they arrive, and produce a single final done on process close.
     let lastSessionId: string | undefined;

@@ -40,6 +40,14 @@ export interface GolemConfig {
   skipPermissions?: boolean;
   channels?: ChannelsConfig;
   gateway?: GatewayConfig;
+  /** Agent invocation timeout in seconds. Default: 300 (5 minutes). */
+  timeout?: number;
+  /** Maximum concurrent Agent invocations across all sessions. Default: 10. */
+  maxConcurrent?: number;
+  /** Maximum queued requests per session key. Default: 3. */
+  maxQueuePerSession?: number;
+  /** Days before inactive sessions are pruned. Default: 30. */
+  sessionTtlDays?: number;
 }
 
 export interface SkillInfo {
@@ -94,6 +102,10 @@ export async function loadConfig(dir: string): Promise<GolemConfig> {
   if (doc.gateway && typeof doc.gateway === 'object') {
     config.gateway = resolveEnvPlaceholders(doc.gateway as GatewayConfig);
   }
+  if (typeof doc.timeout === 'number') config.timeout = doc.timeout;
+  if (typeof doc.maxConcurrent === 'number') config.maxConcurrent = doc.maxConcurrent;
+  if (typeof doc.maxQueuePerSession === 'number') config.maxQueuePerSession = doc.maxQueuePerSession;
+  if (typeof doc.sessionTtlDays === 'number') config.sessionTtlDays = doc.sessionTtlDays;
 
   return config;
 }

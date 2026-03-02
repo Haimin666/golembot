@@ -1,10 +1,17 @@
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import type { Server as HttpServer } from 'node:http';
 import type { Assistant } from './index.js';
 
 export interface ServerOpts {
   port?: number;
   token?: string;
   hostname?: string;
+}
+
+/** http.Server extended with a forceClose() method for clean shutdown. */
+export interface GolemServer extends HttpServer {
+  /** Close all active SSE connections and stop the server. */
+  forceClose(): void;
 }
 
 function readBody(req: IncomingMessage): Promise<string> {
@@ -27,8 +34,9 @@ function checkAuth(req: IncomingMessage, token: string | undefined): boolean {
   return auth === `Bearer ${token}`;
 }
 
-export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}) {
+export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}): GolemServer {
   const token = opts.token || process.env.GOLEM_TOKEN;
+  const activeConnections = new Set<ServerResponse>();
 
   const server = createHttpServer(async (req, res) => {
     // CORS
@@ -73,6 +81,9 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}) {
         'Connection': 'keep-alive',
       });
 
+      activeConnections.add(res);
+      res.on('close', () => activeConnections.delete(res));
+
       try {
         for await (const event of assistant.chat(body.message, { sessionKey: body.sessionKey })) {
           res.write(`data: ${JSON.stringify(event)}\n\n`);
@@ -82,6 +93,7 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}) {
         res.write(`data: ${JSON.stringify(errEvent)}\n\n`);
       }
 
+      activeConnections.delete(res);
       res.end();
       return;
     }
@@ -104,7 +116,18 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}) {
 
     // 404
     json(res, 404, { error: 'Not found' });
-  });
+  }) as GolemServer;
+
+  server.forceClose = () => {
+    for (const res of activeConnections) {
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'Server shutting down' })}\n\n`);
+        res.end();
+      } catch { /* best effort */ }
+    }
+    activeConnections.clear();
+    server.close();
+  };
 
   return server;
 }

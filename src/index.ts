@@ -1,11 +1,11 @@
 import { resolve } from 'node:path';
 import { ensureReady, initWorkspace, type GolemConfig, type SkillInfo } from './workspace.js';
-import { loadSession, saveSession, clearSession } from './session.js';
+import { loadSession, saveSession, clearSession, pruneExpiredSessions, appendHistory } from './session.js';
 import { createEngine, type StreamEvent, type AgentEngine } from './engine.js';
 
 export type { StreamEvent } from './engine.js';
 export type { GolemConfig, SkillInfo, ChannelsConfig, GatewayConfig, FeishuChannelConfig, DingtalkChannelConfig, WecomChannelConfig } from './workspace.js';
-export { createGolemServer, startServer, type ServerOpts } from './server.js';
+export { createGolemServer, startServer, type ServerOpts, type GolemServer } from './server.js';
 export type { ChannelAdapter, ChannelMessage } from './channel.js';
 export { buildSessionKey, stripMention } from './channel.js';
 export { startGateway } from './gateway.js';
@@ -31,6 +31,22 @@ class KeyedMutex {
       return Promise.resolve();
     }
     return new Promise<void>(r => e.queue.push(r));
+  }
+
+  /**
+   * Try to acquire the lock. Returns false immediately if the pending queue
+   * already has `maxPending` waiters (not counting the currently running one).
+   */
+  tryAcquire(key: string, maxPending: number): Promise<boolean> {
+    const e = this._entry(key);
+    if (!e.locked) {
+      e.locked = true;
+      return Promise.resolve(true);
+    }
+    if (e.queue.length >= maxPending) {
+      return Promise.resolve(false);
+    }
+    return new Promise<boolean>(r => e.queue.push(() => r(true)));
   }
 
   release(key: string): void {
@@ -63,6 +79,12 @@ export interface CreateAssistantOpts {
   engine?: string;
   model?: string;
   apiKey?: string;
+  /** Max concurrent Agent invocations (overrides golem.yaml). Default: 10. */
+  maxConcurrent?: number;
+  /** Max queued requests per session key (overrides golem.yaml). Default: 3. */
+  maxQueuePerSession?: number;
+  /** Agent invocation timeout in ms (overrides golem.yaml timeout field). Default: 300000. */
+  timeoutMs?: number;
 }
 
 const DEFAULT_SESSION_KEY = 'default';
@@ -73,6 +95,17 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
   let engineOverride = opts.engine;
   let modelOverride = opts.model;
   const apiKey = opts.apiKey;
+
+  // Concurrency limits — resolved from opts, then config, then hardcoded defaults
+  const maxConcurrentOpt = opts.maxConcurrent;
+  const maxQueuePerSessionOpt = opts.maxQueuePerSession;
+  const timeoutMsOpt = opts.timeoutMs;
+
+  // Global concurrency counter (across all sessions for this assistant instance)
+  let activeChatCount = 0;
+
+  // Prune expired sessions once per process lifetime per assistant instance
+  let pruneDone = false;
 
   async function* doChat(
     message: string,
@@ -88,27 +121,67 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     const sessionId = await loadSession(dir, sessionKey);
     const skillPaths = skills.map(s => s.path);
 
+    // Prune once per process
+    if (!pruneDone) {
+      pruneDone = true;
+      pruneExpiredSessions(dir, config.sessionTtlDays ?? 30).catch(() => {});
+    }
+
+    // Timeout via AbortController
+    const timeoutMs = timeoutMsOpt ?? (config.timeout ? config.timeout * 1000 : 300_000);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    // Write user turn to history
+    await appendHistory(dir, {
+      ts: new Date().toISOString(),
+      sessionKey,
+      role: 'user',
+      content: message,
+    }).catch(() => {});
+
     let lastSessionId: string | undefined;
     let gotError = false;
     let errorMessage = '';
+    let fullReply = '';
+    let doneEvt: Extract<StreamEvent, { type: 'done' }> | undefined;
 
-    for await (const event of engine.invoke(message, {
-      workspace: dir,
-      skillPaths,
-      sessionId,
-      model,
-      apiKey,
-      skipPermissions: config.skipPermissions,
-    })) {
-      if (event.type === 'done' && event.sessionId) {
-        lastSessionId = event.sessionId;
+    try {
+      for await (const event of engine.invoke(message, {
+        workspace: dir,
+        skillPaths,
+        sessionId,
+        model,
+        apiKey,
+        skipPermissions: config.skipPermissions,
+        signal: controller.signal,
+      })) {
+        if (event.type === 'done') {
+          if (event.sessionId) lastSessionId = event.sessionId;
+          doneEvt = event;
+        }
+        if (event.type === 'error') {
+          gotError = true;
+          errorMessage = event.message;
+        }
+        if (event.type === 'text') {
+          fullReply += event.content;
+        }
+        yield event;
       }
-      if (event.type === 'error') {
-        gotError = true;
-        errorMessage = event.message;
-      }
-      yield event;
+    } finally {
+      clearTimeout(timer);
     }
+
+    // Write assistant turn to history (even partial on timeout)
+    await appendHistory(dir, {
+      ts: new Date().toISOString(),
+      sessionKey,
+      role: 'assistant',
+      content: fullReply,
+      durationMs: doneEvt?.durationMs,
+      costUsd: doneEvt?.costUsd,
+    }).catch(() => {});
 
     if (lastSessionId) {
       await saveSession(dir, lastSessionId, sessionKey);
@@ -127,10 +200,29 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
   }
 
   async function* chatImpl(message: string, sessionKey: string): AsyncIterable<StreamEvent> {
-    await mutex.acquire(sessionKey);
+    // Rate limits use opts values directly — no file I/O before acquiring the mutex,
+    // so same-key serialization order is preserved (first caller wins the lock).
+    const maxConcurrent = maxConcurrentOpt ?? 10;
+    const maxQueuePerSession = maxQueuePerSessionOpt ?? 3;
+
+    // Global concurrency check (soft — sufficient to prevent overload)
+    if (activeChatCount >= maxConcurrent) {
+      yield { type: 'error', message: `Server busy: too many concurrent requests (limit: ${maxConcurrent}). Try again later.` };
+      return;
+    }
+
+    // Per-session queue limit — synchronous path taken before any await
+    const acquired = await mutex.tryAcquire(sessionKey, maxQueuePerSession);
+    if (!acquired) {
+      yield { type: 'error', message: `Too many pending requests for this session (limit: ${maxQueuePerSession}). Try again later.` };
+      return;
+    }
+
+    activeChatCount++;
     try {
       yield* doChat(message, sessionKey, false);
     } finally {
+      activeChatCount--;
       mutex.release(sessionKey);
     }
   }
