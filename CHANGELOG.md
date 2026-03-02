@@ -1,3 +1,10 @@
+# [0.5.0](https://github.com/0xranx/golembot/compare/v0.4.0...v0.5.0) (2026-03-02)
+
+
+### Features
+
+* **channels:** add Slack and Telegram channel adapters ([8aa5de5](https://github.com/0xranx/golembot/commit/8aa5de5d07677e2682635451778a563421d0e53c))
+
 # [0.4.0](https://github.com/0xranx/golembot/compare/v0.3.0...v0.4.0) (2026-03-02)
 
 
