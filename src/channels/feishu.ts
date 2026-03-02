@@ -28,20 +28,48 @@ export class FeishuAdapter implements ChannelAdapter {
 
     this.client = new lark.Client(baseConfig);
 
+    // Fetch the bot's own open_id so we can filter @mentions in group chats.
+    let botOpenId: string | undefined;
+    try {
+      const botInfo = await this.client.bot.v3.botInfo.get({});
+      botOpenId = (botInfo as any).data?.bot?.open_id;
+    } catch {
+      console.warn('[feishu] Could not fetch bot open_id; group messages will be ignored');
+    }
+
     const eventDispatcher = new lark.EventDispatcher({}).register({
       'im.message.receive_v1': async (data: any) => {
         const { message, sender } = data;
 
         if (message.message_type !== 'text') return;
 
-        let text = '';
+        let content: { text: string; mentions?: Array<{ key: string; id: { open_id: string } }> };
         try {
-          text = JSON.parse(message.content).text;
+          content = JSON.parse(message.content);
         } catch {
           return;
         }
 
         const chatType: 'dm' | 'group' = message.chat_type === 'p2p' ? 'dm' : 'group';
+
+        // In group chats, only respond when the bot is @mentioned.
+        if (chatType === 'group') {
+          if (!botOpenId) return;
+          const isMentioned = content.mentions?.some(m => m.id?.open_id === botOpenId) ?? false;
+          if (!isMentioned) return;
+        }
+
+        // Strip the bot's @mention key from the text before passing to the assistant.
+        let text = content.text || '';
+        if (chatType === 'group' && content.mentions?.length) {
+          for (const m of content.mentions) {
+            if (m.id?.open_id === botOpenId) {
+              text = text.replace(m.key, '').trim();
+            }
+          }
+        }
+
+        if (!text) return;
 
         const channelMsg: ChannelMessage = {
           channelType: 'feishu',
