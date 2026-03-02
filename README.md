@@ -21,7 +21,7 @@
 
 Cursor, Claude Code, OpenCode, Codex — these Coding Agents can already write code, run scripts, analyze data, and reason through complex tasks. But they're stuck in an IDE or a terminal window.
 
-**GolemBot gives them a body.** One command connects your Coding Agent to Feishu, DingTalk, WeCom, or any HTTP client. Or embed it into your own product with 5 lines of code. No AI framework, no prompt engineering — the agent you already have *is* the brain.
+**GolemBot gives them a body.** One command connects your Coding Agent to Slack, Telegram, Feishu, DingTalk, WeCom, or any HTTP client. Or embed it into your own product with 5 lines of code. No AI framework, no prompt engineering — the agent you already have *is* the brain.
 
 ## Run Your Coding Agent Everywhere
 
@@ -29,7 +29,7 @@ Cursor, Claude Code, OpenCode, Codex — these Coding Agents can already write c
 
 ```bash
 golembot init -e claude-code -n my-bot
-golembot gateway    # connects to Feishu / DingTalk / WeCom
+golembot gateway    # Slack, Telegram, Feishu, DingTalk, WeCom
 ```
 
 Your colleagues @ the bot in group chat. It can write code, analyze files, answer questions — because behind it is a real Coding Agent, not a thin API wrapper.
@@ -74,21 +74,21 @@ golembot gateway      # start IM + HTTP service
 ## Architecture
 
 ```
-Feishu / DingTalk / WeCom / HTTP API
-         │
-         ▼
-┌─────────────────────────┐
-│     Gateway Service     │
-│  (Channel adapters +    │
-│   HTTP service)         │
-└────────────┬────────────┘
-             │
-     createAssistant()
-             │
-     ┌───────┼───────┬───────┐
-     ▼       ▼       ▼       ▼
-  Cursor  Claude  OpenCode  Codex
-          Code
+Slack / Telegram / Feishu / DingTalk / WeCom / HTTP API
+                    │
+                    ▼
+         ┌─────────────────────────┐
+         │     Gateway Service     │
+         │  (Channel adapters +    │
+         │   HTTP service)         │
+         └────────────┬────────────┘
+                      │
+              createAssistant()
+                      │
+          ┌───────┬───────┬───────┐
+          ▼       ▼       ▼       ▼
+       Cursor  Claude  OpenCode  Codex
+               Code
 ```
 
 ## Engine Comparison

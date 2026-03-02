@@ -25,7 +25,7 @@ features:
   - icon:
       src: /icons/plug.svg
     title: Connect Anywhere
-    details: One command for IM channels (Feishu, DingTalk, WeCom) or HTTP. Or import as a library and embed in Express, Next.js, or any Node.js app — 5 lines of code, no AI framework required.
+    details: One command for IM channels (Slack, Telegram, Feishu, DingTalk, WeCom) or HTTP. Or import as a library and embed in Express, Next.js, or any Node.js app — 5 lines of code, no AI framework required.
   - icon:
       src: /icons/folder.svg
     title: Directory Is the Assistant
@@ -90,9 +90,19 @@ Switch engines by changing one line in `golem.yaml` — the [StreamEvent](/api/s
 
 ## IM Channels
 
-Connect to your team's chat platform — no public IP needed for Feishu and DingTalk.
+Connect to your team's chat platform — no public URL needed for any channel.
 
 <div class="channels-grid">
+  <div class="channel-card">
+    <img class="channel-icon" src="/icons/slack.svg" alt="Slack" />
+    <div class="channel-name">Slack</div>
+    <div class="channel-transport">Socket Mode</div>
+  </div>
+  <div class="channel-card">
+    <img class="channel-icon" src="/icons/telegram.svg" alt="Telegram" />
+    <div class="channel-name">Telegram</div>
+    <div class="channel-transport">Long-Polling</div>
+  </div>
   <div class="channel-card">
     <img class="channel-icon" src="/icons/feishu.svg" alt="Feishu" />
     <div class="channel-name">Feishu (Lark)</div>
@@ -143,7 +153,7 @@ Connect to your team's chat platform — no public IP needed for Feishu and Ding
 }
 
 .channels-grid {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .engine-card,

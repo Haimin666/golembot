@@ -25,7 +25,7 @@ features:
   - icon:
       src: /icons/plug.svg
     title: 随处接入
-    details: 一条命令接入飞书、钉钉、企业微信或 HTTP。也可作为库导入，嵌入 Express、Next.js 或任何 Node.js 应用 — 5 行代码，无需 AI 框架。
+    details: 一条命令接入 Slack、Telegram、飞书、钉钉、企业微信或 HTTP。也可作为库导入，嵌入 Express、Next.js 或任何 Node.js 应用 — 5 行代码，无需 AI 框架。
   - icon:
       src: /icons/folder.svg
     title: 目录即助手
@@ -90,9 +90,19 @@ for await (const ev of bot.chat('分析上个月的销售数据'))
 
 ## IM 通道
 
-接入团队的聊天平台 — 飞书和钉钉无需公网 IP。
+接入团队的聊天平台 — 所有通道均无需公网 URL。
 
 <div class="channels-grid">
+  <div class="channel-card">
+    <img class="channel-icon" src="/icons/slack.svg" alt="Slack" />
+    <div class="channel-name">Slack</div>
+    <div class="channel-transport">Socket Mode</div>
+  </div>
+  <div class="channel-card">
+    <img class="channel-icon" src="/icons/telegram.svg" alt="Telegram" />
+    <div class="channel-name">Telegram</div>
+    <div class="channel-transport">长轮询</div>
+  </div>
   <div class="channel-card">
     <img class="channel-icon" src="/icons/feishu.svg" alt="飞书" />
     <div class="channel-name">飞书</div>
@@ -143,7 +153,7 @@ for await (const ev of bot.chat('分析上个月的销售数据'))
 }
 
 .channels-grid {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .engine-card,
