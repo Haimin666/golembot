@@ -888,13 +888,19 @@ export function parseCodexStreamLine(
     const itemType = item.type as string | undefined;
 
     if (itemType === 'agent_message') {
+      // Primary format: item.text (direct string, as shown in Codex CLI --json output)
+      const directText = item.text as string | undefined;
+      if (directText) return [{ type: 'text', content: directText }];
+
+      // Fallback: item.content[] content blocks (OpenAI API-style format)
       const content = item.content as Array<Record<string, unknown>> | undefined;
-      if (!Array.isArray(content)) return [];
-      const text = content
-        .filter(b => b.type === 'output_text')
-        .map(b => (b.text as string) || '')
-        .join('');
-      if (text) return [{ type: 'text', content: text }];
+      if (Array.isArray(content)) {
+        const text = content
+          .filter(b => b.type === 'output_text')
+          .map(b => (b.text as string) || '')
+          .join('');
+        if (text) return [{ type: 'text', content: text }];
+      }
       return [];
     }
 

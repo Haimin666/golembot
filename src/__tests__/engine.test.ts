@@ -1231,14 +1231,16 @@ const CODEX_SAMPLES = {
     thread_id: 'thread_abc123',
   }),
 
+  // Primary format: item.text (documented Codex CLI --json output)
   agentMessage: JSON.stringify({
     type: 'item.completed',
     item: {
       type: 'agent_message',
-      content: [{ type: 'output_text', text: 'Hello! I can help you.' }],
+      text: 'Hello! I can help you.',
     },
   }),
 
+  // Fallback format: item.content[] content blocks (OpenAI API-style)
   agentMessageMultiBlock: JSON.stringify({
     type: 'item.completed',
     item: {
@@ -1254,7 +1256,6 @@ const CODEX_SAMPLES = {
     type: 'item.completed',
     item: {
       type: 'agent_message',
-      content: [],
     },
   }),
 
@@ -1323,13 +1324,13 @@ describe('parseCodexStreamLine', () => {
     expect(events).toEqual([{ type: 'text', content: 'Hello! I can help you.' }]);
   });
 
-  it('agent_message with multiple content blocks — concatenates text', () => {
+  it('agent_message with content array (fallback format) — concatenates text', () => {
     const state: { threadId?: string } = {};
     const events = parseCodexStreamLine(CODEX_SAMPLES.agentMessageMultiBlock, state);
     expect(events).toEqual([{ type: 'text', content: 'First part. Second part.' }]);
   });
 
-  it('agent_message with empty content — returns []', () => {
+  it('agent_message with no text and no content — returns []', () => {
     const state: { threadId?: string } = {};
     const events = parseCodexStreamLine(CODEX_SAMPLES.agentMessageEmpty, state);
     expect(events).toEqual([]);

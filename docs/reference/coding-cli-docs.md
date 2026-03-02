@@ -1126,10 +1126,13 @@ Spawn with `stdio: ['pipe', 'pipe', 'pipe']` and consume stdout/stderr independe
 #### GolemBot Parsing Strategy
 
 ```
-thread.started  → extract thread_id → save as sessionId
+thread.started  → extract thread_id → save as sessionId (do not yield)
 item.completed + item.type === "agent_message" → yield { type: 'text', content: item.text }
+  (fallback: item.content[].output_text concatenated, for OpenAI API-style format)
 item.completed + item.type === "command_execution" → yield { type: 'tool_call', name: item.command, args: '' }
-turn.completed  → yield { type: 'done', sessionId, costUsd (from usage tokens * rate) }
+  + (if item.output exists) yield { type: 'tool_result', content: item.output }
+turn.completed  → yield { type: 'done', sessionId }
+  Note: Codex does not provide per-request cost; costUsd is not emitted.
 turn.failed / error → yield { type: 'error', message: ... }
 ```
 
