@@ -6,7 +6,7 @@ GolemBot 使用一个配置文件：助手目录根目录下的 `golem.yaml`。
 
 ```yaml
 name: my-assistant
-engine: claude-code          # cursor | claude-code | opencode
+engine: claude-code          # cursor | claude-code | opencode | codex
 model: claude-sonnet         # 可选，首选模型
 
 # 可选：跳过 Agent 权限确认
@@ -48,7 +48,7 @@ gateway:
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `name` | `string` | 助手名称 |
-| `engine` | `string` | 引擎类型：`cursor`、`claude-code` 或 `opencode` |
+| `engine` | `string` | 引擎类型：`cursor`、`claude-code`、`opencode` 或 `codex` |
 
 ### 可选
 
@@ -112,6 +112,7 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxx
 | `cursor` | Cursor 模型名称 | `claude-sonnet-4-5` | Cursor → Settings → Models |
 | `claude-code` | Anthropic model ID | `claude-sonnet-4-6` | `claude models` |
 | `opencode` | `provider/model` | `anthropic/claude-sonnet-4-5` | `opencode models` |
+| `codex` | OpenAI 模型名称 | `codex-mini-latest` | `codex models` |
 
 详见各引擎页面中的完整模型表格和运行时覆盖用法。
 

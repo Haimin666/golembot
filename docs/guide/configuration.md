@@ -6,7 +6,7 @@ GolemBot uses a single configuration file: `golem.yaml` in the assistant directo
 
 ```yaml
 name: my-assistant
-engine: claude-code          # cursor | claude-code | opencode
+engine: claude-code          # cursor | claude-code | opencode | codex
 model: claude-sonnet         # optional, preferred model
 
 # Optional: bypass agent permission prompts
@@ -48,7 +48,7 @@ gateway:
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | `string` | Assistant name |
-| `engine` | `string` | Engine type: `cursor`, `claude-code`, or `opencode` |
+| `engine` | `string` | Engine type: `cursor`, `claude-code`, `opencode`, or `codex` |
 
 ### Optional
 
@@ -112,6 +112,7 @@ The `model` value format is different for each engine:
 | `cursor` | Cursor model name | `claude-sonnet-4-5` | Cursor → Settings → Models |
 | `claude-code` | Anthropic model ID | `claude-sonnet-4-6` | `claude models` |
 | `opencode` | `provider/model` | `anthropic/claude-sonnet-4-5` | `opencode models` |
+| `codex` | OpenAI model name | `codex-mini-latest` | `codex models` |
 
 See the individual engine pages for full model tables and runtime override syntax.
 

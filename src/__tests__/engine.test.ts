@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, readlink, readdir, mkdir, writeFile, readFile, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { parseStreamLine, stripAnsi, injectSkills, parseClaudeStreamLine, injectClaudeSkills, parseOpenCodeStreamLine, resolveOpenCodeEnv, injectOpenCodeSkills, ensureOpenCodeConfig, createEngine, CursorEngine, ClaudeCodeEngine, OpenCodeEngine } from '../engine.js';
+import { parseStreamLine, stripAnsi, injectSkills, parseClaudeStreamLine, injectClaudeSkills, parseOpenCodeStreamLine, resolveOpenCodeEnv, injectOpenCodeSkills, ensureOpenCodeConfig, parseCodexStreamLine, injectCodexSkills, createEngine, CursorEngine, ClaudeCodeEngine, OpenCodeEngine, CodexEngine } from '../engine.js';
 import type { StreamEvent } from '../engine.js';
 
 // ═══════════════════════════════════════════════════════
@@ -778,6 +778,10 @@ describe('createEngine', () => {
     expect(createEngine('opencode')).toBeInstanceOf(OpenCodeEngine);
   });
 
+  it('codex → CodexEngine', () => {
+    expect(createEngine('codex')).toBeInstanceOf(CodexEngine);
+  });
+
   it('unknown engine → throws', () => {
     expect(() => createEngine('gpt')).toThrow(/Unsupported engine/);
   });
@@ -1214,5 +1218,245 @@ describe('ensureOpenCodeConfig', () => {
     const raw = await readFile(join(workspace, 'opencode.json'), 'utf-8');
     const config = JSON.parse(raw);
     expect(config.model).toEqual({ default: 'anthropic/claude-sonnet-4-5' });
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// Codex stream-json samples
+// ═══════════════════════════════════════════════════════
+
+const CODEX_SAMPLES = {
+  threadStarted: JSON.stringify({
+    type: 'thread.started',
+    thread_id: 'thread_abc123',
+  }),
+
+  agentMessage: JSON.stringify({
+    type: 'item.completed',
+    item: {
+      type: 'agent_message',
+      content: [{ type: 'output_text', text: 'Hello! I can help you.' }],
+    },
+  }),
+
+  agentMessageMultiBlock: JSON.stringify({
+    type: 'item.completed',
+    item: {
+      type: 'agent_message',
+      content: [
+        { type: 'output_text', text: 'First part. ' },
+        { type: 'output_text', text: 'Second part.' },
+      ],
+    },
+  }),
+
+  agentMessageEmpty: JSON.stringify({
+    type: 'item.completed',
+    item: {
+      type: 'agent_message',
+      content: [],
+    },
+  }),
+
+  commandExecution: JSON.stringify({
+    type: 'item.completed',
+    item: {
+      type: 'command_execution',
+      command: 'ls -la',
+      output: 'total 32\ndrwxr-xr-x  8 user user 4096 Jan 1 00:00 .',
+    },
+  }),
+
+  commandExecutionNoOutput: JSON.stringify({
+    type: 'item.completed',
+    item: {
+      type: 'command_execution',
+      command: 'mkdir -p /tmp/test',
+    },
+  }),
+
+  turnCompleted: JSON.stringify({
+    type: 'turn.completed',
+    usage: { total_tokens: 42, input_tokens: 20, output_tokens: 22 },
+  }),
+
+  turnFailed: JSON.stringify({
+    type: 'turn.failed',
+    error: { message: 'Rate limit exceeded' },
+  }),
+
+  turnFailedNoMessage: JSON.stringify({
+    type: 'turn.failed',
+    error: {},
+  }),
+
+  topLevelError: JSON.stringify({
+    type: 'error',
+    message: 'Invalid API key',
+  }),
+
+  topLevelErrorNoMessage: JSON.stringify({
+    type: 'error',
+  }),
+
+  unknownItemType: JSON.stringify({
+    type: 'item.completed',
+    item: { type: 'reasoning', content: 'thinking...' },
+  }),
+};
+
+// ═══════════════════════════════════════════════════════
+// parseCodexStreamLine
+// ═══════════════════════════════════════════════════════
+
+describe('parseCodexStreamLine', () => {
+  it('thread.started — saves threadId, returns []', () => {
+    const state: { threadId?: string } = {};
+    const events = parseCodexStreamLine(CODEX_SAMPLES.threadStarted, state);
+    expect(events).toEqual([]);
+    expect(state.threadId).toBe('thread_abc123');
+  });
+
+  it('agent_message — returns text event', () => {
+    const state: { threadId?: string } = {};
+    const events = parseCodexStreamLine(CODEX_SAMPLES.agentMessage, state);
+    expect(events).toEqual([{ type: 'text', content: 'Hello! I can help you.' }]);
+  });
+
+  it('agent_message with multiple content blocks — concatenates text', () => {
+    const state: { threadId?: string } = {};
+    const events = parseCodexStreamLine(CODEX_SAMPLES.agentMessageMultiBlock, state);
+    expect(events).toEqual([{ type: 'text', content: 'First part. Second part.' }]);
+  });
+
+  it('agent_message with empty content — returns []', () => {
+    const state: { threadId?: string } = {};
+    const events = parseCodexStreamLine(CODEX_SAMPLES.agentMessageEmpty, state);
+    expect(events).toEqual([]);
+  });
+
+  it('command_execution — returns tool_call + tool_result', () => {
+    const state: { threadId?: string } = {};
+    const events = parseCodexStreamLine(CODEX_SAMPLES.commandExecution, state);
+    expect(events).toHaveLength(2);
+    expect(events[0]).toEqual({ type: 'tool_call', name: 'ls -la', args: '' });
+    expect(events[1]).toEqual({
+      type: 'tool_result',
+      content: 'total 32\ndrwxr-xr-x  8 user user 4096 Jan 1 00:00 .',
+    });
+  });
+
+  it('command_execution without output — returns only tool_call', () => {
+    const state: { threadId?: string } = {};
+    const events = parseCodexStreamLine(CODEX_SAMPLES.commandExecutionNoOutput, state);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({ type: 'tool_call', name: 'mkdir -p /tmp/test', args: '' });
+  });
+
+  it('turn.completed — returns done event with threadId from state', () => {
+    const state: { threadId?: string } = { threadId: 'thread_abc123' };
+    const events = parseCodexStreamLine(CODEX_SAMPLES.turnCompleted, state);
+    expect(events).toEqual([{ type: 'done', sessionId: 'thread_abc123' }]);
+  });
+
+  it('turn.completed without prior thread.started — done with undefined sessionId', () => {
+    const state: { threadId?: string } = {};
+    const events = parseCodexStreamLine(CODEX_SAMPLES.turnCompleted, state);
+    expect(events).toEqual([{ type: 'done', sessionId: undefined }]);
+  });
+
+  it('turn.failed — returns error event', () => {
+    const state: { threadId?: string } = {};
+    const events = parseCodexStreamLine(CODEX_SAMPLES.turnFailed, state);
+    expect(events).toEqual([{ type: 'error', message: 'Rate limit exceeded' }]);
+  });
+
+  it('turn.failed without message — returns fallback error', () => {
+    const state: { threadId?: string } = {};
+    const events = parseCodexStreamLine(CODEX_SAMPLES.turnFailedNoMessage, state);
+    expect(events).toEqual([{ type: 'error', message: 'Codex turn failed' }]);
+  });
+
+  it('top-level error — returns error event', () => {
+    const state: { threadId?: string } = {};
+    const events = parseCodexStreamLine(CODEX_SAMPLES.topLevelError, state);
+    expect(events).toEqual([{ type: 'error', message: 'Invalid API key' }]);
+  });
+
+  it('top-level error without message — returns fallback error', () => {
+    const state: { threadId?: string } = {};
+    const events = parseCodexStreamLine(CODEX_SAMPLES.topLevelErrorNoMessage, state);
+    expect(events).toEqual([{ type: 'error', message: 'Codex error' }]);
+  });
+
+  it('unknown item type — returns []', () => {
+    const state: { threadId?: string } = {};
+    const events = parseCodexStreamLine(CODEX_SAMPLES.unknownItemType, state);
+    expect(events).toEqual([]);
+  });
+
+  it('empty string — returns []', () => {
+    expect(parseCodexStreamLine('', {})).toEqual([]);
+  });
+
+  it('whitespace only — returns []', () => {
+    expect(parseCodexStreamLine('   \n  ', {})).toEqual([]);
+  });
+
+  it('non-JSON text — returns []', () => {
+    expect(parseCodexStreamLine('Starting codex agent...', {})).toEqual([]);
+  });
+
+  it('broken JSON — returns []', () => {
+    expect(parseCodexStreamLine('{"broken', {})).toEqual([]);
+  });
+
+  it('unknown top-level type — returns []', () => {
+    expect(parseCodexStreamLine('{"type":"unknown_event","data":"x"}', {})).toEqual([]);
+  });
+
+  it('full session sequence — thread.started → agent_message → turn.completed', () => {
+    const lines = [
+      CODEX_SAMPLES.threadStarted,
+      CODEX_SAMPLES.agentMessage,
+      CODEX_SAMPLES.commandExecution,
+      CODEX_SAMPLES.turnCompleted,
+    ];
+    const state: { threadId?: string } = {};
+    const allEvents = lines.flatMap(l => parseCodexStreamLine(l, state));
+
+    expect(state.threadId).toBe('thread_abc123');
+    expect(allEvents).toHaveLength(4); // text + tool_call + tool_result + done
+    expect(allEvents[0]).toEqual({ type: 'text', content: 'Hello! I can help you.' });
+    expect(allEvents[1]).toEqual({ type: 'tool_call', name: 'ls -la', args: '' });
+    expect(allEvents[2].type).toBe('tool_result');
+    expect(allEvents[3]).toEqual({ type: 'done', sessionId: 'thread_abc123' });
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// injectCodexSkills — no-op (AGENTS.md managed by workspace)
+// ═══════════════════════════════════════════════════════
+
+describe('injectCodexSkills', () => {
+  let workspace: string;
+
+  beforeEach(async () => {
+    workspace = await mkdtemp(join(tmpdir(), 'golem-test-codex-inject-'));
+  });
+
+  afterEach(async () => {
+    await rm(workspace, { recursive: true, force: true });
+  });
+
+  it('resolves without error (no-op)', async () => {
+    await expect(injectCodexSkills(workspace, [])).resolves.toBeUndefined();
+  });
+
+  it('does not create any directories or files', async () => {
+    const before = await readdir(workspace).catch(() => []);
+    await injectCodexSkills(workspace, ['/fake/skill/path']);
+    const after = await readdir(workspace).catch(() => []);
+    expect(after).toEqual(before);
   });
 });

@@ -238,6 +238,7 @@ export async function initWorkspace(
 
   const gitignoreLines = ['.golem/'];
   if (config.engine === 'opencode') gitignoreLines.push('.opencode/');
+  if (config.engine === 'codex') gitignoreLines.push('.codex/');
   const gitignorePath = join(dir, '.gitignore');
   try {
     await stat(gitignorePath);

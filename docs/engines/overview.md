@@ -1,18 +1,18 @@
 # Engine Overview
 
-GolemBot supports three Coding Agent engines. All three expose the same `StreamEvent` interface — switching engines requires only a one-line config change.
+GolemBot supports four Coding Agent engines. All four expose the same `StreamEvent` interface — switching engines requires only a one-line config change.
 
 ## Comparison
 
-| | Cursor | Claude Code | OpenCode |
-|---|---|---|---|
-| Binary | `agent` | `claude` | `opencode` |
-| Output format | stream-json | stream-json | NDJSON |
-| Skill injection | `.cursor/skills/` | `.claude/skills/` + `CLAUDE.md` | `.opencode/skills/` + `opencode.json` |
-| Session resume | `--resume <id>` | `--resume <id>` | `--session <id>` |
-| API key env | `CURSOR_API_KEY` | `ANTHROPIC_API_KEY` | Depends on provider |
-| Permission bypass | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | `opencode.json` permission config |
-| Cost tracking | — | `costUsd`, `numTurns` | `costUsd` (accumulated) |
+| | Cursor | Claude Code | OpenCode | Codex |
+|---|---|---|---|---|
+| Binary | `agent` | `claude` | `opencode` | `codex` |
+| Output format | stream-json | stream-json | NDJSON | NDJSON |
+| Skill injection | `.cursor/skills/` | `.claude/skills/` + `CLAUDE.md` | `.opencode/skills/` + `opencode.json` | `AGENTS.md` |
+| Session resume | `--resume <id>` | `--resume <id>` | `--session <id>` | `resume <thread_id>` |
+| API key env | `CURSOR_API_KEY` | `ANTHROPIC_API_KEY` | Depends on provider | `OPENAI_API_KEY` |
+| Permission bypass | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | `opencode.json` permission config | `--full-auto` |
+| Cost tracking | — | `costUsd`, `numTurns` | `costUsd` (accumulated) | — |
 
 ## Unified StreamEvent
 
@@ -43,7 +43,7 @@ All engines follow the same pattern:
 The engine is selected by the `engine` field in `golem.yaml`:
 
 ```yaml
-engine: claude-code   # cursor | claude-code | opencode
+engine: claude-code   # cursor | claude-code | opencode | codex
 ```
 
 Or overridden at runtime:
@@ -60,3 +60,4 @@ const assistant = createAssistant({
 - **Cursor** — best if you already use Cursor IDE and have a Cursor subscription
 - **Claude Code** — first-party Anthropic CLI, provides cost and turn tracking
 - **OpenCode** — open-source, supports multiple LLM providers (Anthropic, OpenAI, OpenRouter, etc.)
+- **Codex** — OpenAI's CLI agent (`@openai/codex`), uses `OPENAI_API_KEY`

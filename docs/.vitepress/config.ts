@@ -19,6 +19,7 @@ const sidebarEn = [
       { text: 'Cursor', link: '/engines/cursor' },
       { text: 'Claude Code', link: '/engines/claude-code' },
       { text: 'OpenCode', link: '/engines/opencode' },
+      { text: 'Codex', link: '/engines/codex' },
     ],
   },
   {
@@ -76,6 +77,7 @@ const sidebarZh = [
       { text: 'Cursor', link: '/zh/engines/cursor' },
       { text: 'Claude Code', link: '/zh/engines/claude-code' },
       { text: 'OpenCode', link: '/zh/engines/opencode' },
+      { text: 'Codex', link: '/zh/engines/codex' },
     ],
   },
   {
