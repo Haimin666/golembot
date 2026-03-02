@@ -1,3 +1,10 @@
+## [0.2.2](https://github.com/0xranx/golembot/compare/v0.2.1...v0.2.2) (2026-03-02)
+
+
+### Bug Fixes
+
+* **opencode:** register provider block in opencode.json to fix ProviderModelNotFoundError ([c10e01e](https://github.com/0xranx/golembot/commit/c10e01e0f1466bdb75b90da66bd6a271cdefc375))
+
 ## [0.2.1](https://github.com/0xranx/golembot/compare/v0.2.0...v0.2.1) (2026-03-02)
 
 
