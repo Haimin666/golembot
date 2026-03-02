@@ -12,7 +12,33 @@ Cursor 引擎调用 Cursor 的 `agent` CLI 来处理对话。
 ```yaml
 name: my-bot
 engine: cursor
-model: claude-sonnet   # 可选
+model: claude-sonnet-4-5   # 可选，见下方说明
+```
+
+## 选择模型
+
+Cursor 维护自己的模型列表，名称**不同于** Anthropic 或 OpenAI 的官方命名。
+
+**查看可用模型名称：**
+
+1. 打开 Cursor → Settings → Models — 界面中显示的标识符就是填入 `model` 的值。
+2. 或查阅 [Cursor 模型文档](https://docs.cursor.com/settings/models)。
+
+**常用值：**
+
+| 模型 | 说明 |
+|------|------|
+| `claude-sonnet-4-5` | Anthropic Claude Sonnet（通过 Cursor） |
+| `gpt-4o` | OpenAI GPT-4o |
+| `o3-mini` | OpenAI o3-mini |
+| `gemini-2.5-pro` | Google Gemini 2.5 Pro |
+
+不填 `model` 时，Cursor 使用其 Settings 中配置的默认模型。
+
+**运行时覆盖** — 通过 `createAssistant()` 传入：
+
+```typescript
+const bot = createAssistant({ dir: './my-bot', model: 'gpt-4o' })
 ```
 
 ## 工作原理

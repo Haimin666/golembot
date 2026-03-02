@@ -13,8 +13,34 @@ The Claude Code engine invokes Anthropic's `claude` CLI.
 # golem.yaml
 name: my-bot
 engine: claude-code
-model: claude-sonnet    # optional
-skipPermissions: true   # default: true
+model: claude-sonnet-4-6   # optional, see below
+skipPermissions: true       # default: true
+```
+
+## Choosing a Model
+
+Model names are Anthropic's model IDs, passed directly as `--model` to the `claude` CLI.
+
+**List available models:**
+
+```bash
+claude models
+```
+
+**Current models (as of 2025):**
+
+| Model | Description |
+|-------|-------------|
+| `claude-opus-4-5` | Most capable, slower |
+| `claude-sonnet-4-6` | Balanced — recommended default |
+| `claude-haiku-4-5-20251001` | Fast and lightweight |
+
+See the full list at [Anthropic model documentation](https://docs.anthropic.com/en/docs/about-claude/models).
+
+**Override at runtime** — pass `model` to `createAssistant()`:
+
+```typescript
+const bot = createAssistant({ dir: './my-bot', model: 'claude-opus-4-5' })
 ```
 
 ## How It Works

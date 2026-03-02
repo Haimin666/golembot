@@ -48,7 +48,7 @@ gateway:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `model` | `string` | — | Preferred model (passed to the engine CLI) |
+| `model` | `string` | — | Preferred model. Format varies by engine — see each engine's docs for valid values |
 | `skipPermissions` | `boolean` | `true` | Whether to bypass agent permission prompts |
 | `channels` | `object` | — | IM channel configurations |
 | `gateway` | `object` | — | Gateway service settings |
@@ -92,6 +92,18 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxx
 ::: tip
 Add `.env` to `.gitignore` and commit `.env.example` (without real values) for sharing.
 :::
+
+## Model Names by Engine
+
+The `model` value format is different for each engine:
+
+| Engine | Format | Example | Where to find values |
+|--------|--------|---------|----------------------|
+| `cursor` | Cursor model name | `claude-sonnet-4-5` | Cursor → Settings → Models |
+| `claude-code` | Anthropic model ID | `claude-sonnet-4-6` | `claude models` |
+| `opencode` | `provider/model` | `anthropic/claude-sonnet-4-5` | `opencode models` |
+
+See the individual engine pages for full model tables and runtime override syntax.
 
 ## Skills Are Not Configured
 

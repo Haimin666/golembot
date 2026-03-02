@@ -12,8 +12,34 @@ Claude Code 引擎调用 Anthropic 的 `claude` CLI。
 ```yaml
 name: my-bot
 engine: claude-code
-model: claude-sonnet    # 可选
-skipPermissions: true   # 默认：true
+model: claude-sonnet-4-6   # 可选，见下方说明
+skipPermissions: true       # 默认：true
+```
+
+## 选择模型
+
+模型名称为 Anthropic 的 model ID，直接通过 `--model` 传给 `claude` CLI。
+
+**列出可用模型：**
+
+```bash
+claude models
+```
+
+**当前主要模型（2025）：**
+
+| 模型 | 说明 |
+|------|------|
+| `claude-opus-4-5` | 能力最强，速度较慢 |
+| `claude-sonnet-4-6` | 均衡推荐，默认首选 |
+| `claude-haiku-4-5-20251001` | 轻量快速 |
+
+完整列表见 [Anthropic 模型文档](https://docs.anthropic.com/en/docs/about-claude/models)。
+
+**运行时覆盖** — 通过 `createAssistant()` 传入：
+
+```typescript
+const bot = createAssistant({ dir: './my-bot', model: 'claude-opus-4-5' })
 ```
 
 ## 工作原理

@@ -13,7 +13,38 @@ The OpenCode engine invokes the `opencode` CLI, which supports multiple LLM prov
 # golem.yaml
 name: my-bot
 engine: opencode
-model: anthropic/claude-sonnet   # optional, provider/model format
+model: anthropic/claude-sonnet-4-5   # optional, format: provider/model
+```
+
+## Choosing a Model
+
+OpenCode uses a `provider/model` format. The provider prefix also determines which API key environment variable is used.
+
+**List available models:**
+
+```bash
+opencode models
+```
+
+**Common values:**
+
+| Model string | Provider | API key env var |
+|---|---|---|
+| `anthropic/claude-sonnet-4-5` | Anthropic | `ANTHROPIC_API_KEY` |
+| `anthropic/claude-opus-4-5` | Anthropic | `ANTHROPIC_API_KEY` |
+| `openai/gpt-4o` | OpenAI | `OPENAI_API_KEY` |
+| `openai/o3-mini` | OpenAI | `OPENAI_API_KEY` |
+| `openrouter/anthropic/claude-opus-4-5` | OpenRouter | `OPENROUTER_API_KEY` |
+| `google/gemini-2.5-pro` | Google | `GOOGLE_GENERATIVE_AI_API_KEY` |
+| `deepseek/deepseek-chat` | DeepSeek | `DEEPSEEK_API_KEY` |
+| `groq/llama-3.3-70b-versatile` | Groq | `GROQ_API_KEY` |
+
+GolemBot automatically maps the provider prefix to the correct env var when `apiKey` is passed via `createAssistant()`.
+
+**Override at runtime** — pass `model` to `createAssistant()`:
+
+```typescript
+const bot = createAssistant({ dir: './my-bot', model: 'openai/gpt-4o' })
 ```
 
 ## How It Works

@@ -13,7 +13,33 @@ The Cursor engine invokes Cursor's `agent` CLI to handle conversations.
 # golem.yaml
 name: my-bot
 engine: cursor
-model: claude-sonnet   # optional
+model: claude-sonnet-4-5   # optional, see below
+```
+
+## Choosing a Model
+
+Cursor manages its own model list — the names do **not** follow Anthropic's or OpenAI's naming conventions directly.
+
+**How to find available model names:**
+
+1. Open Cursor → Settings → Models — the exact identifier shown there is what you put in `model`.
+2. Or check the [Cursor model documentation](https://docs.cursor.com/settings/models).
+
+**Common values:**
+
+| Model | Notes |
+|-------|-------|
+| `claude-sonnet-4-5` | Anthropic Claude Sonnet (via Cursor) |
+| `gpt-4o` | OpenAI GPT-4o |
+| `o3-mini` | OpenAI o3-mini |
+| `gemini-2.5-pro` | Google Gemini 2.5 Pro |
+
+If `model` is omitted, Cursor uses its default model (configured in Cursor settings).
+
+**Override at runtime** — pass `model` to `createAssistant()`:
+
+```typescript
+const bot = createAssistant({ dir: './my-bot', model: 'gpt-4o' })
 ```
 
 ## How It Works

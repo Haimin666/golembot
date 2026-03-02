@@ -12,7 +12,38 @@ OpenCode 引擎调用 `opencode` CLI，支持多种 LLM Provider。
 ```yaml
 name: my-bot
 engine: opencode
-model: anthropic/claude-sonnet   # 可选，provider/model 格式
+model: anthropic/claude-sonnet-4-5   # 可选，格式：provider/model
+```
+
+## 选择模型
+
+OpenCode 使用 `provider/model` 格式。Provider 前缀同时决定使用哪个 API Key 环境变量。
+
+**列出可用模型：**
+
+```bash
+opencode models
+```
+
+**常用值：**
+
+| 模型字符串 | Provider | API Key 环境变量 |
+|---|---|---|
+| `anthropic/claude-sonnet-4-5` | Anthropic | `ANTHROPIC_API_KEY` |
+| `anthropic/claude-opus-4-5` | Anthropic | `ANTHROPIC_API_KEY` |
+| `openai/gpt-4o` | OpenAI | `OPENAI_API_KEY` |
+| `openai/o3-mini` | OpenAI | `OPENAI_API_KEY` |
+| `openrouter/anthropic/claude-opus-4-5` | OpenRouter | `OPENROUTER_API_KEY` |
+| `google/gemini-2.5-pro` | Google | `GOOGLE_GENERATIVE_AI_API_KEY` |
+| `deepseek/deepseek-chat` | DeepSeek | `DEEPSEEK_API_KEY` |
+| `groq/llama-3.3-70b-versatile` | Groq | `GROQ_API_KEY` |
+
+通过 `createAssistant()` 传入 `apiKey` 时，GolemBot 会根据 Provider 前缀自动映射到正确的环境变量。
+
+**运行时覆盖** — 通过 `createAssistant()` 传入：
+
+```typescript
+const bot = createAssistant({ dir: './my-bot', model: 'openai/gpt-4o' })
 ```
 
 ## 多 Provider 支持

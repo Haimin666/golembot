@@ -48,7 +48,7 @@ gateway:
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `model` | `string` | — | 首选模型（传递给引擎 CLI） |
+| `model` | `string` | — | 首选模型，格式因引擎而异 — 详见各引擎文档 |
 | `skipPermissions` | `boolean` | `true` | 是否跳过 Agent 权限确认 |
 | `channels` | `object` | — | IM 通道配置 |
 | `gateway` | `object` | — | Gateway 服务设置 |
@@ -92,6 +92,18 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxx
 ::: tip
 将 `.env` 加入 `.gitignore`，提交 `.env.example`（不含真实值）用于共享。
 :::
+
+## 各引擎模型名称格式
+
+`model` 字段的格式因引擎不同而不同：
+
+| 引擎 | 格式 | 示例 | 查看可用值 |
+|------|------|------|------------|
+| `cursor` | Cursor 模型名称 | `claude-sonnet-4-5` | Cursor → Settings → Models |
+| `claude-code` | Anthropic model ID | `claude-sonnet-4-6` | `claude models` |
+| `opencode` | `provider/model` | `anthropic/claude-sonnet-4-5` | `opencode models` |
+
+详见各引擎页面中的完整模型表格和运行时覆盖用法。
 
 ## 技能不在配置中声明
 
