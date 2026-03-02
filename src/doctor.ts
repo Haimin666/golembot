@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { isOnPath } from './engine.js';
 import { loadConfig, scanSkills } from './workspace.js';
 
@@ -46,6 +49,7 @@ export async function runDoctor(dir: string): Promise<void> {
     cursor: 'agent',
     'claude-code': 'claude',
     opencode: 'opencode',
+    codex: 'codex',
   };
   if (engine && engineBins[engine]) {
     const bin = engineBins[engine];
@@ -57,16 +61,32 @@ export async function runDoctor(dir: string): Promise<void> {
     });
   }
 
-  // 4. API key set
-  const keyVars = ['ANTHROPIC_API_KEY', 'CURSOR_API_KEY', 'OPENROUTER_API_KEY'];
-  const hasKey = keyVars.some(k => !!process.env[k]);
-  results.push({
-    name: 'API key',
-    ok: hasKey,
-    detail: hasKey
-      ? keyVars.filter(k => !!process.env[k]).join(', ')
-      : 'none set (set ANTHROPIC_API_KEY, CURSOR_API_KEY, or OPENROUTER_API_KEY)',
-  });
+  // 4. API key / auth credentials
+  let authOk = false;
+  let authDetail = '';
+  if (engine === 'codex') {
+    const apiKeyVars = ['OPENAI_API_KEY', 'CODEX_API_KEY'];
+    const foundVars = apiKeyVars.filter(k => !!process.env[k]);
+    const oauthFile = join(homedir(), '.codex', 'auth.json');
+    const hasOAuth = existsSync(oauthFile);
+    if (foundVars.length > 0) {
+      authOk = true;
+      authDetail = foundVars.join(', ');
+    } else if (hasOAuth) {
+      authOk = true;
+      authDetail = 'ChatGPT OAuth (~/.codex/auth.json)';
+    } else {
+      authDetail = 'none — run `codex login` or set OPENAI_API_KEY';
+    }
+  } else {
+    const keyVars = ['ANTHROPIC_API_KEY', 'CURSOR_API_KEY', 'OPENROUTER_API_KEY', 'OPENAI_API_KEY'];
+    const foundVars = keyVars.filter(k => !!process.env[k]);
+    authOk = foundVars.length > 0;
+    authDetail = authOk
+      ? foundVars.join(', ')
+      : 'none set (set ANTHROPIC_API_KEY, CURSOR_API_KEY, or OPENROUTER_API_KEY)';
+  }
+  results.push({ name: 'API key / auth', ok: authOk, detail: authDetail });
 
   // 5. Skills
   try {

@@ -1378,16 +1378,24 @@ describe('parseCodexStreamLine', () => {
     expect(events).toEqual([{ type: 'error', message: 'Codex turn failed' }]);
   });
 
-  it('top-level error — returns error event', () => {
+  it('top-level error — returns warning event for non-reconnection errors (e.g. auth failure)', () => {
     const state: { threadId?: string } = {};
     const events = parseCodexStreamLine(CODEX_SAMPLES.topLevelError, state);
-    expect(events).toEqual([{ type: 'error', message: 'Invalid API key' }]);
+    expect(events).toEqual([{ type: 'warning', message: 'Invalid API key' }]);
   });
 
-  it('top-level error without message — returns fallback error', () => {
+  it('top-level error without message — returns fallback warning', () => {
     const state: { threadId?: string } = {};
     const events = parseCodexStreamLine(CODEX_SAMPLES.topLevelErrorNoMessage, state);
-    expect(events).toEqual([{ type: 'error', message: 'Codex error' }]);
+    expect(events).toEqual([{ type: 'warning', message: 'Codex error' }]);
+  });
+
+  it('top-level error — suppresses WebSocket reconnection notices (returns [])', () => {
+    const state: { threadId?: string } = {};
+    const reconnect2 = JSON.stringify({ type: 'error', message: 'Reconnecting... 2/5 (stream disconnected before completion: ...)' });
+    const reconnect5 = JSON.stringify({ type: 'error', message: 'Reconnecting... 5/5 (failed to send websocket request: Connection closed normally)' });
+    expect(parseCodexStreamLine(reconnect2, state)).toEqual([]);
+    expect(parseCodexStreamLine(reconnect5, state)).toEqual([]);
   });
 
   it('unknown item type — returns []', () => {
