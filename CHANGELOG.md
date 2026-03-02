@@ -1,3 +1,10 @@
+# [0.4.0-beta.5](https://github.com/0xranx/golembot/compare/v0.4.0-beta.4...v0.4.0-beta.5) (2026-03-02)
+
+
+### Bug Fixes
+
+* **feishu:** use tokenManager + raw fetch for bot open_id, fix mentions source ([d974702](https://github.com/0xranx/golembot/commit/d974702cdca787ce53b09ee1df7cfebc0ba1df1f))
+
 # [0.4.0-beta.4](https://github.com/0xranx/golembot/compare/v0.4.0-beta.3...v0.4.0-beta.4) (2026-03-02)
 
 
