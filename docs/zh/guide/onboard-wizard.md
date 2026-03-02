@@ -49,7 +49,7 @@ golembot onboard --template customer-support
 
 ### 第 6 步：选择场景模板
 
-从 6 个预置模板中选择：
+从 6 个预置模板中选择，或选择**不使用模板**：
 
 | 模板 | 说明 |
 |------|------|
@@ -59,6 +59,11 @@ golembot onboard --template customer-support
 | `ops-assistant` | 内容运营、排期管理、竞品追踪 |
 | `meeting-notes` | 结构化会议纪要，行动项跟踪 |
 | `research` | 结构化研究报告，来源管理 |
+| *（不使用）* | 跳过 — 仅使用内置技能 |
+
+模板是**可选的**。选择"不使用"会跳过模板安装，助手仍然拥有 `general` 和 `im-adapter` 两个内置技能，功能完整。
+
+如果没有合适的模板，可以在这里跳过，之后自定义技能 — 在 `skills/` 下新建目录并放一个 `SKILL.md` 文件即可。详见[创建技能](/zh/skills/create-skill)。
 
 ### 第 7 步：生成并启动
 

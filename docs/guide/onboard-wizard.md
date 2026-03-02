@@ -49,7 +49,7 @@ All credentials are stored in `.env` with `${ENV_VAR}` references in `golem.yaml
 
 ### Step 6: Choose a Scenario Template
 
-Select from 6 pre-built templates:
+Select from 6 pre-built templates, or choose **None** to skip:
 
 | Template | Description |
 |----------|-------------|
@@ -59,6 +59,11 @@ Select from 6 pre-built templates:
 | `ops-assistant` | Content operations, scheduling, competitor tracking |
 | `meeting-notes` | Structured minutes with action item tracking |
 | `research` | Structured research reports with source management |
+| *(None)* | Skip — use built-in skills only |
+
+Templates are **optional**. Selecting "None" skips template installation; the assistant still gets the `general` and `im-adapter` built-in skills and is fully functional.
+
+If no template fits your scenario, skip here and create a custom skill later — add a directory under `skills/` with a `SKILL.md` file. See [Create a Skill](/skills/create-skill).
 
 Each template includes a tailored `golem.yaml`, skill directory, and supporting files.
 

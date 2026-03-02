@@ -4,3 +4,4 @@ dist/
 .golem/
 .env
 .env.local
+docs/.vitepress/cache/
