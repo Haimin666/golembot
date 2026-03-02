@@ -1,3 +1,10 @@
+# [0.4.0-beta.2](https://github.com/0xranx/golembot/compare/v0.4.0-beta.1...v0.4.0-beta.2) (2026-03-02)
+
+
+### Bug Fixes
+
+* **feishu:** use correct SDK path bot.v3.info.get() to fetch bot open_id ([adcd035](https://github.com/0xranx/golembot/commit/adcd035344a6ee813fe7ec6e9054564646673c04))
+
 # [0.4.0-beta.1](https://github.com/0xranx/golembot/compare/v0.3.0...v0.4.0-beta.1) (2026-03-02)
 
 
