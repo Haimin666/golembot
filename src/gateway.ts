@@ -61,13 +61,20 @@ export interface GroupMessage {
 }
 
 /** Recent message history per group (key: `channelType:chatId`). */
-const groupHistories = new Map<string, GroupMessage[]>();
+export const groupHistories = new Map<string, GroupMessage[]>();
 
 /** Total bot replies sent per group — used as a safety valve against runaway chains. */
-const groupTurnCounters = new Map<string, number>();
+export const groupTurnCounters = new Map<string, number>();
 
 /** Timestamp of the last human (non-bot) message per group — used to reset turn counters. */
-const groupLastActivity = new Map<string, number>();
+export const groupLastActivity = new Map<string, number>();
+
+/** Clear all in-memory group state for a session key (called by the resetSession wrapper). */
+export function clearGroupChatState(sessionKey: string): void {
+  groupHistories.delete(sessionKey);
+  groupTurnCounters.delete(sessionKey);
+  groupLastActivity.delete(sessionKey);
+}
 
 /**
  * After this many milliseconds of silence in a group, reset the turn counter.
@@ -195,9 +202,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
   // group state (history buffer, turn counter, last-activity timestamp).
   const _originalReset = assistant.resetSession.bind(assistant);
   assistant.resetSession = async (sessionKey: string) => {
-    groupHistories.delete(sessionKey);
-    groupTurnCounters.delete(sessionKey);
-    groupLastActivity.delete(sessionKey);
+    clearGroupChatState(sessionKey);
     return _originalReset(sessionKey);
   };
 

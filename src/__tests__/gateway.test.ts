@@ -4,7 +4,16 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ChannelAdapter, ChannelMessage } from '../channel.js';
 import { detectMention } from '../channel.js';
-import { buildGroupPrompt, resolveGroupChatConfig, GROUP_TURN_RESET_MS, type GroupMessage } from '../gateway.js';
+import {
+  buildGroupPrompt,
+  resolveGroupChatConfig,
+  GROUP_TURN_RESET_MS,
+  clearGroupChatState,
+  groupHistories,
+  groupTurnCounters,
+  groupLastActivity,
+  type GroupMessage,
+} from '../gateway.js';
 
 function createMockAdapter(name: string): ChannelAdapter & {
   messages: ChannelMessage[];
@@ -322,5 +331,71 @@ describe('GROUP_TURN_RESET_MS', () => {
     // Simulate the reset condition: Date.now() - lastActivity > GROUP_TURN_RESET_MS
     expect(now - oneHourAgo > GROUP_TURN_RESET_MS).toBe(true);   // → reset
     expect(now - justNow > GROUP_TURN_RESET_MS).toBe(false);     // → no reset
+  });
+});
+
+describe('clearGroupChatState', () => {
+  afterEach(() => {
+    // Ensure module-level Maps are clean between tests
+    groupHistories.clear();
+    groupTurnCounters.clear();
+    groupLastActivity.clear();
+  });
+
+  it('removes history, turn counter, and last-activity for the given key', () => {
+    const key = 'slack:C001';
+    groupHistories.set(key, [{ senderName: 'alice', text: 'hi', isBot: false }]);
+    groupTurnCounters.set(key, 3);
+    groupLastActivity.set(key, Date.now());
+
+    clearGroupChatState(key);
+
+    expect(groupHistories.has(key)).toBe(false);
+    expect(groupTurnCounters.has(key)).toBe(false);
+    expect(groupLastActivity.has(key)).toBe(false);
+  });
+
+  it('only removes the specified key, leaving other groups intact', () => {
+    const key = 'slack:C001';
+    const other = 'slack:C002';
+    groupHistories.set(key, []);
+    groupHistories.set(other, [{ senderName: 'bob', text: 'hey', isBot: false }]);
+    groupTurnCounters.set(key, 1);
+    groupTurnCounters.set(other, 2);
+
+    clearGroupChatState(key);
+
+    expect(groupHistories.has(key)).toBe(false);
+    expect(groupHistories.has(other)).toBe(true);
+    expect(groupTurnCounters.has(key)).toBe(false);
+    expect(groupTurnCounters.has(other)).toBe(true);
+  });
+
+  it('is a no-op when the key does not exist', () => {
+    expect(() => clearGroupChatState('nonexistent:key')).not.toThrow();
+    expect(groupHistories.size).toBe(0);
+    expect(groupTurnCounters.size).toBe(0);
+    expect(groupLastActivity.size).toBe(0);
+  });
+});
+
+describe('DiscordAdapter', () => {
+  it('has name "discord" and maxMessageLength 2000', async () => {
+    const { DiscordAdapter } = await import('../channels/discord.js');
+    const adapter = new (DiscordAdapter as any)({ botToken: 'fake-token' });
+    expect(adapter.name).toBe('discord');
+    expect(adapter.maxMessageLength).toBe(2000);
+  });
+
+  it('accepts optional botName config', async () => {
+    const { DiscordAdapter } = await import('../channels/discord.js');
+    const adapter = new (DiscordAdapter as any)({ botToken: 'tok', botName: 'mybot' });
+    expect(adapter.name).toBe('discord');
+  });
+
+  it('stop() is safe to call before start()', async () => {
+    const { DiscordAdapter } = await import('../channels/discord.js');
+    const adapter = new (DiscordAdapter as any)({ botToken: 'fake-token' });
+    await expect(adapter.stop()).resolves.toBeUndefined();
   });
 });
