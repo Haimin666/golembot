@@ -1,3 +1,10 @@
+## [0.8.1](https://github.com/0xranx/golembot/compare/v0.8.0...v0.8.1) (2026-03-03)
+
+
+### Bug Fixes
+
+* Telegram group [@mention](https://github.com/mention), typing indicator, cross-engine session isolation ([2e3fbf0](https://github.com/0xranx/golembot/commit/2e3fbf00dd626582d40e5cd3da79b2591b8dc833))
+
 # [0.8.0](https://github.com/0xranx/golembot/compare/v0.7.1...v0.8.0) (2026-03-03)
 
 
