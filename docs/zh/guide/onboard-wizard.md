@@ -24,6 +24,7 @@ golembot onboard --template customer-support
 - **cursor** — Cursor 的 `agent` CLI
 - **claude-code** — Anthropic 的 `claude` CLI
 - **opencode** — OpenCode CLI（多 Provider 支持）
+- **codex** — OpenAI Codex CLI
 
 ### 第 2 步：命名助手
 

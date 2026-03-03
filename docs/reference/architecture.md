@@ -20,7 +20,7 @@ This leads to a key experience difference: **OpenClaw's assistant is global, whi
 Unique advantages:
 
 - **More capable**: Coding Agents can natively read/write files, run code, operate browsers, and perform multi-step reasoning
-- **Choice of engine**: Cursor / Claude Code / Codex — use whichever you prefer
+- **Choice of engine**: Cursor / Claude Code / OpenCode / Codex — use whichever you prefer
 - **Fully transparent**: just `ls` the assistant directory to see what it knows, what it can do, and what it has done
 - **Version-controllable**: the entire assistant can be managed, shared, and cloned via git
 
@@ -78,7 +78,7 @@ The config file `golem.yaml` is minimal — only configures the engine, not skil
 
 ```yaml
 name: my-assistant
-engine: cursor              # cursor | claude-code | opencode
+engine: cursor              # cursor | claude-code | opencode | codex
 model: claude-sonnet        # Optional, preferred model
 
 # Optional: IM channel configuration (gateway connects whichever channels are configured)
@@ -206,7 +206,7 @@ Core and CLI are separated:
 **Core library (importable):**
 
 - **`index.ts`** — Public API: `createAssistant(opts) → Assistant`. Coordinates workspace, engine, and session. Includes a concurrency lock: for the same assistant instance and same sessionKey, only one `chat()` can execute at a time; different sessionKeys can run in parallel.
-- **`engine.ts`** — Engine interface + Cursor / Claude Code / OpenCode three-engine implementation. Process management and skill injection are internal engine details.
+- **`engine.ts`** — Engine interface + Cursor / Claude Code / OpenCode / Codex four-engine implementation. Process management and skill injection are internal engine details.
 - **`workspace.ts`** — Reads `golem.yaml` (including `channels` and `gateway` fields), scans the `skills/` directory, and auto-generates `AGENTS.md`. `resolveEnvPlaceholders()` resolves `${ENV_VAR}` placeholders.
 - **`session.ts`** — Multi-user session storage: `.golem/sessions.json`, indexed by `sessionKey`.
 - **`server.ts`** — HTTP service: `createServer(assistant, opts) → http.Server`. `POST /chat` (SSE), `POST /reset`, `GET /health`.
@@ -443,7 +443,7 @@ type StreamEvent =
   | { type: 'done'; sessionId?: string; durationMs?: number; costUsd?: number; numTurns?: number };
 ```
 
-Three engines are implemented, created via the `createEngine(type)` factory function:
+Four engines are implemented, created via the `createEngine(type)` factory function:
 
 **CursorEngine** — Invokes `agent` CLI via child_process.spawn:
 
@@ -485,16 +485,16 @@ class OpenCodeEngine implements AgentEngine {
 }
 ```
 
-Key differences between the three engines:
+Key differences between the four engines:
 
-| | CursorEngine | ClaudeCodeEngine | OpenCodeEngine |
-|---|---|---|---|
-| Spawn method | child_process.spawn | child_process.spawn | child_process.spawn |
-| Output format | stream-json (with ANSI) | stream-json (pure JSON) | NDJSON (`--format json`) |
-| Skill injection | `.cursor/skills/` symlink | `.claude/skills/` + CLAUDE.md | `.opencode/skills/` + opencode.json |
-| Session resume | `--resume <uuid>` | `--resume <uuid>` | `--session <ses_xxx>` |
-| API Key | CURSOR_API_KEY | ANTHROPIC_API_KEY | Depends on Provider |
-| Permission bypass | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | opencode.json permission |
+| | CursorEngine | ClaudeCodeEngine | OpenCodeEngine | CodexEngine |
+|---|---|---|---|---|
+| Spawn method | child_process.spawn | child_process.spawn | child_process.spawn | child_process.spawn |
+| Output format | stream-json (with ANSI) | stream-json (pure JSON) | NDJSON (`--format json`) | JSON (`--json`) |
+| Skill injection | `.cursor/skills/` symlink | `.claude/skills/` + CLAUDE.md | `.opencode/skills/` + opencode.json | N/A (prompt-injected) |
+| Session resume | `--resume <uuid>` | `--resume <uuid>` | `--session <ses_xxx>` | `exec resume <thread_id>` |
+| API Key | CURSOR_API_KEY | ANTHROPIC_API_KEY | Depends on Provider | CODEX_API_KEY |
+| Permission bypass | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | opencode.json permission | `--full-auto` |
 
 But the externally exposed `StreamEvent` is completely consistent.
 
@@ -533,7 +533,7 @@ But the externally exposed `StreamEvent` is completely consistent.
 
 - ~~Claude Code Engine~~ ✅ (`ClaudeCodeEngine`, stream-json parsing, native `.claude/skills/` injection)
 - ~~OpenCode Engine~~ ✅ (`OpenCodeEngine`, NDJSON parsing, `.opencode/skills/` injection, multi-Provider API Key, `opencode.json` permission config)
-- Codex Engine (to be implemented)
+- ~~Codex Engine~~ ✅ (`CodexEngine`, JSON parsing, `exec`/`exec resume` subcommands, `CODEX_API_KEY`)
 
 **Phase 4 — Gateway + IM Channels** ✅
 
@@ -557,7 +557,6 @@ But the externally exposed `StreamEvent` is completely consistent.
 **Phase 6 — Ecosystem Expansion (To Be Implemented)**
 
 - Skill repository (`golembot skill search/install`, community skill discovery and installation)
-- Codex Engine
 - Permissions integration (`golem.yaml` project-level permission config)
 - WebSocket support (bidirectional communication)
 - Multi-assistant routing (single Gateway serving multiple assistants)

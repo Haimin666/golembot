@@ -24,6 +24,7 @@ Choose your Coding Agent backend:
 - **cursor** — Cursor's `agent` CLI
 - **claude-code** — Anthropic's `claude` CLI
 - **opencode** — OpenCode CLI (multi-provider support)
+- **codex** — OpenAI Codex CLI
 
 ### Step 2: Name Your Assistant
 

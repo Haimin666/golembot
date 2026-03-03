@@ -7,6 +7,7 @@
   - [Cursor](https://docs.cursor.com/agent) (`agent` CLI)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude` CLI)
   - [OpenCode](https://github.com/opencode-ai/opencode) (`opencode` CLI)
+  - [Codex](https://developers.openai.com/codex/cli) (`codex` CLI)
 
 ## Install
 
@@ -65,7 +66,18 @@ This opens an interactive REPL. Type your message and press Enter. The Coding Ag
 golembot gateway
 ```
 
-This starts both an HTTP API and any configured IM channel adapters. See [Channels](/channels/overview) for IM setup.
+This starts both an HTTP API and any configured IM channel adapters. GolemBot supports the following IM platforms out of the box:
+
+| Platform | Connection Mode |
+|----------|----------------|
+| [Feishu (Lark)](/channels/feishu) | WebSocket (no public IP needed) |
+| [DingTalk](/channels/dingtalk) | Stream mode (no public IP needed) |
+| [WeCom](/channels/wecom) | Webhook (requires public URL) |
+| [Slack](/channels/slack) | Socket Mode (no public IP needed) |
+| [Telegram](/channels/telegram) | Polling (no public IP needed) |
+| [Discord](/channels/discord) | Gateway API (no public IP needed) |
+
+See [Channels Overview](/channels/overview) for setup instructions.
 
 ## Use as a Library
 
@@ -88,5 +100,5 @@ This pattern works for embedding into Slack bots, internal tools, SaaS products,
 - [Embed in Your Product](/guide/embed) — library integration patterns (Express, Next.js, queues)
 - [Configuration](/guide/configuration) — understand `golem.yaml` and `${ENV_VAR}` placeholders
 - [CLI Commands](/guide/cli-commands) — full command reference
-- [Engines](/engines/overview) — compare Cursor, Claude Code, and OpenCode
+- [Engines](/engines/overview) — compare Cursor, Claude Code, OpenCode, and Codex
 - [Skills](/skills/overview) — extend your assistant's capabilities

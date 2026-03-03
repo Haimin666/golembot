@@ -7,6 +7,7 @@
   - [Cursor](https://docs.cursor.com/agent)（`agent` CLI）
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)（`claude` CLI）
   - [OpenCode](https://github.com/opencode-ai/opencode)（`opencode` CLI）
+  - [Codex](https://developers.openai.com/codex/cli)（`codex` CLI）
 
 ## 安装
 
@@ -65,7 +66,18 @@ golembot run
 golembot gateway
 ```
 
-这会同时启动 HTTP API 和已配置的 IM 通道适配器。IM 配置详见[通道](/zh/channels/overview)。
+这会同时启动 HTTP API 和已配置的 IM 通道适配器。GolemBot 内置支持以下 IM 平台：
+
+| 平台 | 连接方式 |
+|------|---------|
+| [飞书（Lark）](/zh/channels/feishu) | WebSocket 长连接（无需公网 IP） |
+| [钉钉](/zh/channels/dingtalk) | Stream 模式（无需公网 IP） |
+| [企业微信](/zh/channels/wecom) | Webhook 回调（需要公网 URL） |
+| [Slack](/zh/channels/slack) | Socket Mode（无需公网 IP） |
+| [Telegram](/zh/channels/telegram) | 轮询模式（无需公网 IP） |
+| [Discord](/zh/channels/discord) | Gateway API（无需公网 IP） |
+
+IM 配置详见[通道概览](/zh/channels/overview)。
 
 ## 作为库使用
 
@@ -88,5 +100,5 @@ for await (const event of assistant.chat('分析销售数据')) {
 - [嵌入到你的产品](/zh/guide/embed) — 库集成模式（Express、Next.js、队列任务）
 - [配置说明](/zh/guide/configuration) — 了解 `golem.yaml` 和 `${ENV_VAR}` 占位符
 - [CLI 命令](/zh/guide/cli-commands) — 完整命令参考
-- [引擎](/zh/engines/overview) — 对比 Cursor、Claude Code 和 OpenCode
+- [引擎](/zh/engines/overview) — 对比 Cursor、Claude Code、OpenCode 和 Codex
 - [技能](/zh/skills/overview) — 扩展助手能力

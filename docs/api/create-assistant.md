@@ -27,7 +27,7 @@ interface CreateAssistantOpts {
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `dir` | `string` | Yes | Absolute or relative path to the assistant directory (must contain `golem.yaml`) |
-| `engine` | `string` | No | Override the `engine` field in `golem.yaml`. One of `cursor`, `claude-code`, `opencode` |
+| `engine` | `string` | No | Override the `engine` field in `golem.yaml`. One of `cursor`, `claude-code`, `opencode`, `codex` |
 | `model` | `string` | No | Override the `model` field in `golem.yaml` |
 | `apiKey` | `string` | No | API key passed to the engine. Alternatively set via environment variables (`CURSOR_API_KEY`, `ANTHROPIC_API_KEY`, etc.) |
 | `maxConcurrent` | `number` | No | Maximum number of parallel `chat()` calls across all sessions. Excess calls receive an immediate `type: 'error'` event. Default: `10` |
