@@ -185,6 +185,128 @@ async function createChannelAdapter(
   }
 }
 
+/**
+ * Process a single incoming IM message through the gateway pipeline.
+ * Exported for unit-testing; `startGateway` calls this for every adapter message.
+ */
+export async function handleMessage(
+  msg: ChannelMessage,
+  config: GolemConfig,
+  assistant: Pick<Assistant, 'chat'>,
+  adapter: Pick<ChannelAdapter, 'reply' | 'maxMessageLength'>,
+  channelType: string,
+  verbose: boolean,
+  dir: string,
+): Promise<void> {
+  const userText = msg.chatType === 'group' ? stripMention(msg.text) : msg.text;
+  if (!userText) return;
+
+  let sessionKey: string;
+  let fullText: string;
+
+  if (msg.chatType === 'group') {
+    const groupKey = `${msg.channelType}:${msg.chatId}`;
+    sessionKey = groupKey;
+    const gc = resolveGroupChatConfig(config);
+
+    // Skip messages sent by this bot itself (prevents feedback loops in broadcast adapters)
+    if (msg.senderName === config.name) return;
+
+    // Reset turn counter if the group has been idle for longer than GROUP_TURN_RESET_MS.
+    // This makes maxTurns a per-conversation limit rather than a permanent process-lifetime ban.
+    const lastActivity = groupLastActivity.get(groupKey) ?? 0;
+    if (Date.now() - lastActivity > GROUP_TURN_RESET_MS) {
+      groupTurnCounters.delete(groupKey);
+    }
+    groupLastActivity.set(groupKey, Date.now());
+
+    // Always update history buffer, regardless of policy
+    const hist = groupHistories.get(groupKey) ?? [];
+    hist.push({ senderName: msg.senderName ?? msg.senderId, text: userText, isBot: false });
+    if (hist.length > gc.historyLimit) hist.shift();
+    groupHistories.set(groupKey, hist);
+
+    // mention-only: skip if not @mentioned (zero agent cost)
+    // msg.mentioned is set by adapters that detect mentions natively
+    // (e.g. Discord's <@userId> token), as a fallback when text normalisation
+    // hasn't happened (e.g. botName not configured).
+    const mentioned = detectMention(msg.text, config.name) || !!msg.mentioned;
+    if (gc.groupPolicy === 'mention-only' && !mentioned) return;
+
+    // maxTurns safety valve: stop if this bot has replied too many times in this group
+    if ((groupTurnCounters.get(groupKey) ?? 0) >= gc.maxTurns) {
+      log(verbose, `[${channelType}] maxTurns (${gc.maxTurns}) reached for group ${groupKey}, skipping`);
+      return;
+    }
+
+    // Ensure memory/groups/ directory exists (agent will read/write memory files here)
+    await mkdir(join(dir, 'memory', 'groups'), { recursive: true }).catch(() => {});
+
+    const injectPass = gc.groupPolicy === 'smart' && !mentioned;
+    fullText = buildGroupPrompt(hist, msg.senderName ?? msg.senderId, userText, injectPass, groupKey, dir);
+  } else {
+    sessionKey = buildSessionKey(msg);
+    fullText = msg.text;
+  }
+
+  log(
+    verbose,
+    `[${channelType}] received from ${msg.senderName || msg.senderId}: "${userText}" → session ${sessionKey}`,
+  );
+
+  try {
+    let reply = '';
+    let hasError = false;
+    for await (const event of assistant.chat(fullText, { sessionKey })) {
+      if (event.type === 'text') {
+        reply += event.content;
+      } else if (event.type === 'warning') {
+        log(verbose, `[${channelType}] warning: ${event.message}`);
+      } else if (event.type === 'error') {
+        hasError = true;
+        console.error(`[${channelType}] Engine error: ${event.message}`);
+      }
+    }
+
+    // [PASS] sentinel: smart mode bot chose to stay silent
+    if (reply.trim() === '[PASS]') {
+      log(verbose, `[${channelType}] [PASS] — bot chose not to respond`);
+      return;
+    }
+
+    if (!reply.trim() && hasError) {
+      reply = 'Sorry, an error occurred while processing your message. Please try again later.';
+    }
+
+    if (reply.trim()) {
+      const maxLen = adapter.maxMessageLength ?? CHANNEL_LIMITS[channelType] ?? 4000;
+      const chunks = splitMessage(reply.trim(), maxLen);
+      for (const chunk of chunks) {
+        await adapter.reply(msg, chunk);
+      }
+      log(verbose, `[${channelType}] replied to ${msg.senderName || msg.senderId}: "${reply.trim().slice(0, 80)}..." (${chunks.length} chunk(s))`);
+
+      // Update group history with bot reply + increment turn counter
+      if (msg.chatType === 'group') {
+        const groupKey = `${msg.channelType}:${msg.chatId}`;
+        const gc = resolveGroupChatConfig(config);
+        const hist = groupHistories.get(groupKey) ?? [];
+        hist.push({ senderName: config.name, text: reply.trim(), isBot: true });
+        if (hist.length > gc.historyLimit) hist.shift();
+        groupHistories.set(groupKey, hist);
+        groupTurnCounters.set(groupKey, (groupTurnCounters.get(groupKey) ?? 0) + 1);
+      }
+    }
+  } catch (e) {
+    console.error(`[${channelType}] Failed to process message:`, e);
+    try {
+      await adapter.reply(msg, 'Sorry, an error occurred while processing your message. Please try again later.');
+    } catch {
+      // best effort
+    }
+  }
+}
+
 export async function startGateway(opts: GatewayOpts): Promise<void> {
   const dir = resolve(opts.dir || '.');
   const config: GolemConfig = await loadConfig(dir);
@@ -230,115 +352,9 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
 
       try {
         const adapter = await createChannelAdapter(type, channelConfig as Record<string, unknown>, dir);
-        await adapter.start(async (msg: ChannelMessage) => {
-          const userText = msg.chatType === 'group' ? stripMention(msg.text) : msg.text;
-          if (!userText) return;
-
-          let sessionKey: string;
-          let fullText: string;
-
-          if (msg.chatType === 'group') {
-            const groupKey = `${msg.channelType}:${msg.chatId}`;
-            sessionKey = groupKey;
-            const gc = resolveGroupChatConfig(config);
-
-            // Skip messages sent by this bot itself (prevents feedback loops in broadcast adapters)
-            if (msg.senderName === config.name) return;
-
-            // Reset turn counter if the group has been idle for longer than GROUP_TURN_RESET_MS.
-            // This makes maxTurns a per-conversation limit rather than a permanent process-lifetime ban.
-            const lastActivity = groupLastActivity.get(groupKey) ?? 0;
-            if (Date.now() - lastActivity > GROUP_TURN_RESET_MS) {
-              groupTurnCounters.delete(groupKey);
-            }
-            groupLastActivity.set(groupKey, Date.now());
-
-            // Always update history buffer, regardless of policy
-            const hist = groupHistories.get(groupKey) ?? [];
-            hist.push({ senderName: msg.senderName ?? msg.senderId, text: userText, isBot: false });
-            if (hist.length > gc.historyLimit) hist.shift();
-            groupHistories.set(groupKey, hist);
-
-            // mention-only: skip if not @mentioned (zero agent cost)
-            // msg.mentioned is set by adapters that detect mentions natively
-            // (e.g. Discord's <@userId> token), as a fallback when text normalisation
-            // hasn't happened (e.g. botName not configured).
-            const mentioned = detectMention(msg.text, config.name) || !!msg.mentioned;
-            if (gc.groupPolicy === 'mention-only' && !mentioned) return;
-
-            // maxTurns safety valve: stop if this bot has replied too many times in this group
-            if ((groupTurnCounters.get(groupKey) ?? 0) >= gc.maxTurns) {
-              log(verbose, `[${type}] maxTurns (${gc.maxTurns}) reached for group ${groupKey}, skipping`);
-              return;
-            }
-
-            // Ensure memory/groups/ directory exists (agent will read/write memory files here)
-            await mkdir(join(dir, 'memory', 'groups'), { recursive: true }).catch(() => {});
-
-            const injectPass = gc.groupPolicy === 'smart' && !mentioned;
-            fullText = buildGroupPrompt(hist, msg.senderName ?? msg.senderId, userText, injectPass, groupKey, dir);
-          } else {
-            sessionKey = buildSessionKey(msg);
-            fullText = msg.text;
-          }
-
-          log(
-            verbose,
-            `[${type}] received from ${msg.senderName || msg.senderId}: "${userText}" → session ${sessionKey}`,
-          );
-
-          try {
-            let reply = '';
-            let hasError = false;
-            for await (const event of assistant.chat(fullText, { sessionKey })) {
-              if (event.type === 'text') {
-                reply += event.content;
-              } else if (event.type === 'warning') {
-                log(verbose, `[${type}] warning: ${event.message}`);
-              } else if (event.type === 'error') {
-                hasError = true;
-                console.error(`[${type}] Engine error: ${event.message}`);
-              }
-            }
-
-            // [PASS] sentinel: smart mode bot chose to stay silent
-            if (reply.trim() === '[PASS]') {
-              log(verbose, `[${type}] [PASS] — bot chose not to respond`);
-              return;
-            }
-
-            if (!reply.trim() && hasError) {
-              reply = 'Sorry, an error occurred while processing your message. Please try again later.';
-            }
-
-            if (reply.trim()) {
-              const maxLen = adapter.maxMessageLength ?? CHANNEL_LIMITS[type] ?? 4000;
-              const chunks = splitMessage(reply.trim(), maxLen);
-              for (const chunk of chunks) {
-                await adapter.reply(msg, chunk);
-              }
-              log(verbose, `[${type}] replied to ${msg.senderName || msg.senderId}: "${reply.trim().slice(0, 80)}..." (${chunks.length} chunk(s))`);
-
-              // Update group history with bot reply + increment turn counter
-              if (msg.chatType === 'group') {
-                const groupKey = `${msg.channelType}:${msg.chatId}`;
-                const gc = resolveGroupChatConfig(config);
-                const hist = groupHistories.get(groupKey) ?? [];
-                hist.push({ senderName: config.name, text: reply.trim(), isBot: true });
-                if (hist.length > gc.historyLimit) hist.shift();
-                groupHistories.set(groupKey, hist);
-                groupTurnCounters.set(groupKey, (groupTurnCounters.get(groupKey) ?? 0) + 1);
-              }
-            }
-          } catch (e) {
-            console.error(`[${type}] Failed to process message:`, e);
-            try {
-              await adapter.reply(msg, 'Sorry, an error occurred while processing your message. Please try again later.');
-            } catch {
-              // best effort
-            }
-          }
-        });
+        await adapter.start((msg: ChannelMessage) =>
+          handleMessage(msg, config, assistant, adapter, type, verbose, dir),
+        );
 
         adapters.push(adapter);
         console.log(`   ✅ ${type} channel connected`);

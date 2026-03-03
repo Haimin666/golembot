@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { buildSessionKey, stripMention, type ChannelAdapter, type ChannelMessage } from '../channel.js';
 import type { StreamEvent } from '../engine.js';
+import type { GolemConfig } from '../workspace.js';
 
 vi.mock('../engine.js', async (importOriginal) => {
   const original = await importOriginal() as Record<string, unknown>;
@@ -367,6 +368,521 @@ describe('gateway integration', () => {
       });
 
       expect(key1).not.toBe(key2);
+    });
+  });
+});
+
+// ── handleMessage integration tests ──────────────────────────────────────────
+//
+// These tests exercise the full gateway message-handling pipeline
+// (group policies, session key scoping, history buffer, safety valves, etc.)
+// using mock assistant and adapter objects — no real IM credentials required.
+
+// Use plain functions with a callCount counter to avoid vi.fn() ↔ typed-function mismatch.
+type MockAssistant = {
+  chat(message: string, opts?: { sessionKey?: string }): AsyncIterable<StreamEvent>;
+  callCount: number;
+  lastSessionKey: string | undefined;
+  lastPrompt: string | undefined;
+};
+
+function makeMockAssistant(replyText: string): MockAssistant {
+  const obj: MockAssistant = {
+    callCount: 0,
+    lastSessionKey: undefined,
+    lastPrompt: undefined,
+    async *chat(message: string, opts: { sessionKey?: string } = {}) {
+      obj.callCount++;
+      obj.lastPrompt = message;
+      obj.lastSessionKey = opts.sessionKey;
+      yield { type: 'text' as const, content: replyText };
+      yield { type: 'done' as const, sessionId: 'mock-sid' };
+    },
+  };
+  return obj;
+}
+
+function makeThrowingAssistant(): MockAssistant {
+  const obj: MockAssistant = {
+    callCount: 0,
+    lastSessionKey: undefined,
+    lastPrompt: undefined,
+    async *chat(message: string, opts: { sessionKey?: string } = {}) {
+      obj.callCount++;
+      obj.lastPrompt = message;
+      obj.lastSessionKey = opts.sessionKey;
+      throw new Error('network failure');
+      yield { type: 'done' as const, sessionId: 'x' }; // unreachable — keeps TS happy
+    },
+  };
+  return obj;
+}
+
+function makeErrorEventAssistant(): MockAssistant {
+  const obj: MockAssistant = {
+    callCount: 0,
+    lastSessionKey: undefined,
+    lastPrompt: undefined,
+    async *chat(message: string, opts: { sessionKey?: string } = {}) {
+      obj.callCount++;
+      obj.lastPrompt = message;
+      obj.lastSessionKey = opts.sessionKey;
+      yield { type: 'error' as const, message: 'engine blew up' };
+    },
+  };
+  return obj;
+}
+
+type MockAdapter = {
+  replies: Array<{ msg: ChannelMessage; text: string }>;
+  reply(msg: ChannelMessage, text: string): Promise<void>;
+  maxMessageLength?: number;
+};
+
+function makeMockAdapter(maxLen?: number): MockAdapter {
+  const obj: MockAdapter = {
+    replies: [],
+    maxMessageLength: maxLen,
+    async reply(msg: ChannelMessage, text: string) {
+      obj.replies.push({ msg, text });
+    },
+  };
+  return obj;
+}
+
+function makeConfig(overrides: Partial<GolemConfig> = {}): GolemConfig {
+  return { name: 'golem', engine: 'cursor', ...overrides } as GolemConfig;
+}
+
+function makeGroupMsg(overrides: Partial<ChannelMessage> = {}): ChannelMessage {
+  return {
+    channelType: 'slack',
+    senderId: 'U001',
+    senderName: 'alice',
+    chatId: 'C123',
+    chatType: 'group',
+    text: '@golem hello',
+    raw: {},
+    ...overrides,
+  };
+}
+
+function makeDmMsg(overrides: Partial<ChannelMessage> = {}): ChannelMessage {
+  return {
+    channelType: 'slack',
+    senderId: 'U001',
+    senderName: 'alice',
+    chatId: 'C001',
+    chatType: 'dm',
+    text: 'hello',
+    raw: {},
+    ...overrides,
+  };
+}
+
+describe('handleMessage — full gateway pipeline', () => {
+  let dir: string;
+  let handleMessage: typeof import('../gateway.js').handleMessage;
+  let groupHistories: typeof import('../gateway.js').groupHistories;
+  let groupTurnCounters: typeof import('../gateway.js').groupTurnCounters;
+  let groupLastActivity: typeof import('../gateway.js').groupLastActivity;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'golem-hm-'));
+    const mod = await import('../gateway.js');
+    handleMessage = mod.handleMessage;
+    groupHistories = mod.groupHistories;
+    groupTurnCounters = mod.groupTurnCounters;
+    groupLastActivity = mod.groupLastActivity;
+    groupHistories.clear();
+    groupTurnCounters.clear();
+    groupLastActivity.clear();
+  });
+
+  afterEach(async () => {
+    groupHistories.clear();
+    groupTurnCounters.clear();
+    groupLastActivity.clear();
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  // ── Session key scoping ─────────────────────────────────────────────────
+
+  describe('session key scoping', () => {
+    it('DM message uses per-user session key (channelType:chatId:senderId)', async () => {
+      const assistant = makeMockAssistant('hi');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg();
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.lastSessionKey).toBe('slack:C001:U001');
+    });
+
+    it('group message uses group-scoped session key (channelType:chatId, no senderId)', async () => {
+      const assistant = makeMockAssistant('hi');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg();
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.lastSessionKey).toBe('slack:C123');
+    });
+
+    it('two different users in the same group share a session key', async () => {
+      const assistant = makeMockAssistant('hi');
+      const adapter = makeMockAdapter();
+      const msg1 = makeGroupMsg({ senderId: 'U001', senderName: 'alice' });
+      const msg2 = makeGroupMsg({ senderId: 'U002', senderName: 'bob' });
+      await handleMessage(msg1, makeConfig(), assistant, adapter, 'slack', false, dir);
+      const key1 = assistant.lastSessionKey;
+      await handleMessage(msg2, makeConfig(), assistant, adapter, 'slack', false, dir);
+      const key2 = assistant.lastSessionKey;
+      expect(key1).toBe(key2);
+      expect(key1).toBe('slack:C123');
+    });
+  });
+
+  // ── mention-only policy ─────────────────────────────────────────────────
+
+  describe('groupPolicy: mention-only (default)', () => {
+    it('calls assistant.chat when bot is @mentioned', async () => {
+      const assistant = makeMockAssistant('pong');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: '@golem ping' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(1);
+      expect(adapter.replies).toHaveLength(1);
+      expect(adapter.replies[0].text).toBe('pong');
+    });
+
+    it('skips assistant.chat when bot is NOT mentioned', async () => {
+      const assistant = makeMockAssistant('should not send');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: 'hello everyone' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(0);
+      expect(adapter.replies).toHaveLength(0);
+    });
+
+    it('honours msg.mentioned=true even without @BotName in text (Discord-style)', async () => {
+      const assistant = makeMockAssistant('discord reply');
+      const adapter = makeMockAdapter();
+      // Text already normalized to @golem by Discord adapter, but msg.mentioned also set
+      const msg = makeGroupMsg({ text: '@golem hello', mentioned: true });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'discord', false, dir);
+      expect(assistant.callCount).toBe(1);
+    });
+
+    it('msg.mentioned=true triggers response even when text has no @BotName', async () => {
+      const assistant = makeMockAssistant('ok');
+      const adapter = makeMockAdapter();
+      // Simulate Discord adapter without botName: text still has raw token
+      const msg = makeGroupMsg({ text: '<@U123456> help', mentioned: true });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'discord', false, dir);
+      expect(assistant.callCount).toBe(1);
+    });
+
+    it('still updates history even when message is skipped (not mentioned)', async () => {
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: 'just chatting' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      // history should have the message even though bot didn't reply
+      const hist = groupHistories.get('slack:C123');
+      expect(hist).toBeDefined();
+      expect(hist!.length).toBe(1);
+      expect(hist![0].senderName).toBe('alice');
+    });
+  });
+
+  // ── smart policy ────────────────────────────────────────────────────────
+
+  describe('groupPolicy: smart', () => {
+    const config = makeConfig({ groupChat: { groupPolicy: 'smart' } } as any);
+
+    it('calls assistant.chat for all group messages (not just mentions)', async () => {
+      const assistant = makeMockAssistant('great point');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: 'anyone know how to fix this?' });
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(1);
+    });
+
+    it('injects [PASS] instruction in prompt when NOT mentioned', async () => {
+      const assistant = makeMockAssistant('noted');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: 'general discussion' });
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(assistant.lastPrompt).toContain('[PASS]');
+    });
+
+    it('does NOT inject [PASS] instruction when @mentioned', async () => {
+      const assistant = makeMockAssistant('sure');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: '@golem explain this' });
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(assistant.lastPrompt).not.toContain('[System:');
+    });
+
+    it('[PASS] sentinel: adapter.reply is NOT called when agent returns [PASS]', async () => {
+      const assistant = makeMockAssistant('[PASS]');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: 'just chatting' });
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies).toHaveLength(0);
+    });
+
+    it('[PASS] does not increment turn counter', async () => {
+      const assistant = makeMockAssistant('[PASS]');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: 'topic shift' });
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(groupTurnCounters.get('slack:C123') ?? 0).toBe(0);
+    });
+
+    it('normal reply increments turn counter', async () => {
+      const assistant = makeMockAssistant('good question');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: '@golem help' });
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(groupTurnCounters.get('slack:C123')).toBe(1);
+    });
+  });
+
+  // ── always policy ───────────────────────────────────────────────────────
+
+  describe('groupPolicy: always', () => {
+    const config = makeConfig({ groupChat: { groupPolicy: 'always' } } as any);
+
+    it('replies to every group message regardless of mention', async () => {
+      const assistant = makeMockAssistant('hello there');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: 'good morning' }); // no @mention
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(1);
+      expect(adapter.replies).toHaveLength(1);
+    });
+  });
+
+  // ── Bot self-exclusion ──────────────────────────────────────────────────
+
+  describe('bot self-exclusion', () => {
+    it('skips messages where senderName matches config.name', async () => {
+      const assistant = makeMockAssistant('loop');
+      const adapter = makeMockAdapter();
+      // The bot itself sent this message (e.g. broadcast adapters echo back)
+      const msg = makeGroupMsg({ senderName: 'golem', text: '@golem hi' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(0);
+    });
+
+    it('does not add bot-self message to history', async () => {
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ senderName: 'golem', text: '@golem feedback' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(groupHistories.get('slack:C123')).toBeUndefined();
+    });
+  });
+
+  // ── maxTurns safety valve ───────────────────────────────────────────────
+
+  describe('maxTurns safety valve', () => {
+    it('stops processing when turn counter reaches maxTurns', async () => {
+      const config = makeConfig({ groupChat: { groupPolicy: 'always', maxTurns: 2 } } as any);
+      const assistant = makeMockAssistant('reply');
+      const adapter = makeMockAdapter();
+      // Pre-fill the turn counter to maxTurns; also set lastActivity so the idle-reset
+      // heuristic (which fires when lastActivity === 0) doesn't clear the counter.
+      groupTurnCounters.set('slack:C123', 2);
+      groupLastActivity.set('slack:C123', Date.now());
+      const msg = makeGroupMsg({ text: 'yet another message' });
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(0);
+    });
+
+    it('allows processing when turn counter is below maxTurns', async () => {
+      const config = makeConfig({ groupChat: { groupPolicy: 'always', maxTurns: 3 } } as any);
+      const assistant = makeMockAssistant('still going');
+      const adapter = makeMockAdapter();
+      groupTurnCounters.set('slack:C123', 2); // below threshold
+      const msg = makeGroupMsg({ text: 'one more' });
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(1);
+    });
+
+    it('resets turn counter after GROUP_TURN_RESET_MS of inactivity', async () => {
+      const { GROUP_TURN_RESET_MS } = await import('../gateway.js');
+      const config = makeConfig({ groupChat: { groupPolicy: 'always', maxTurns: 1 } } as any);
+      const assistant = makeMockAssistant('revived');
+      const adapter = makeMockAdapter();
+      // Simulate counter at limit and last activity more than 1h ago
+      groupTurnCounters.set('slack:C123', 1);
+      groupLastActivity.set('slack:C123', Date.now() - GROUP_TURN_RESET_MS - 1);
+      const msg = makeGroupMsg({ text: 'wake up' });
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      // Counter was reset, so assistant.chat should have been called
+      expect(assistant.callCount).toBe(1);
+    });
+  });
+
+  // ── History buffer management ───────────────────────────────────────────
+
+  describe('history buffer', () => {
+    it('adds user messages to history', async () => {
+      const assistant = makeMockAssistant('ack');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: '@golem remember this' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      const hist = groupHistories.get('slack:C123')!;
+      expect(hist.some(h => h.senderName === 'alice' && !h.isBot)).toBe(true);
+    });
+
+    it('adds bot reply to history with isBot=true', async () => {
+      const assistant = makeMockAssistant('done!');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: '@golem do it' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      const hist = groupHistories.get('slack:C123')!;
+      expect(hist.some(h => h.isBot && h.text === 'done!')).toBe(true);
+    });
+
+    it('respects historyLimit by discarding oldest entries', async () => {
+      const config = makeConfig({ groupChat: { historyLimit: 3 } } as any);
+      const assistant = makeMockAssistant('ok');
+      const adapter = makeMockAdapter();
+      // Send 3 messages (each with mention so they process)
+      for (let i = 0; i < 3; i++) {
+        await handleMessage(
+          makeGroupMsg({ text: `@golem msg${i}`, senderId: `U00${i}` }),
+          config, assistant, adapter, 'slack', false, dir,
+        );
+      }
+      const hist = groupHistories.get('slack:C123')!;
+      expect(hist.length).toBeLessThanOrEqual(3);
+    });
+
+    it('injects previous history into prompt for subsequent messages', async () => {
+      const assistant = makeMockAssistant('got it');
+      const adapter = makeMockAdapter();
+      // First message
+      await handleMessage(makeGroupMsg({ text: '@golem first' }), makeConfig(), assistant, adapter, 'slack', false, dir);
+      // Second message — prompt should contain history section
+      await handleMessage(makeGroupMsg({ text: '@golem second' }), makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.lastPrompt).toContain('--- Recent group conversation ---');
+    });
+  });
+
+  // ── DM handling ─────────────────────────────────────────────────────────
+
+  describe('DM handling', () => {
+    it('DM text is passed to assistant without mention stripping', async () => {
+      const assistant = makeMockAssistant('ok');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '@golem test' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      // DM: text goes straight through (no stripMention), sessionKey includes senderId
+      expect(assistant.lastPrompt).toBe('@golem test');
+    });
+
+    it('DM does not use group state Maps', async () => {
+      const assistant = makeMockAssistant('reply');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg();
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(groupHistories.size).toBe(0);
+      expect(groupTurnCounters.size).toBe(0);
+    });
+  });
+
+  // ── Message splitting ───────────────────────────────────────────────────
+
+  describe('message splitting', () => {
+    it('long replies are split and each chunk sent as a separate reply', async () => {
+      // 50 chars reply, adapter max = 20 → should split into 3 chunks
+      const longReply = 'x'.repeat(50);
+      const assistant = makeMockAssistant(longReply);
+      const adapter = makeMockAdapter(20); // maxMessageLength = 20
+      const msg = makeDmMsg();
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies.length).toBeGreaterThanOrEqual(3);
+      for (const r of adapter.replies) {
+        expect(r.text.length).toBeLessThanOrEqual(20);
+      }
+    });
+
+    it('short reply is sent as single chunk', async () => {
+      const assistant = makeMockAssistant('short');
+      const adapter = makeMockAdapter(100);
+      const msg = makeDmMsg();
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies).toHaveLength(1);
+    });
+  });
+
+  // ── Error handling ──────────────────────────────────────────────────────
+
+  describe('error handling', () => {
+    it('engine error event → sends fallback error reply', async () => {
+      const assistant = makeErrorEventAssistant();
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg();
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies).toHaveLength(1);
+      expect(adapter.replies[0].text).toContain('error occurred');
+    });
+
+    it('exception in assistant.chat → sends fallback error reply', async () => {
+      const assistant = makeThrowingAssistant();
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg();
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies).toHaveLength(1);
+      expect(adapter.replies[0].text).toContain('error occurred');
+    });
+
+    it('empty text after mention stripping → no assistant.chat call', async () => {
+      const assistant = makeMockAssistant('should not send');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: '@golem' }); // strips to empty string
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(0);
+      expect(adapter.replies).toHaveLength(0);
+    });
+  });
+
+  // ── clearGroupChatState (/reset integration) ────────────────────────────
+
+  describe('clearGroupChatState — /reset integration', () => {
+    it('clearing state resets history, turn counter, and last-activity', async () => {
+      const { clearGroupChatState } = await import('../gateway.js');
+      const key = 'slack:C123';
+      groupHistories.set(key, [{ senderName: 'alice', text: 'hi', isBot: false }]);
+      groupTurnCounters.set(key, 5);
+      groupLastActivity.set(key, Date.now());
+
+      clearGroupChatState(key);
+
+      expect(groupHistories.has(key)).toBe(false);
+      expect(groupTurnCounters.has(key)).toBe(false);
+      expect(groupLastActivity.has(key)).toBe(false);
+    });
+
+    it('after reset, a previously maxTurns-blocked group can reply again', async () => {
+      const { clearGroupChatState } = await import('../gateway.js');
+      const config = makeConfig({ groupChat: { groupPolicy: 'always', maxTurns: 1 } } as any);
+      const assistant = makeMockAssistant('back!');
+      const adapter = makeMockAdapter();
+      const key = 'slack:C123';
+
+      groupTurnCounters.set(key, 1); // at limit
+      groupLastActivity.set(key, Date.now()); // prevent idle-reset heuristic from clearing the counter
+      const blockedMsg = makeGroupMsg({ text: 'blocked' });
+      await handleMessage(blockedMsg, config, assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(0);
+
+      clearGroupChatState(key);
+
+      const unblockedMsg = makeGroupMsg({ text: 'try again' });
+      await handleMessage(unblockedMsg, config, assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(1);
     });
   });
 });
