@@ -74,6 +74,41 @@ Telegram Bot API 行为：privacy mode ON + bot 非群管理员 = 只投递 `/co
 
 ---
 
+## Issue 5 · Slack/飞书/钉钉群 @mention 消息被 gateway 静默丢弃
+
+**发现时间**: 2026-03-03
+**测试阶段**: Slack C-2 Channel mention-only
+**严重级别**: High（群聊 @mention 功能完全失效）
+**影响范围**: Slack、飞书、钉钉三个 adapter
+**状态**: ✅ 已修复
+
+### 现象
+在 Slack 频道里 `@GolemBot what's 2+2?`，bot 无回复，gateway 日志无任何 "received" 记录。通过临时 debug log 确认：`app_mention` 事件确实到达了 Bolt 的事件处理器，但 `onMessage` 之后没有产生任何日志。
+
+### 根本原因
+Slack adapter 的 `app_mention` 处理器在调用 `onMessage` 前已把 `<@BOT_ID>` strip 掉，但没有设置 `mentioned: true`。gateway 的 mention 检查逻辑为：
+
+```typescript
+const mentioned = detectMention(msg.text, config.name) || !!msg.mentioned;
+if (gc.groupPolicy === 'mention-only' && !mentioned) return;
+```
+
+- `detectMention(strippedText, 'golem-test')` → `false`（文本中已无 @token）
+- `!!msg.mentioned` → `false`（adapter 未设置）
+- 结果：`mentioned-only` 模式下直接 `return`，消息被静默丢弃
+
+**同样问题存在于**：
+- 飞书 adapter：群消息在 adapter 内已过滤（仅转发被 @mention 的消息），但 `mentioned` 字段未设置
+- 钉钉 adapter：平台本身只投递 @mention 消息，但 `mentioned` 字段未设置
+
+### 修复方案
+在 `app_mention` / 飞书群消息 / 钉钉群消息的 `onMessage` payload 中加入 `mentioned: true`：
+- `src/channels/slack.ts`: `onMessage({ ..., mentioned: true })`
+- `src/channels/feishu.ts`: `onMessage({ ..., mentioned: chatType === 'group' ? true : undefined })`
+- `src/channels/dingtalk.ts`: `onMessage({ ..., mentioned: isGroup ? true : undefined })`
+
+---
+
 ## Issue 2 · 长回复"批量投递"体验差
 
 **发现时间**: 2026-03-03

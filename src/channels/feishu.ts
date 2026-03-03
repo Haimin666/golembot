@@ -100,6 +100,7 @@ export class FeishuAdapter implements ChannelAdapter {
           chatId: message.chat_id,
           chatType,
           text,
+          mentioned: chatType === 'group' ? true : undefined,
           raw: data,
         };
 

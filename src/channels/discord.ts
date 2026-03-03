@@ -56,12 +56,13 @@ export class DiscordAdapter implements ChannelAdapter {
       const mentionPattern = new RegExp(`<@!?${botId}>`);
       const mentioned = mentionPattern.test(message.content);
 
-      // Normalize Discord mention tokens (<@botId>, <@!botId>) → @botName
-      // so that gateway's detectMention(text, config.name) also works correctly.
-      let text = message.content;
-      if (botName) {
-        text = text.replace(new RegExp(`<@!?${botId}>`, 'g'), `@${botName}`);
-      }
+      // Normalize Discord mention tokens (<@botId>, <@!botId>):
+      // - If botName is set: replace with @botName so gateway's detectMention works.
+      // - If no botName: strip the token entirely so the engine receives clean text.
+      let text = message.content.replace(
+        new RegExp(`<@!?${botId}>`, 'g'),
+        botName ? `@${botName}` : '',
+      ).trim();
 
       onMessage({
         channelType: 'discord',

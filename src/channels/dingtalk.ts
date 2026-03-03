@@ -43,6 +43,7 @@ export class DingtalkAdapter implements ChannelAdapter {
           chatId: data.conversationId || '',
           chatType: isGroup ? 'group' : 'dm',
           text,
+          mentioned: isGroup ? true : undefined,
           raw: { ...data, _sessionWebhook: data.sessionWebhook },
         };
 

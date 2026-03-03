@@ -56,8 +56,14 @@ export class SlackAdapter implements ChannelAdapter {
         chatId: event.channel,
         chatType: 'group',
         text,
+        mentioned: true,
         raw: event,
       });
+    });
+
+    // Log all unhandled errors from Bolt
+    this.app.error(async (error: any) => {
+      console.error('[slack:error]', error);
     });
 
     await this.app.start();
