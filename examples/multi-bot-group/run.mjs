@@ -70,9 +70,8 @@ async function ensureBotWorkspace(botDir, builtinSkillsDir) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.error('Error: ANTHROPIC_API_KEY is not set.');
-    console.error('Usage: ANTHROPIC_API_KEY=sk-... node run.mjs');
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENROUTER_API_KEY) {
+    console.error('Error: no API key found. Set ANTHROPIC_API_KEY or OPENROUTER_API_KEY.');
     process.exit(1);
   }
 
@@ -126,7 +125,6 @@ async function main() {
     const config = await loadConfig(botDir);
     const assistant = createAssistant({
       dir: botDir,
-      apiKey: process.env.ANTHROPIC_API_KEY,
       timeoutMs: TIMEOUT_SEC * 1000,
     });
 
@@ -144,6 +142,7 @@ async function main() {
     await adapter.start(async (msg) => {
       const userText = msg.chatType === 'group' ? stripMention(msg.text) : msg.text;
       if (!userText) return;
+      room.emit('bot:processing');
 
       const groupKey = `${msg.channelType}:${msg.chatId}`;
       const gc = resolveGroupChatConfig(config);
@@ -203,6 +202,8 @@ async function main() {
       } catch (e) {
         console.error(`[${config.name}] failed to process message:`, e.message);
         stats.errors++;
+      } finally {
+        room.emit('bot:done');
       }
     });
 
@@ -232,17 +233,21 @@ async function main() {
     injector.injectMessage(step.sender, step.text, CHAT_ID);
   }
 
-  // Wait for bots to finish responding (simple: wait until no new messages for 5s, or timeout)
-  const IDLE_TIMEOUT = 8000;
+  // Wait for bots to finish responding (wait until no new activity for IDLE_TIMEOUT, or hard timeout)
+  const IDLE_TIMEOUT = 30000;
   let lastActivityAt = Date.now();
+  let activeBots = 0;
   const activityListener = () => { lastActivityAt = Date.now(); };
   room.on('message', activityListener);
+  room.on('bot:processing', () => { activeBots++; lastActivityAt = Date.now(); });
+  room.on('bot:done', () => { activeBots = Math.max(0, activeBots - 1); lastActivityAt = Date.now(); });
 
   await new Promise((resolve) => {
     const check = setInterval(() => {
       const idle = Date.now() - lastActivityAt;
       const elapsed = Date.now() - startTime;
-      if (idle > IDLE_TIMEOUT || elapsed > TIMEOUT_SEC * 1000) {
+      const idleAndQuiet = idle > IDLE_TIMEOUT && activeBots === 0;
+      if (idleAndQuiet || elapsed > TIMEOUT_SEC * 1000) {
         clearInterval(check);
         resolve();
       }
@@ -250,6 +255,8 @@ async function main() {
   });
 
   room.off('message', activityListener);
+  room.off('bot:processing', activityListener);
+  room.off('bot:done', activityListener);
 
   // ── Summary ───────────────────────────────────────────────────────────────
   const totalMs = Date.now() - startTime;

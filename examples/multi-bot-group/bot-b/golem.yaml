@@ -1,5 +1,6 @@
 name: coder
-engine: claude-code
+engine: opencode
+model: openrouter/anthropic/claude-sonnet-4-5
 
 # Coder bot uses "mention-only" mode: it only responds when directly @mentioned,
 # keeping noise low while researcher observes everything in smart mode.

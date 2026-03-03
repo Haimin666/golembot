@@ -1,5 +1,6 @@
 name: researcher
-engine: claude-code
+engine: opencode
+model: openrouter/anthropic/claude-sonnet-4-5
 
 # Researcher bot uses "smart" mode: it observes all messages and only speaks
 # when it has something important to add, otherwise outputs [PASS].

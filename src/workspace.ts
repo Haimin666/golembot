@@ -138,6 +138,9 @@ export async function loadConfig(dir: string): Promise<GolemConfig> {
   if (typeof doc.maxQueuePerSession === 'number') config.maxQueuePerSession = doc.maxQueuePerSession;
   if (typeof doc.sessionTtlDays === 'number') config.sessionTtlDays = doc.sessionTtlDays;
   if (typeof doc.systemPrompt === 'string') config.systemPrompt = doc.systemPrompt;
+  if (doc.groupChat && typeof doc.groupChat === 'object') {
+    config.groupChat = doc.groupChat as GroupChatConfig;
+  }
 
   return config;
 }
