@@ -25,6 +25,12 @@ maxConcurrent: 20            # 最大并发 chat() 数（默认：10）
 maxQueuePerSession: 2        # 每个用户最大排队数（默认：3）
 sessionTtlDays: 14           # 闲置会话保留天数（默认：30）
 
+# 可选：群聊行为配置（适用于所有通道）
+groupChat:
+  groupPolicy: mention-only  # mention-only（默认）| smart | always
+  historyLimit: 20           # 注入最近多少条消息作为上下文（默认：20）
+  maxTurns: 10               # 每个群最多连续回复次数（默认：10，防死循环）
+
 # 可选：IM 通道配置
 channels:
   feishu:
@@ -78,6 +84,40 @@ gateway:
 - `channels.feishu` — 见[飞书配置](/zh/channels/feishu)
 - `channels.dingtalk` — 见[钉钉配置](/zh/channels/dingtalk)
 - `channels.wecom` — 见[企业微信配置](/zh/channels/wecom)
+- `channels.slack` — 见[Slack 配置](/zh/channels/slack)
+- `channels.telegram` — 见[Telegram 配置](/zh/channels/telegram)
+- 任意 key 加 `_adapter: <路径>` — 见[自定义 Adapter](/zh/channels/overview#自定义-adapter)
+
+### `groupChat`
+
+控制 bot 在群聊中的响应行为，适用于所有通道。
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `groupPolicy` | `string` | `mention-only` | 响应策略，见下表 |
+| `historyLimit` | `number` | `20` | 注入多少条历史消息作为上下文 |
+| `maxTurns` | `number` | `10` | 每个群最多连续 bot 回复次数（安全阀） |
+
+**`groupPolicy` 取值：**
+
+| 值 | Agent 调用时机 | Bot 何时回复 | 适用场景 |
+|----|--------------|------------|---------|
+| `mention-only` | 仅被 @mention 时 | 仅被 @mention 时（零成本跳过） | 低噪音，最省成本 |
+| `smart` | 所有群消息 | Agent 自己决定（输出 `[PASS]` 保持沉默） | Bot 持续观察并积累群记忆，按需发言 |
+| `always` | 所有群消息 | 每条消息都回复 | 高互动的专用小群 |
+
+::: tip smart 模式与群记忆
+`smart` 模式下，agent 对每条群消息都会运行——即使它最终输出 `[PASS]` 保持沉默。这意味着 agent 可以持续读写群记忆文件（`memory/groups/<group>.md`），始终掌握完整的群对话上下文。
+
+`mention-only` 模式下，agent 只在被 @mention 时才运行，记忆文件也只在此时更新。
+:::
+
+```yaml
+groupChat:
+  groupPolicy: smart     # mention-only（默认）| smart | always
+  historyLimit: 30       # 注入最近 30 条历史（默认：20）
+  maxTurns: 5            # 连续回复超过 5 次后自动沉默（默认：10）
+```
 
 ### `gateway`
 
@@ -140,17 +180,23 @@ interface GolemConfig {
   maxConcurrent?: number;       // 默认 10
   maxQueuePerSession?: number;  // 默认 3
   sessionTtlDays?: number;      // 默认 30
+  systemPrompt?: string;
+  groupChat?: {
+    groupPolicy?: 'mention-only' | 'smart' | 'always';  // 默认：'mention-only'
+    historyLimit?: number;   // 默认：20
+    maxTurns?: number;       // 默认：10
+  };
   channels?: {
     feishu?: { appId: string; appSecret: string };
     dingtalk?: { clientId: string; clientSecret: string };
     wecom?: {
-      corpId: string;
-      agentId: string;
-      secret: string;
-      token: string;
-      encodingAESKey: string;
-      port?: number;
+      corpId: string; agentId: string; secret: string;
+      token: string; encodingAESKey: string; port?: number;
     };
+    slack?: { botToken: string; appToken: string };
+    telegram?: { botToken: string };
+    // 自定义 adapter：任意 key，需包含 _adapter 字段
+    [key: string]: { _adapter: string; [k: string]: unknown } | undefined;
   };
   gateway?: {
     port?: number;

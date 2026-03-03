@@ -24,6 +24,12 @@ maxConcurrent: 20            # max parallel chats (default: 10)
 maxQueuePerSession: 2        # max queued requests per user (default: 3)
 sessionTtlDays: 14           # prune idle sessions after N days (default: 30)
 
+# Optional: group chat behaviour (applies to all channels)
+groupChat:
+  groupPolicy: mention-only  # mention-only (default) | smart | always
+  historyLimit: 20           # recent messages to inject as context (default: 20)
+  maxTurns: 10               # max consecutive bot replies per group (default: 10)
+
 # Optional: IM channel configuration
 channels:
   feishu:
@@ -77,6 +83,40 @@ Configure one or more IM platforms. Only configured channels are started by the 
 - `channels.feishu` — see [Feishu setup](/channels/feishu)
 - `channels.dingtalk` — see [DingTalk setup](/channels/dingtalk)
 - `channels.wecom` — see [WeCom setup](/channels/wecom)
+- `channels.slack` — see [Slack setup](/channels/slack)
+- `channels.telegram` — see [Telegram setup](/channels/telegram)
+- Any other key with `_adapter: <path>` — see [Custom Adapters](/channels/overview#custom-adapters)
+
+### `groupChat`
+
+Controls how the bot participates in group chats across all channels.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `groupPolicy` | `string` | `mention-only` | Response policy — see below |
+| `historyLimit` | `number` | `20` | Recent messages to inject as context |
+| `maxTurns` | `number` | `10` | Max consecutive bot replies per group (safety valve) |
+
+**`groupPolicy` values:**
+
+| Value | Agent called | Replies when | Use case |
+|-------|-------------|-------------|---------|
+| `mention-only` | Only on @mention | Only when @mentioned | Low noise, lowest cost |
+| `smart` | Every message | Agent decides (outputs `[PASS]` to stay silent) | Bot observes all and builds memory continuously |
+| `always` | Every message | Every message | High-interaction small groups |
+
+::: tip Smart mode and group memory
+In `smart` mode the agent runs on every group message — even when it stays silent by outputting `[PASS]`. This means the agent can read and update its group memory file (`memory/groups/<group>.md`) continuously, giving it full context of the conversation at all times.
+
+In `mention-only` mode the agent only runs when @mentioned, so memory is only updated at those moments.
+:::
+
+```yaml
+groupChat:
+  groupPolicy: smart     # mention-only (default) | smart | always
+  historyLimit: 30       # inject last 30 messages as context (default: 20)
+  maxTurns: 5            # stop after 5 consecutive bot replies (default: 10)
+```
 
 ### `gateway`
 
@@ -123,6 +163,31 @@ The `model` value format is different for each engine:
 
 See the individual engine pages for full model tables and runtime override syntax.
 
+## Full Example with Group Chat
+
+```yaml
+name: my-bot
+engine: claude-code
+
+groupChat:
+  groupPolicy: smart
+  historyLimit: 30
+  maxTurns: 5
+
+channels:
+  slack:
+    botToken: ${SLACK_BOT_TOKEN}
+    appToken: ${SLACK_APP_TOKEN}
+  # Custom adapter example:
+  my-platform:
+    _adapter: ./adapters/my-platform.mjs
+    apiKey: ${MY_PLATFORM_API_KEY}
+
+gateway:
+  port: 3000
+  token: ${GOLEM_TOKEN}
+```
+
 ## Skills Are Not Configured
 
 Skills are **not** declared in `golem.yaml`. The `skills/` directory is the single source of truth — whatever skill directories exist, those capabilities are loaded. See [Skills](/skills/overview).
@@ -139,17 +204,23 @@ interface GolemConfig {
   maxConcurrent?: number;       // default 10
   maxQueuePerSession?: number;  // default 3
   sessionTtlDays?: number;      // default 30
+  systemPrompt?: string;
+  groupChat?: {
+    groupPolicy?: 'mention-only' | 'smart' | 'always';  // default: 'mention-only'
+    historyLimit?: number;   // default: 20
+    maxTurns?: number;       // default: 10
+  };
   channels?: {
     feishu?: { appId: string; appSecret: string };
     dingtalk?: { clientId: string; clientSecret: string };
     wecom?: {
-      corpId: string;
-      agentId: string;
-      secret: string;
-      token: string;
-      encodingAESKey: string;
-      port?: number;
+      corpId: string; agentId: string; secret: string;
+      token: string; encodingAESKey: string; port?: number;
     };
+    slack?: { botToken: string; appToken: string };
+    telegram?: { botToken: string };
+    // Custom adapter: any key with _adapter field
+    [key: string]: { _adapter: string; [k: string]: unknown } | undefined;
   };
   gateway?: {
     port?: number;
