@@ -1,3 +1,10 @@
+## [0.7.1](https://github.com/0xranx/golembot/compare/v0.7.0...v0.7.1) (2026-03-03)
+
+
+### Bug Fixes
+
+* Discord mention detection works without botName configured ([1d8188e](https://github.com/0xranx/golembot/commit/1d8188ef60a325d8894b8ee0ee947901b2942f06))
+
 # [0.7.0-beta.2](https://github.com/0xranx/golembot/compare/v0.7.0-beta.1...v0.7.0-beta.2) (2026-03-03)
 
 
