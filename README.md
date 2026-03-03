@@ -25,7 +25,7 @@
 
 Cursor, Claude Code, OpenCode, Codex — these Coding Agents can already write code, run scripts, analyze data, and reason through complex tasks. But they're stuck in an IDE or a terminal window.
 
-**GolemBot gives them a body.** One command connects your Coding Agent to Slack, Telegram, Feishu, DingTalk, WeCom, or any HTTP client. Write a custom adapter to plug in email, Discord, GitHub Issues, or any other message source. Or embed into your own product with 5 lines of code. No AI framework, no prompt engineering — the agent you already have *is* the brain.
+**GolemBot gives them a body.** One command connects your Coding Agent to Slack, Telegram, Discord, Feishu, DingTalk, WeCom, or any HTTP client. Write a custom adapter to plug in email, GitHub Issues, or any other message source. Or embed into your own product with 5 lines of code. No AI framework, no prompt engineering — the agent you already have *is* the brain.
 
 ## Run Your Coding Agent Everywhere
 
@@ -33,7 +33,7 @@ Cursor, Claude Code, OpenCode, Codex — these Coding Agents can already write c
 
 ```bash
 golembot init -e claude-code -n my-bot
-golembot gateway    # Slack, Telegram, Feishu, DingTalk, WeCom
+golembot gateway    # Slack, Telegram, Discord, Feishu, DingTalk, WeCom
 ```
 
 Your colleagues @ the bot in group chat. It can write code, analyze files, answer questions — because behind it is a real Coding Agent, not a thin API wrapper.
@@ -78,8 +78,8 @@ golembot gateway      # start IM + HTTP service
 ## Architecture
 
 ```
-Slack / Telegram / Feishu / DingTalk / WeCom / HTTP API
-    Custom Adapters (email, Discord, GitHub Issues, ...)
+Slack / Telegram / Discord / Feishu / DingTalk / WeCom / HTTP API
+    Custom Adapters (email, GitHub Issues, ...)
                     │
                     ▼
          ┌─────────────────────────┐
@@ -120,6 +120,9 @@ channels:
     appToken: ${SLACK_APP_TOKEN}
   telegram:
     botToken: ${TELEGRAM_BOT_TOKEN}
+  discord:
+    botToken: ${DISCORD_BOT_TOKEN}
+    botName: my-assistant        # must match `name` above for @mention detection
   feishu:
     appId: ${FEISHU_APP_ID}
     appSecret: ${FEISHU_APP_SECRET}
