@@ -1,3 +1,10 @@
+# [0.7.0-beta.1](https://github.com/0xranx/golembot/compare/v0.6.1-beta.1...v0.7.0-beta.1) (2026-03-03)
+
+
+### Features
+
+* add Discord channel adapter and fix /reset group state cleanup ([7b30b89](https://github.com/0xranx/golembot/commit/7b30b895f91722c7609908ab26a909d6e83e97f9))
+
 ## [0.6.1-beta.1](https://github.com/0xranx/golembot/compare/v0.6.0...v0.6.1-beta.1) (2026-03-03)
 
 
