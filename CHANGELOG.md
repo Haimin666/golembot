@@ -1,3 +1,10 @@
+## [0.8.2](https://github.com/0xranx/golembot/compare/v0.8.1...v0.8.2) (2026-03-03)
+
+
+### Bug Fixes
+
+* set mentioned=true in Slack/Feishu/DingTalk group adapters ([ee04abd](https://github.com/0xranx/golembot/commit/ee04abd69a570ef1f03cbfae8c581bd7abd3d79f))
+
 ## [0.8.1](https://github.com/0xranx/golembot/compare/v0.8.0...v0.8.1) (2026-03-03)
 
 
