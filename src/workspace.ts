@@ -46,6 +46,20 @@ export interface GatewayConfig {
   token?: string;
 }
 
+export interface GroupChatConfig {
+  /**
+   * How the bot decides whether to respond in a group:
+   * - `mention-only` (default): only respond when @mentioned; agent not called otherwise (zero cost)
+   * - `smart`: agent is called for every message; outputs `[PASS]` to stay silent; can update group memory even when not responding
+   * - `always`: respond to every message unconditionally
+   */
+  groupPolicy?: 'mention-only' | 'smart' | 'always';
+  /** Number of recent group messages to inject as context. Default: 20. */
+  historyLimit?: number;
+  /** Max total replies this bot will send per group before stopping (safety valve). Default: 10. */
+  maxTurns?: number;
+}
+
 export interface GolemConfig {
   name: string;
   engine: string;
@@ -63,6 +77,8 @@ export interface GolemConfig {
   sessionTtlDays?: number;
   /** System-level instructions prepended to every user message before engine invocation. */
   systemPrompt?: string;
+  /** Group chat behaviour. Applies to all group messages across all channels. */
+  groupChat?: GroupChatConfig;
 }
 
 export interface SkillInfo {

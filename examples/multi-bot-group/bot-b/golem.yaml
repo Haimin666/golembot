@@ -1,0 +1,14 @@
+name: coder
+engine: claude-code
+
+# Coder bot uses "mention-only" mode: it only responds when directly @mentioned,
+# keeping noise low while researcher observes everything in smart mode.
+groupChat:
+  groupPolicy: mention-only
+  historyLimit: 20
+  maxTurns: 6
+
+channels:
+  mock-group:
+    _adapter: ../adapters/mock-group-adapter.mjs
+    botName: coder

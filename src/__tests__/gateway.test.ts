@@ -3,6 +3,8 @@ import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ChannelAdapter, ChannelMessage } from '../channel.js';
+import { detectMention } from '../channel.js';
+import { buildGroupPrompt, resolveGroupChatConfig, type GroupMessage } from '../gateway.js';
 
 function createMockAdapter(name: string): ChannelAdapter & {
   messages: ChannelMessage[];
@@ -150,15 +152,7 @@ describe('custom channel adapter loading', () => {
 }`,
     );
 
-    const { createChannelAdapter: createAdapter } = await import('../gateway.js').then(
-      async (m) => {
-        // Access private function via the module internals by writing a golem.yaml and using startGateway indirectly.
-        // Instead test through the splitMessage export which is public.
-        return m;
-      },
-    );
-
-    // Verify the adapter file is loadable via dynamic import directly
+    // createChannelAdapter is internal; test by loading the adapter file directly
     const adapterPath = join(adapterDir, 'test-adapter.mjs');
     const mod = await import(adapterPath);
     const AdapterClass = mod.default;
@@ -181,5 +175,136 @@ describe('custom channel adapter loading', () => {
     // Test that importing a non-existent module throws
     const badPath = join(tmpDir, 'non-existent-adapter.mjs');
     await expect(import(badPath)).rejects.toThrow();
+  });
+});
+
+describe('group chat helpers - detectMention', () => {
+  it('detects @BotName mention', () => {
+    expect(detectMention('@mybot hello', 'mybot')).toBe(true);
+  });
+
+  it('detects XML-style <at> mention', () => {
+    expect(detectMention('<at user_id="u1">mybot</at> hello', 'mybot')).toBe(true);
+  });
+
+  it('is case-insensitive', () => {
+    expect(detectMention('@MyBot hello', 'mybot')).toBe(true);
+    expect(detectMention('<at user_id="u1">MYBOT</at> hi', 'mybot')).toBe(true);
+  });
+
+  it('returns false when not mentioned', () => {
+    expect(detectMention('hello world, mybot', 'mybot')).toBe(false);
+  });
+
+  it('does not match partial names', () => {
+    expect(detectMention('@mybotplus hello', 'mybot')).toBe(false);
+  });
+});
+
+describe('group chat helpers - resolveGroupChatConfig', () => {
+  it('fills in default values when groupChat is absent', () => {
+    const config = { name: 'bot', engine: 'cursor' };
+    const gc = resolveGroupChatConfig(config as any);
+    expect(gc.groupPolicy).toBe('mention-only');
+    expect(gc.historyLimit).toBe(20);
+    expect(gc.maxTurns).toBe(10);
+  });
+
+  it('respects custom values', () => {
+    const config = {
+      name: 'bot',
+      engine: 'cursor',
+      groupChat: { groupPolicy: 'smart' as const, historyLimit: 30, maxTurns: 5 },
+    };
+    const gc = resolveGroupChatConfig(config as any);
+    expect(gc.groupPolicy).toBe('smart');
+    expect(gc.historyLimit).toBe(30);
+    expect(gc.maxTurns).toBe(5);
+  });
+
+  it('fills in missing partial fields', () => {
+    const config = { name: 'bot', engine: 'cursor', groupChat: { historyLimit: 50 } };
+    const gc = resolveGroupChatConfig(config as any);
+    expect(gc.groupPolicy).toBe('mention-only');
+    expect(gc.historyLimit).toBe(50);
+    expect(gc.maxTurns).toBe(10);
+  });
+});
+
+describe('group chat helpers - buildGroupPrompt', () => {
+  it('includes [Group:] metadata and MemoryFile path', () => {
+    const result = buildGroupPrompt([], 'alice', 'hi', false, 'slack:C123', '');
+    expect(result).toContain('[Group: slack:C123');
+    expect(result).toContain('MemoryFile:');
+    expect(result).toContain('memory');
+    expect(result).toContain('slack-C123.md');
+  });
+
+  it('sanitizes special characters in group key for memory path', () => {
+    const result = buildGroupPrompt([], 'alice', 'hi', false, 'slack:C #1!', '');
+    // ':' ' ' '#' '!' all → '-'
+    expect(result).toContain('slack-C--1-.md');
+  });
+
+  it('injects [PASS] instruction when injectPass=true', () => {
+    const result = buildGroupPrompt([], 'alice', 'hi', true, 'slack:C123', '');
+    expect(result).toContain('[System:');
+    expect(result).toContain('[PASS]');
+  });
+
+  it('excludes [PASS] instruction when injectPass=false', () => {
+    const result = buildGroupPrompt([], 'alice', 'hi', false, 'slack:C123', '');
+    expect(result).not.toContain('[System:');
+  });
+
+  it('formats current message as [senderName] text', () => {
+    const result = buildGroupPrompt([], 'alice', 'hello there', false, 'slack:C123', '');
+    expect(result).toContain('[alice] hello there');
+  });
+
+  it('includes history (excluding last entry which is current message)', () => {
+    const history: GroupMessage[] = [
+      { senderName: 'alice', text: 'first message', isBot: false },
+      { senderName: 'bob', text: 'current message', isBot: false }, // current — excluded from history
+    ];
+    const result = buildGroupPrompt(history, 'bob', 'current message', false, 'slack:C123', '');
+    expect(result).toContain('--- Recent group conversation ---');
+    expect(result).toContain('[alice] first message');
+    expect(result).toContain('--- New message ---');
+    expect(result).toContain('[bob] current message');
+  });
+
+  it('marks bot messages with [bot] label in history', () => {
+    const history: GroupMessage[] = [
+      { senderName: 'golem', text: 'bot reply', isBot: true },
+      { senderName: 'alice', text: 'thanks', isBot: false }, // current
+    ];
+    const result = buildGroupPrompt(history, 'alice', 'thanks', false, 'slack:C123', '');
+    expect(result).toContain('[bot] bot reply');
+  });
+
+  it('excludes history section when only one or zero history entries', () => {
+    const history: GroupMessage[] = [
+      { senderName: 'alice', text: 'hello', isBot: false }, // current (only entry)
+    ];
+    const result = buildGroupPrompt(history, 'alice', 'hello', false, 'slack:C123', '');
+    expect(result).not.toContain('--- Recent group conversation ---');
+  });
+
+  it('DM uses per-user session key (buildSessionKey still works)', async () => {
+    const { buildSessionKey } = await import('../channel.js');
+    const msg: ChannelMessage = {
+      channelType: 'slack',
+      senderId: 'U001',
+      chatId: 'C001',
+      chatType: 'dm',
+      text: 'hello',
+      raw: {},
+    };
+    // DM key includes senderId; group key would be channelType:chatId only
+    expect(buildSessionKey(msg)).toBe('slack:C001:U001');
+    const groupKey = `${msg.channelType}:${msg.chatId}`;
+    expect(groupKey).toBe('slack:C001');
+    expect(buildSessionKey(msg)).not.toBe(groupKey);
   });
 });

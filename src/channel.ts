@@ -31,3 +31,12 @@ export function stripMention(text: string): string {
     .replace(/@\S+/g, '')
     .trim();
 }
+
+/**
+ * Detect whether `text` contains an @mention of `botName`.
+ * Handles `@BotName` and XML-style `<at ...>BotName</at>`.
+ */
+export function detectMention(text: string, botName: string): boolean {
+  const escaped = botName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`@${escaped}(?!\\w)|<at[^>]*>${escaped}<\\/at>`, 'i').test(text);
+}
