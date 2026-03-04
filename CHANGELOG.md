@@ -1,3 +1,10 @@
+# [0.9.0](https://github.com/0xranx/golembot/compare/v0.8.6...v0.9.0) (2026-03-04)
+
+
+### Features
+
+* add engine authentication step to onboard wizard ([1024c42](https://github.com/0xranx/golembot/commit/1024c42f01035653fdc4b9be7b84574a91b85782))
+
 ## [0.8.6](https://github.com/0xranx/golembot/compare/v0.8.5...v0.8.6) (2026-03-04)
 
 
