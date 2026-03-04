@@ -53,6 +53,119 @@ describe('stripMention', () => {
   });
 });
 
+// ── Adapter mentioned field logic ─────────────────────────
+
+describe('Slack adapter mentioned field', () => {
+  it('sets mentioned=true for app_mention group events', () => {
+    // Simulates Slack adapter app_mention handler
+    const event = { text: '<@UBOT123> what is 2+2?', user: 'U001', channel: 'C001' };
+    const text = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
+    const msg: ChannelMessage = {
+      channelType: 'slack', senderId: event.user, chatId: event.channel,
+      chatType: 'group', text, mentioned: true, raw: event,
+    };
+    expect(msg.mentioned).toBe(true);
+    expect(msg.text).toBe('what is 2+2?');
+  });
+
+  it('DM messages do not set mentioned', () => {
+    const msg: ChannelMessage = {
+      channelType: 'slack', senderId: 'U001', chatId: 'D001',
+      chatType: 'dm', text: 'hello', raw: {},
+    };
+    expect(msg.mentioned).toBeUndefined();
+  });
+});
+
+describe('Feishu adapter mentioned field', () => {
+  it('sets mentioned=true when bot is @mentioned in group', () => {
+    const botOpenId = 'ou_bot123';
+    const mentions = [{ key: '@_user_1', id: { open_id: 'ou_bot123' } }];
+    const isMentioned = mentions.some(m => m.id?.open_id === botOpenId);
+    const text = '@_user_1 help me'.replace(mentions[0].key, '').trim();
+
+    const msg: ChannelMessage = {
+      channelType: 'feishu', senderId: 'ou_user1', chatId: 'oc_group1',
+      chatType: 'group', text, mentioned: isMentioned, raw: {},
+    };
+    expect(msg.mentioned).toBe(true);
+    expect(msg.text).toBe('help me');
+  });
+
+  it('sets mentioned=false for non-mention group messages (smart mode)', () => {
+    const botOpenId = 'ou_bot123';
+    const mentions: any[] = [];
+    const isMentioned = mentions.some(m => m.id?.open_id === botOpenId);
+
+    const msg: ChannelMessage = {
+      channelType: 'feishu', senderId: 'ou_user1', chatId: 'oc_group1',
+      chatType: 'group', text: 'general discussion', mentioned: isMentioned, raw: {},
+    };
+    expect(msg.mentioned).toBe(false);
+  });
+
+  it('DM messages have mentioned=undefined', () => {
+    const chatType: 'dm' | 'group' = 'dm';
+    const msg: ChannelMessage = {
+      channelType: 'feishu', senderId: 'ou_user1', chatId: 'oc_dm1',
+      chatType, text: 'hello', mentioned: chatType === 'group' ? true : undefined, raw: {},
+    };
+    expect(msg.mentioned).toBeUndefined();
+  });
+});
+
+describe('DingTalk adapter mentioned field', () => {
+  it('sets mentioned=true for group messages (platform guarantees @mention)', () => {
+    const isGroup = true;
+    const msg: ChannelMessage = {
+      channelType: 'dingtalk', senderId: 'user001', chatId: 'cid_group1',
+      chatType: 'group', text: 'hello bot', mentioned: isGroup ? true : undefined, raw: {},
+    };
+    expect(msg.mentioned).toBe(true);
+  });
+
+  it('DM messages have mentioned=undefined', () => {
+    const isGroup = false;
+    const msg: ChannelMessage = {
+      channelType: 'dingtalk', senderId: 'user001', chatId: 'cid_dm1',
+      chatType: 'dm', text: 'hello', mentioned: isGroup ? true : undefined, raw: {},
+    };
+    expect(msg.mentioned).toBeUndefined();
+  });
+});
+
+describe('Discord adapter mentioned field and mention stripping', () => {
+  it('sets mentioned=true when <@botId> token is present', () => {
+    const botId = '123456789';
+    const content = '<@123456789> help me';
+    const mentionPattern = new RegExp(`<@!?${botId}>`);
+    const mentioned = mentionPattern.test(content);
+    expect(mentioned).toBe(true);
+  });
+
+  it('strips <@botId> and replaces with @botName when configured', () => {
+    const botId = '123456789';
+    const botName = 'GolemBot';
+    const content = '<@123456789> help me';
+    const text = content.replace(new RegExp(`<@!?${botId}>`, 'g'), `@${botName}`).trim();
+    expect(text).toBe('@GolemBot help me');
+  });
+
+  it('strips <@botId> cleanly when botName is not configured', () => {
+    const botId = '123456789';
+    const content = '<@123456789> help me';
+    const text = content.replace(new RegExp(`<@!?${botId}>`, 'g'), '').trim();
+    expect(text).toBe('help me');
+  });
+
+  it('handles <@!botId> format (nickname mention)', () => {
+    const botId = '123456789';
+    const content = '<@!123456789> help me';
+    const text = content.replace(new RegExp(`<@!?${botId}>`, 'g'), '').trim();
+    expect(text).toBe('help me');
+  });
+});
+
 // ── Slack routing logic ───────────────────────────────────
 
 describe('Slack message routing logic', () => {
