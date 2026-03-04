@@ -68,16 +68,13 @@ export class FeishuAdapter implements ChannelAdapter {
 
         const chatType: 'dm' | 'group' = message.chat_type === 'p2p' ? 'dm' : 'group';
 
-        // In group chats, only respond when the bot is @mentioned.
+        // Detect if the bot is @mentioned in group chats.
+        let isMentioned = false;
         if (chatType === 'group') {
           const resolvedId = await fetchBotOpenId();
-          if (resolvedId) {
-            const isMentioned = mentions.some(m => m.id?.open_id === resolvedId);
-            if (!isMentioned) return;
-          } else {
-            // Last-resort fallback: require at least one @mention in the message.
-            if (mentions.length === 0) return;
-          }
+          isMentioned = resolvedId
+            ? mentions.some(m => m.id?.open_id === resolvedId)
+            : mentions.length > 0;
         }
 
         // Strip the bot's @mention key from the text before passing to the assistant.
@@ -100,7 +97,7 @@ export class FeishuAdapter implements ChannelAdapter {
           chatId: message.chat_id,
           chatType,
           text,
-          mentioned: chatType === 'group' ? true : undefined,
+          mentioned: chatType === 'group' ? isMentioned : undefined,
           raw: data,
         };
 
