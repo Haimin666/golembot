@@ -40,7 +40,7 @@ See the full and up-to-date list at [Anthropic model documentation](https://docs
 **Override at runtime** — pass `model` to `createAssistant()`:
 
 ```typescript
-const bot = createAssistant({ dir: './my-bot', model: 'claude-opus-4-5' })
+const bot = createAssistant({ dir: './my-bot', model: 'claude-opus-4-6' })
 ```
 
 ## How It Works

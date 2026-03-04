@@ -38,7 +38,7 @@ If `model` is omitted, Cursor uses the default model from its Settings.
 **Override at runtime** — pass `model` to `createAssistant()`:
 
 ```typescript
-const bot = createAssistant({ dir: './my-bot', model: 'gpt-4o' })
+const bot = createAssistant({ dir: './my-bot', model: 'claude-4.6-sonnet' })
 ```
 
 ## How It Works

@@ -76,7 +76,7 @@ export async function runDoctor(dir: string): Promise<void> {
       authOk = true;
       authDetail = 'ChatGPT OAuth (~/.codex/auth.json)';
     } else {
-      authDetail = 'none — run `codex login` or set OPENAI_API_KEY';
+      authDetail = 'none — run `codex login` or set CODEX_API_KEY';
     }
   } else {
     const keyVars = ['ANTHROPIC_API_KEY', 'CURSOR_API_KEY', 'OPENROUTER_API_KEY', 'OPENAI_API_KEY'];

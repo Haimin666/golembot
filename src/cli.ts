@@ -81,7 +81,7 @@ program
 program
   .command('init')
   .description('Initialize a new GolemBot assistant in the current directory')
-  .option('-e, --engine <engine>', 'engine type (cursor | claude-code | opencode)', 'cursor')
+  .option('-e, --engine <engine>', 'engine type (cursor | claude-code | opencode | codex)', 'cursor')
   .option('-n, --name <name>', 'assistant name')
   .action(async (opts) => {
     const dir = resolve('.');
@@ -99,6 +99,7 @@ program
             { name: 'Cursor', value: 'cursor' },
             { name: 'Claude Code', value: 'claude-code' },
             { name: 'OpenCode', value: 'opencode' },
+            { name: 'Codex', value: 'codex' },
           ],
           default: engine,
         },

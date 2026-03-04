@@ -39,7 +39,7 @@ claude models
 **运行时覆盖** — 通过 `createAssistant()` 传入：
 
 ```typescript
-const bot = createAssistant({ dir: './my-bot', model: 'claude-opus-4-5' })
+const bot = createAssistant({ dir: './my-bot', model: 'claude-opus-4-6' })
 ```
 
 ## 工作原理

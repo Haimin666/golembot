@@ -142,6 +142,7 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
       { name: 'Cursor', value: 'cursor' },
       { name: 'Claude Code', value: 'claude-code' },
       { name: 'OpenCode', value: 'opencode' },
+      { name: 'Codex', value: 'codex' },
     ],
   }]);
 

@@ -5,8 +5,9 @@
 - **Cursor** — if you already use Cursor IDE and have a subscription
 - **Claude Code** — best overall experience; provides cost tracking and turn counts
 - **OpenCode** — if you want multi-provider flexibility (Anthropic, OpenAI, OpenRouter, etc.)
+- **Codex** — if you prefer OpenAI models; supports ChatGPT OAuth or API key
 
-All three produce the same `StreamEvent` interface, so you can switch at any time by changing one line in `golem.yaml`.
+All four produce the same `StreamEvent` interface, so you can switch at any time by changing one line in `golem.yaml`.
 
 ## How do I set API keys?
 
@@ -17,6 +18,7 @@ Each engine uses its own environment variable:
 | Cursor | `CURSOR_API_KEY` |
 | Claude Code | `ANTHROPIC_API_KEY` |
 | OpenCode | Depends on provider (e.g., `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) |
+| Codex | `CODEX_API_KEY` (or `codex login` for ChatGPT OAuth) |
 
 Place them in a `.env` file in the assistant directory — the CLI loads it automatically.
 

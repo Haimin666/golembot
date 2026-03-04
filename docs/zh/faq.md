@@ -5,8 +5,9 @@
 - **Cursor** — 如果你已经在用 Cursor IDE 并有订阅
 - **Claude Code** — 综合体验最佳；提供费用追踪和轮次统计
 - **OpenCode** — 需要多 Provider 灵活性（Anthropic、OpenAI、OpenRouter 等）
+- **Codex** — 偏好 OpenAI 模型；支持 ChatGPT OAuth 或 API Key
 
-三者产出相同的 `StreamEvent` 接口，随时可以切换。
+四者产出相同的 `StreamEvent` 接口，随时可以切换。
 
 ## 如何设置 API Key？
 
@@ -15,6 +16,7 @@
 | Cursor | `CURSOR_API_KEY` |
 | Claude Code | `ANTHROPIC_API_KEY` |
 | OpenCode | 取决于 Provider（如 `ANTHROPIC_API_KEY`、`OPENAI_API_KEY`） |
+| Codex | `CODEX_API_KEY`（或 `codex login` 使用 ChatGPT OAuth） |
 
 放在助手目录的 `.env` 文件中 — CLI 启动时自动加载。
 
