@@ -3,7 +3,9 @@ import {
   hasMarkdown,
   markdownToPost,
   markdownToCard,
+  injectMentionsIntoPost,
   type PostElement,
+  type PostContent,
 } from '../channels/feishu-format.js';
 
 // ---------------------------------------------------------------------------
@@ -261,5 +263,147 @@ describe('markdownToCard', () => {
     expect(content).toContain('```js');
     expect(content).toContain('console.log(1)');
     expect(content).toContain('```');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// injectMentionsIntoPost
+// ---------------------------------------------------------------------------
+
+describe('injectMentionsIntoPost', () => {
+  it('replaces @name with at element in a simple text line', () => {
+    const post: PostContent = {
+      zh_cn: {
+
+        content: [[{ tag: 'text', text: '好的，@小舟 你来处理' }]],
+      },
+    };
+    injectMentionsIntoPost(post, [{ name: '小舟', platformId: 'ou_xiaozhou' }]);
+
+    const line = post.zh_cn.content[0];
+    expect(line).toHaveLength(3);
+    expect(line[0]).toEqual({ tag: 'text', text: '好的，' });
+    expect(line[1]).toEqual({ tag: 'at', user_id: 'ou_xiaozhou' });
+    expect(line[2]).toEqual({ tag: 'text', text: ' 你来处理' });
+  });
+
+  it('replaces multiple different @mentions in the same line', () => {
+    const post: PostContent = {
+      zh_cn: {
+
+        content: [[{ tag: 'text', text: '@alice and @bob please review' }]],
+      },
+    };
+    injectMentionsIntoPost(post, [
+      { name: 'alice', platformId: 'ou_alice' },
+      { name: 'bob', platformId: 'ou_bob' },
+    ]);
+
+    const line = post.zh_cn.content[0];
+    const atElements = line.filter(el => el.tag === 'at');
+    expect(atElements).toHaveLength(2);
+    expect(atElements[0].user_id).toBe('ou_alice');
+    expect(atElements[1].user_id).toBe('ou_bob');
+  });
+
+  it('does not modify non-text elements', () => {
+    const post: PostContent = {
+      zh_cn: {
+
+        content: [[
+          { tag: 'a', text: '@alice link', href: 'https://example.com' },
+          { tag: 'text', text: 'hello @alice' },
+        ]],
+      },
+    };
+    injectMentionsIntoPost(post, [{ name: 'alice', platformId: 'ou_alice' }]);
+
+    const line = post.zh_cn.content[0];
+    // The <a> element should be untouched
+    expect(line[0]).toEqual({ tag: 'a', text: '@alice link', href: 'https://example.com' });
+    // The text element should have been split
+    const atElements = line.filter(el => el.tag === 'at');
+    expect(atElements).toHaveLength(1);
+  });
+
+  it('handles @mention at the very start of text', () => {
+    const post: PostContent = {
+      zh_cn: {
+
+        content: [[{ tag: 'text', text: '@alice 你好' }]],
+      },
+    };
+    injectMentionsIntoPost(post, [{ name: 'alice', platformId: 'ou_alice' }]);
+
+    const line = post.zh_cn.content[0];
+    expect(line[0]).toEqual({ tag: 'at', user_id: 'ou_alice' });
+    expect(line[1]).toEqual({ tag: 'text', text: ' 你好' });
+  });
+
+  it('handles @mention at the very end of text', () => {
+    const post: PostContent = {
+      zh_cn: {
+
+        content: [[{ tag: 'text', text: '请 @alice' }]],
+      },
+    };
+    injectMentionsIntoPost(post, [{ name: 'alice', platformId: 'ou_alice' }]);
+
+    const line = post.zh_cn.content[0];
+    expect(line[0]).toEqual({ tag: 'text', text: '请 ' });
+    expect(line[1]).toEqual({ tag: 'at', user_id: 'ou_alice' });
+  });
+
+  it('does nothing when mentions array is empty', () => {
+    const post: PostContent = {
+      zh_cn: {
+
+        content: [[{ tag: 'text', text: 'hello @alice' }]],
+      },
+    };
+    const original = JSON.parse(JSON.stringify(post));
+    injectMentionsIntoPost(post, []);
+    expect(post).toEqual(original);
+  });
+
+  it('ignores @names not in the mentions list', () => {
+    const post: PostContent = {
+      zh_cn: {
+
+        content: [[{ tag: 'text', text: 'hello @alice and @charlie' }]],
+      },
+    };
+    injectMentionsIntoPost(post, [{ name: 'alice', platformId: 'ou_alice' }]);
+
+    const line = post.zh_cn.content[0];
+    const atElements = line.filter(el => el.tag === 'at');
+    expect(atElements).toHaveLength(1);
+    expect(atElements[0].user_id).toBe('ou_alice');
+    // @charlie should remain as text
+    const textParts = line.filter(el => el.tag === 'text').map(el => el.text).join('');
+    expect(textParts).toContain('@charlie');
+  });
+
+  it('handles multi-line post content', () => {
+    const post: PostContent = {
+      zh_cn: {
+
+        content: [
+          [{ tag: 'text', text: '第一行 @alice' }],
+          [{ tag: 'text', text: '第二行 @bob' }],
+        ],
+      },
+    };
+    injectMentionsIntoPost(post, [
+      { name: 'alice', platformId: 'ou_alice' },
+      { name: 'bob', platformId: 'ou_bob' },
+    ]);
+
+    const atLine1 = post.zh_cn.content[0].filter(el => el.tag === 'at');
+    const atLine2 = post.zh_cn.content[1].filter(el => el.tag === 'at');
+    expect(atLine1).toHaveLength(1);
+    expect(atLine1[0].user_id).toBe('ou_alice');
+    expect(atLine2).toHaveLength(1);
+    expect(atLine2[0].user_id).toBe('ou_bob');
   });
 });
