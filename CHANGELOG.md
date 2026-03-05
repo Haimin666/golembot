@@ -5,6 +5,18 @@
 
 * use card v2 markdown component for native list rendering in Feishu ([00be390](https://github.com/0xranx/golembot/commit/00be390b992f000627fbfc7bde54777d231b7c13))
 
+
+### Features
+
+* private chat context injection and group [@mention](https://github.com/mention) support ([c550d0a](https://github.com/0xranx/golembot/commit/c550d0af37b8adc5131102842ca0602d42c05f4e))
+
+# [0.11.0-beta.8](https://github.com/0xranx/golembot/compare/v0.11.0-beta.7...v0.11.0-beta.8) (2026-03-05)
+
+
+### Bug Fixes
+
+* use card v2 markdown component for native list rendering in Feishu ([00be390](https://github.com/0xranx/golembot/commit/00be390b992f000627fbfc7bde54777d231b7c13))
+
 # [0.11.0-beta.6](https://github.com/0xranx/golembot/compare/v0.11.0-beta.5...v0.11.0-beta.6) (2026-03-05)
 
 
