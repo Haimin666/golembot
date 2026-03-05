@@ -20,6 +20,8 @@ export class WecomAdapter implements ChannelAdapter {
   private tokenExpiresAt: number = 0;
 
   private userNameCache = new Map<string, string>();
+  private seenMsgIds = new Set<string>();
+  private static readonly MAX_SEEN = 500;
 
   constructor(config: WecomChannelConfig) {
     this.config = config;
@@ -128,6 +130,21 @@ export class WecomAdapter implements ChannelAdapter {
             res.writeHead(200);
             res.end('ok');
             return;
+          }
+
+          // Deduplicate re-delivered webhooks.
+          const msgId: string | undefined = msgXml.MsgId;
+          if (msgId) {
+            if (this.seenMsgIds.has(msgId)) {
+              res.writeHead(200);
+              res.end('ok');
+              return;
+            }
+            this.seenMsgIds.add(msgId);
+            if (this.seenMsgIds.size > WecomAdapter.MAX_SEEN) {
+              const entries = [...this.seenMsgIds];
+              this.seenMsgIds = new Set(entries.slice(entries.length >> 1));
+            }
           }
 
           const senderId = msgXml.FromUserName || '';

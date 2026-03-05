@@ -10,6 +10,9 @@ export class FeishuAdapter implements ChannelAdapter {
   private wsClient: any;
 
   private userNameCache = new Map<string, string>();
+  /** Recent message IDs used to deduplicate re-delivered events. */
+  private seenMsgIds = new Set<string>();
+  private static readonly MAX_SEEN = 500;
 
   constructor(config: FeishuChannelConfig) {
     this.config = config;
@@ -73,6 +76,18 @@ export class FeishuAdapter implements ChannelAdapter {
     const eventDispatcher = new lark.EventDispatcher({}).register({
       'im.message.receive_v1': async (data: any) => {
         const { message, sender } = data;
+
+        // Deduplicate re-delivered events.
+        const msgId: string | undefined = message.message_id;
+        if (msgId) {
+          if (this.seenMsgIds.has(msgId)) return;
+          this.seenMsgIds.add(msgId);
+          if (this.seenMsgIds.size > FeishuAdapter.MAX_SEEN) {
+            // Evict oldest half.
+            const entries = [...this.seenMsgIds];
+            this.seenMsgIds = new Set(entries.slice(entries.length >> 1));
+          }
+        }
 
         if (message.message_type !== 'text') return;
 

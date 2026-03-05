@@ -8,6 +8,8 @@ export class DiscordAdapter implements ChannelAdapter {
 
   private config: DiscordChannelConfig;
   private client: any = null;
+  private seenMsgIds = new Set<string>();
+  private static readonly MAX_SEEN = 500;
 
   constructor(config: DiscordChannelConfig) {
     this.config = config;
@@ -49,6 +51,15 @@ export class DiscordAdapter implements ChannelAdapter {
     this.client.on('messageCreate', async (message: any) => {
       if (message.author.bot) return;
       if (!message.content) return; // skip embed-only messages
+      // Deduplicate re-delivered events.
+      if (message.id) {
+        if (this.seenMsgIds.has(message.id)) return;
+        this.seenMsgIds.add(message.id);
+        if (this.seenMsgIds.size > DiscordAdapter.MAX_SEEN) {
+          const entries = [...this.seenMsgIds];
+          this.seenMsgIds = new Set(entries.slice(entries.length >> 1));
+        }
+      }
 
       const isDM = !message.guild;
 

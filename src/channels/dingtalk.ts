@@ -6,6 +6,8 @@ export class DingtalkAdapter implements ChannelAdapter {
   readonly maxMessageLength = 4000;
   private config: DingtalkChannelConfig;
   private dwClient: any;
+  private seenMsgIds = new Set<string>();
+  private static readonly MAX_SEEN = 500;
 
   constructor(config: DingtalkChannelConfig) {
     this.config = config;
@@ -31,6 +33,20 @@ export class DingtalkAdapter implements ChannelAdapter {
     this.dwClient.registerCallbackListener(
       TOPIC_ROBOT,
       async (res: any) => {
+        // Deduplicate re-delivered events.
+        const msgId: string | undefined = res.headers?.messageId || JSON.parse(res.data).msgId;
+        if (msgId) {
+          if (this.seenMsgIds.has(msgId)) {
+            this.dwClient.socketCallBackResponse(res.headers.messageId, { status: 'SUCCESS' });
+            return;
+          }
+          this.seenMsgIds.add(msgId);
+          if (this.seenMsgIds.size > DingtalkAdapter.MAX_SEEN) {
+            const entries = [...this.seenMsgIds];
+            this.seenMsgIds = new Set(entries.slice(entries.length >> 1));
+          }
+        }
+
         const data = JSON.parse(res.data);
         const text = data.text?.content?.trim() || '';
         if (!text) return;
