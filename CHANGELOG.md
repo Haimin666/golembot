@@ -1,3 +1,10 @@
+# [0.11.0-beta.6](https://github.com/0xranx/golembot/compare/v0.11.0-beta.5...v0.11.0-beta.6) (2026-03-05)
+
+
+### Bug Fixes
+
+* deduplicate re-delivered events in all channel adapters ([0607885](https://github.com/0xranx/golembot/commit/06078856e4ec3dbfe38c4cdfcd9131f8e90b9aae))
+
 # [0.11.0-beta.5](https://github.com/0xranx/golembot/compare/v0.11.0-beta.4...v0.11.0-beta.5) (2026-03-05)
 
 
