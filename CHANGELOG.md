@@ -5,6 +5,13 @@
 
 * smart Feishu message formatting with post rich text and optional card mode ([6bcb567](https://github.com/0xranx/golembot/commit/6bcb567923c0181c8be68e4f35e8ee427837657c))
 
+# [0.11.0-beta.1](https://github.com/0xranx/golembot/compare/v0.10.1...v0.11.0-beta.1) (2026-03-05)
+
+
+### Features
+
+* smart Feishu message formatting with post rich text and optional card mode ([6bcb567](https://github.com/0xranx/golembot/commit/6bcb567923c0181c8be68e4f35e8ee427837657c))
+
 ## [0.10.1](https://github.com/0xranx/golembot/compare/v0.10.0...v0.10.1) (2026-03-05)
 
 
