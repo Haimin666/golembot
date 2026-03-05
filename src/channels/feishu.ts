@@ -1,5 +1,6 @@
 import type { ChannelAdapter, ChannelMessage } from '../channel.js';
 import type { FeishuChannelConfig } from '../workspace.js';
+import { hasMarkdown, markdownToPost, markdownToCard } from './feishu-format.js';
 
 export class FeishuAdapter implements ChannelAdapter {
   readonly name = 'feishu';
@@ -138,14 +139,42 @@ export class FeishuAdapter implements ChannelAdapter {
 
   async reply(msg: ChannelMessage, text: string): Promise<void> {
     if (!this.client) return;
-    await this.client.im.v1.message.create({
-      params: { receive_id_type: 'chat_id' },
-      data: {
-        receive_id: msg.chatId,
-        content: JSON.stringify({ text }),
-        msg_type: 'text',
-      },
-    });
+
+    if (hasMarkdown(text)) {
+      if (this.config.sendMarkdownAsCard) {
+        // Interactive card — native lark_md rendering
+        const card = markdownToCard(text);
+        await this.client.im.v1.message.create({
+          params: { receive_id_type: 'chat_id' },
+          data: {
+            receive_id: msg.chatId,
+            content: JSON.stringify(card),
+            msg_type: 'interactive',
+          },
+        });
+      } else {
+        // Post rich text (default)
+        const post = markdownToPost(text);
+        await this.client.im.v1.message.create({
+          params: { receive_id_type: 'chat_id' },
+          data: {
+            receive_id: msg.chatId,
+            content: JSON.stringify(post),
+            msg_type: 'post',
+          },
+        });
+      }
+    } else {
+      // Plain text
+      await this.client.im.v1.message.create({
+        params: { receive_id_type: 'chat_id' },
+        data: {
+          receive_id: msg.chatId,
+          content: JSON.stringify({ text }),
+          msg_type: 'text',
+        },
+      });
+    }
   }
 
   async stop(): Promise<void> {
