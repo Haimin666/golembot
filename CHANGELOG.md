@@ -1,3 +1,10 @@
+# [0.11.0-beta.10](https://github.com/0xranx/golembot/compare/v0.11.0-beta.9...v0.11.0-beta.10) (2026-03-06)
+
+
+### Bug Fixes
+
+* update im-adapter skill to encourage standard markdown formatting ([d8d664b](https://github.com/0xranx/golembot/commit/d8d664b77e4b486c943ea9d1a17450d6a50b5fdc))
+
 # [0.11.0-beta.9](https://github.com/0xranx/golembot/compare/v0.11.0-beta.8...v0.11.0-beta.9) (2026-03-06)
 
 
