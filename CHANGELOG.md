@@ -1,3 +1,10 @@
+# [0.11.0-beta.12](https://github.com/0xranx/golembot/compare/v0.11.0-beta.11...v0.11.0-beta.12) (2026-03-06)
+
+
+### Features
+
+* add golem ASCII art welcome screen to CLI ([d65218f](https://github.com/0xranx/golembot/commit/d65218ff3e6c93bb3d123415c93113fca207553a))
+
 # [0.11.0-beta.11](https://github.com/0xranx/golembot/compare/v0.11.0-beta.10...v0.11.0-beta.11) (2026-03-06)
 
 
