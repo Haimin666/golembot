@@ -16,6 +16,9 @@ hero:
     - theme: alt
       text: API Reference
       link: /api/create-assistant
+    - theme: alt
+      text: Browse Skills
+      link: /skills/overview
 
 features:
   - icon:
@@ -31,7 +34,7 @@ features:
     title: Directory Is the Assistant
     details: Skills, memory, config, and work artifacts all live in one directory. Fully transparent, version-controllable, and shareable via git.
   - icon:
-      src: /icons/plug.svg
+      src: /icons/claw.svg
     title: 13,000+ Community Skills
     details: Search and install skills from ClawHub — the largest AI agent skill marketplace. Your agent can even discover and install skills autonomously during conversations.
 ---
@@ -61,6 +64,26 @@ const bot = createAssistant({ dir: './my-bot' })
 for await (const ev of bot.chat('Analyze last month sales'))
   if (ev.type === 'text') process.stdout.write(ev.content)
 ```
+
+## 13,000+ Community Skills
+
+GolemBot is fully compatible with [ClawHub](https://clawhub.ai) — the largest AI agent skill marketplace. One command to search and install any skill. Your agent can even discover and install skills autonomously during conversations.
+
+<div class="clawhub-demo">
+
+```bash
+$ golembot skill search "code review"
+
+ClawHub results for "code review" (3):
+
+  code-review          5-dimension code review with severity tiers
+  pr-reviewer          Automated PR review with inline comments
+  security-audit       Security vulnerability scanner for codebases
+
+Install: golembot skill add clawhub:<slug>
+```
+
+</div>
 
 ## Supported Engines
 
@@ -283,5 +306,17 @@ Connect to any message source. Built-in adapters need no public URL. Add `_adapt
   .engines-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.clawhub-demo {
+  background: var(--vp-c-bg-soft);
+  border-radius: 12px;
+  padding: 24px;
+  margin-top: 16px;
+}
+
+.clawhub-demo pre {
+  margin: 0;
+  background: transparent !important;
 }
 </style>

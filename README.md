@@ -60,6 +60,7 @@ Embed into Slack bots, internal tools, SaaS products, customer support — anyth
 | **Auto-upgrade** | Agent gets smarter? Your assistant gets smarter. Zero code changes. | You maintain everything yourself |
 | **Transparency** | `ls` the directory = see what the assistant knows and does | Black box pipelines |
 | **Engine lock-in** | Change one line in config to swap engines | Rewrite everything |
+| **Skills** | 13,000+ community skills from ClawHub, one command to install | Write your own tools and prompts from scratch |
 
 ## Quick Start
 
@@ -73,6 +74,7 @@ golembot onboard      # guided setup (recommended)
 golembot init -e claude-code -n my-bot
 golembot run          # REPL conversation
 golembot gateway      # start IM + HTTP service
+golembot skill search "data analysis"  # browse 13,000+ ClawHub skills
 ```
 
 ## Architecture
@@ -155,17 +157,18 @@ skills/
 
 `ls skills/` is the complete list of what your assistant can do.
 
-### ClawHub Integration
+## 13,000+ Skills from ClawHub
 
-Search and install from [ClawHub](https://clawhub.ai) — 13,000+ community skills:
+GolemBot is fully compatible with [ClawHub](https://clawhub.ai) — the largest AI agent skill marketplace by OpenClaw. The `SKILL.md` format is 100% compatible, so all 13,000+ community skills work out of the box.
 
 ```bash
-golembot skill search "data analysis"       # search
-golembot skill add clawhub:data-analysis    # install
-golembot skill search "markdown" --json     # agent-friendly JSON output
+golembot skill search "data analysis"       # discover skills
+golembot skill add clawhub:data-analysis    # one command to install
 ```
 
-The agent can discover and install skills autonomously during IM conversations.
+**Agent-powered skill discovery:** Your agent can search and install skills autonomously during conversations. Ask it "find me a good code review skill" — it searches ClawHub, shows results, and installs on your confirmation.
+
+All skill commands support `--json` for programmatic access. The pluggable registry interface supports additional skill sources beyond ClawHub.
 
 ## Docker Deployment
 
