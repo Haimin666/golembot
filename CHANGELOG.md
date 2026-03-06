@@ -1,3 +1,10 @@
+# [0.11.0-beta.9](https://github.com/0xranx/golembot/compare/v0.11.0-beta.8...v0.11.0-beta.9) (2026-03-06)
+
+
+### Features
+
+* **feishu:** default to card v2 for markdown messages ([de06e99](https://github.com/0xranx/golembot/commit/de06e993ae50ff351650c2daf1db4bb639fbd586))
+
 # [0.11.0-beta.8](https://github.com/0xranx/golembot/compare/v0.11.0-beta.7...v0.11.0-beta.8) (2026-03-06)
 
 
