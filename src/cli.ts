@@ -32,8 +32,58 @@ try {
 } catch { /* .env not found — rely on existing env vars */ }
 
 const DIM = '\x1b[2m';
+const BOLD = '\x1b[1m';
+const CYAN = '\x1b[36m';
 const YELLOW = '\x1b[33m';
 const RESET = '\x1b[0m';
+
+// ── Welcome box renderer ──────────────────────
+const BOX_WIDTH = 52;
+
+function boxLine(content: string, rawLen?: number): string {
+  const len = rawLen ?? stripAnsiLen(content);
+  const pad = BOX_WIDTH - 2 - len; // 2 for "  " left margin
+  return `  │  ${content}${' '.repeat(Math.max(0, pad))}│`;
+}
+
+function stripAnsiLen(s: string): number {
+  return s.replace(/\x1b\[[^a-zA-Z]*[a-zA-Z]/g, '').length;
+}
+
+function renderBox(lines: string[]): string {
+  const top = `  ╭${'─'.repeat(BOX_WIDTH)}╮`;
+  const bot = `  ╰${'─'.repeat(BOX_WIDTH)}╯`;
+  const empty = boxLine('', 0);
+  const body = lines.map(l => l === '' ? empty : boxLine(l));
+  return [top, empty, ...body, empty, bot].join('\n');
+}
+
+function renderTitleLine(version: string): string {
+  const left = `${BOLD}${CYAN}◈ GolemBot${RESET}`;
+  const right = `${DIM}v${version}${RESET}`;
+  const leftRaw = '◈ GolemBot';
+  const rightRaw = `v${version}`;
+  const gap = BOX_WIDTH - 2 - leftRaw.length - rightRaw.length;
+  return `${left}${' '.repeat(Math.max(1, gap))}${right}`;
+}
+
+function centerArt(line: string, rawLen: number): string {
+  const pad = Math.floor((BOX_WIDTH - 2 - rawLen) / 2);
+  const content = ' '.repeat(pad) + line;
+  return content;
+}
+
+function golemArt(): string[] {
+  const y = YELLOW, c = CYAN, d = DIM, b = BOLD, r = RESET;
+  // 13 chars wide — blocky stone golem face matching the GolemBot icon
+  return [
+    centerArt(`${y}▄███████████▄${r}`, 13),
+    centerArt(`${y}█${r} ${d}╲╱${r}    ${d}╳╲${r}  ${y}█${r}`, 13),
+    centerArt(`${y}█${r}  ${c}${b}▐█▌${r} ${c}${b}▐█▌${r}  ${y}█${r}`, 13),
+    centerArt(`${y}█${r}    ${d}─────${r}  ${y}█${r}`, 13),
+    centerArt(`${y}▀███████████▀${r}`, 13),
+  ];
+}
 
 // ── Spinner (zero-dependency, stderr-only) ──────────────
 class Spinner {
@@ -66,16 +116,22 @@ program
   .description('Local-first AI assistant powered by Coding Agent engines')
   .version(pkgVersion)
   .action(() => {
-    console.log(`
-  GolemBot v${pkgVersion}
-  Local-first AI assistant powered by Coding Agent engines
-
-  Quick Start:
-    golembot init          Create a new assistant
-    golembot run           Start chatting (REPL)
-    golembot doctor        Check system prerequisites
-    golembot --help        Show all commands
-`);
+    const art = golemArt();
+    const title = renderTitleLine(pkgVersion);
+    const tagline = `${DIM}Your Coding Agent, Everywhere${RESET}`;
+    const cmds = [
+      [`${BOLD}golembot onboard${RESET}`, 'Setup wizard'],
+      [`${BOLD}golembot run${RESET}`,     'Start chatting'],
+      [`${BOLD}golembot gateway${RESET}`, 'IM + HTTP service'],
+      [`${BOLD}golembot doctor${RESET}`,  'Check system setup'],
+      [`${BOLD}golembot --help${RESET}`,  'All commands'],
+    ];
+    const cmdLines = cmds.map(([cmd, desc]) => {
+      const cmdRaw = cmd.replace(/\x1b\[[^a-zA-Z]*[a-zA-Z]/g, '');
+      const gap = 20 - cmdRaw.length;
+      return `${cmd}${' '.repeat(Math.max(1, gap))}${DIM}${desc}${RESET}`;
+    });
+    console.log('\n' + renderBox([...art, '', title, tagline, '', ...cmdLines]) + '\n');
   });
 
 program
@@ -138,7 +194,37 @@ program
     const dir = resolve(opts.dir);
     const assistant = createAssistant({ dir, apiKey: opts.apiKey });
 
-    console.log('GolemBot assistant started (type /help for commands)\n');
+    // ── Welcome banner ──
+    {
+      const { loadConfig, scanSkills } = await import('./workspace.js');
+      try {
+        const config = await loadConfig(dir);
+        const skills = await scanSkills(dir);
+        const art = golemArt();
+        const title = renderTitleLine(pkgVersion);
+        const infoLines: string[] = [];
+
+        const label = (k: string, v: string) => {
+          const gap = 12 - k.length;
+          return `${DIM}${k}${RESET}${' '.repeat(Math.max(1, gap))}${v}`;
+        };
+        infoLines.push(label('Name', `${BOLD}${config.name}${RESET}`));
+        infoLines.push(label('Engine', config.engine + (config.model ? ` ${DIM}(${config.model})${RESET}` : '')));
+        if (skills.length > 0) {
+          const maxValLen = BOX_WIDTH - 2 - 12 - 2; // box - margin - label - padding
+          let skillStr = skills.map(s => s.name).join(', ');
+          if (skillStr.length > maxValLen) skillStr = skillStr.slice(0, maxValLen - 1) + '\u2026';
+          infoLines.push(label('Skills', skillStr));
+        }
+        const shortDir = dir.replace(process.env.HOME ?? '', '~');
+        infoLines.push(label('cwd', `${DIM}${shortDir}${RESET}`));
+
+        const hint = `${DIM}/help${RESET} for commands`;
+        console.log('\n' + renderBox([...art, '', title, '', ...infoLines, '', hint]) + '\n');
+      } catch {
+        console.log('GolemBot assistant started (type /help for commands)\n');
+      }
+    }
 
     const SLASH_CMDS = ['/help', '/reset', '/quit', '/exit'];
     const completer = (line: string): [string[], string] => {
