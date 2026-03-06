@@ -203,51 +203,25 @@ export class FeishuAdapter implements ChannelAdapter {
     const hasMentions = mentions && mentions.length > 0;
 
     if (hasMarkdown(text) || hasMentions) {
-      if (this.config.sendMarkdownAsCard) {
-        // Interactive card mode (explicit opt-in via config)
-        let cardText = text;
-        if (hasMentions) {
-          for (const m of mentions) {
-            cardText = cardText.replace(
-              new RegExp(`@${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'),
-              `<at id=${m.platformId}></at>`,
-            );
-          }
+      // Card v2 (default) — best markdown rendering with native headings, lists, code blocks
+      let mdText = text;
+      if (hasMentions) {
+        for (const m of mentions) {
+          mdText = mdText.replace(
+            new RegExp(`@${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'),
+            `<at id=${m.platformId}></at>`,
+          );
         }
-        const card = markdownToCard(cardText);
-        await this.client.im.v1.message.create({
-          params: { receive_id_type: 'chat_id' },
-          data: {
-            receive_id: msg.chatId,
-            content: JSON.stringify(card),
-            msg_type: 'interactive',
-          },
-        });
-      } else {
-        // Post rich text with md tag — native markdown rendering
-        let mdText = text;
-        if (hasMentions) {
-          for (const m of mentions) {
-            mdText = mdText.replace(
-              new RegExp(`@${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'),
-              `<at user_id="${m.platformId}">${m.name}</at>`,
-            );
-          }
-        }
-        const post = {
-          zh_cn: {
-            content: [[{ tag: 'md', text: mdText }]],
-          },
-        };
-        await this.client.im.v1.message.create({
-          params: { receive_id_type: 'chat_id' },
-          data: {
-            receive_id: msg.chatId,
-            content: JSON.stringify(post),
-            msg_type: 'post',
-          },
-        });
       }
+      const card = markdownToCard(mdText);
+      await this.client.im.v1.message.create({
+        params: { receive_id_type: 'chat_id' },
+        data: {
+          receive_id: msg.chatId,
+          content: JSON.stringify(card),
+          msg_type: 'interactive',
+        },
+      });
     } else {
       // Plain text
       await this.client.im.v1.message.create({
