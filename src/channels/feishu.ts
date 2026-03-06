@@ -204,7 +204,7 @@ export class FeishuAdapter implements ChannelAdapter {
 
     if (hasMarkdown(text) || hasMentions) {
       if (this.config.sendMarkdownAsCard) {
-        // Interactive card — native markdown rendering
+        // Interactive card mode (explicit opt-in via config)
         let cardText = text;
         if (hasMentions) {
           for (const m of mentions) {
@@ -224,11 +224,21 @@ export class FeishuAdapter implements ChannelAdapter {
           },
         });
       } else {
-        // Post rich text (default)
-        const post = markdownToPost(text);
+        // Post rich text with md tag — native markdown rendering
+        let mdText = text;
         if (hasMentions) {
-          injectMentionsIntoPost(post, mentions);
+          for (const m of mentions) {
+            mdText = mdText.replace(
+              new RegExp(`@${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'),
+              `<at user_id="${m.platformId}">${m.name}</at>`,
+            );
+          }
         }
+        const post = {
+          zh_cn: {
+            content: [[{ tag: 'md', text: mdText }]],
+          },
+        };
         await this.client.im.v1.message.create({
           params: { receive_id_type: 'chat_id' },
           data: {

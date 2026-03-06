@@ -77,6 +77,7 @@ describe('hasMarkdown', () => {
   });
 });
 
+
 // ---------------------------------------------------------------------------
 // markdownToPost
 // ---------------------------------------------------------------------------
@@ -102,9 +103,10 @@ describe('markdownToPost', () => {
     expect(content).toEqual([[{ tag: 'text', text: 'Hello World', style: ['bold'] }]]);
   });
 
-  it('passes through unordered list items as-is', () => {
+  it('converts unordered list - item to • item', () => {
     const content = getContent('- item one');
-    expect(content[0][0]).toEqual({ tag: 'text', text: '- item one' });
+    expect(content[0][0]).toEqual({ tag: 'text', text: '• ' });
+    expect(content[0][1]).toEqual({ tag: 'text', text: 'item one' });
   });
 
   it('passes through ordered list items as-is', () => {

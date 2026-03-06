@@ -65,6 +65,7 @@ export function hasMarkdown(text: string): boolean {
   return MD_PATTERNS.some((p) => p.test(text));
 }
 
+
 // ---------------------------------------------------------------------------
 // Markdown -> Post (rich text)
 // ---------------------------------------------------------------------------
@@ -129,7 +130,11 @@ function parseLine(line: string): PostElement[] {
     return [{ tag: 'text', text: icon }, ...parseInline(checkboxMatch[2])];
   }
 
-  // Unordered / ordered lists — pass through as-is (keep original `- ` / `1. ` prefix)
+  // Unordered list: - item → • item
+  const ulMatch = trimmed.match(/^[-*]\s+(.+)$/);
+  if (ulMatch) {
+    return [{ tag: 'text', text: '• ' }, ...parseInline(ulMatch[1])];
+  }
 
   // Horizontal rule
   if (/^[-*_]{3,}$/.test(trimmed)) {
