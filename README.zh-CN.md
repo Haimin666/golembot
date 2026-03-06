@@ -60,6 +60,7 @@ for await (const event of bot.chat('分析上个月的销售数据')) {
 | **自动升级** | Agent 变强了？你的助手自动变强，零代码改动 | 你自己维护所有东西 |
 | **透明度** | `ls` 目录 = 看到助手知道什么、做了什么 | 黑盒流水线 |
 | **引擎锁定** | 改一行配置换引擎 | 全部重写 |
+| **技能生态** | ClawHub 13,000+ 社区技能，一条命令安装 | 自己从零编写工具和 prompt |
 
 ## 快速开始
 
@@ -73,6 +74,7 @@ golembot onboard      # 引导式安装（推荐）
 golembot init -e claude-code -n my-bot
 golembot run          # REPL 对话
 golembot gateway      # 启动 IM + HTTP 服务
+golembot skill search "数据分析"  # 浏览 13,000+ ClawHub 社区技能
 ```
 
 ## 架构
@@ -154,6 +156,19 @@ skills/
 ```
 
 `ls skills/` 就是助手能力的完整清单。
+
+## 13,000+ ClawHub 社区技能
+
+GolemBot 与 [ClawHub](https://clawhub.ai) 完全兼容 —— OpenClaw 旗下最大的 AI agent 技能市场。`SKILL.md` 格式 100% 兼容，13,000+ 社区技能开箱即用。
+
+```bash
+golembot skill search "数据分析"           # 发现技能
+golembot skill add clawhub:data-analysis  # 一条命令安装
+```
+
+**Agent 自主发现技能：** 你的 Agent 可以在对话中自主搜索和安装技能。对它说"帮我找个好用的代码审查 skill"—— 它会搜索 ClawHub、展示结果，你确认后自动安装。
+
+所有 skill 命令支持 `--json` 输出，方便程序化调用。可插拔的 registry 接口支持未来接入更多技能来源。
 
 ## Docker 部署
 

@@ -43,7 +43,7 @@ describe('CLI integration', () => {
     const { stdout, exitCode } = await runCli([]);
     expect(exitCode).toBe(0);
     expect(stdout).toContain('GolemBot');
-    expect(stdout).toContain('Quick Start');
+    expect(stdout).toContain('Your Coding Agent, Everywhere');
     expect(stdout).toMatch(/v\d+\.\d+\.\d+/);
   });
 

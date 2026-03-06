@@ -1,17 +1,16 @@
-# [0.12.0](https://github.com/0xranx/golembot/compare/v0.11.0...v0.12.0) (2026-03-06)
-
-
-### Bug Fixes
-
-* update im-adapter skill to encourage standard markdown formatting ([d8d664b](https://github.com/0xranx/golembot/commit/d8d664b77e4b486c943ea9d1a17450d6a50b5fdc))
+# [0.11.0-beta.12](https://github.com/0xranx/golembot/compare/v0.11.0-beta.11...v0.11.0-beta.12) (2026-03-06)
 
 
 ### Features
 
-* add Slack mrkdwn and Telegram HTML message formatting ([58573c0](https://github.com/0xranx/golembot/commit/58573c04059844cbacbb8970650e69e8112789eb))
-* **feishu:** default to card v2 for markdown messages ([de06e99](https://github.com/0xranx/golembot/commit/de06e993ae50ff351650c2daf1db4bb639fbd586))
-* **feishu:** upgrade card to v2 schema with native markdown ([7fa203e](https://github.com/0xranx/golembot/commit/7fa203e9baf0f01e981ccdf8df5d67d4bc66f9fe))
-* **feishu:** use native md tag in post mode for markdown rendering ([2916c51](https://github.com/0xranx/golembot/commit/2916c51290c292f490f79891d6c52cd8e294134c))
+* add golem ASCII art welcome screen to CLI ([d65218f](https://github.com/0xranx/golembot/commit/d65218ff3e6c93bb3d123415c93113fca207553a))
+
+# [0.11.0-beta.11](https://github.com/0xranx/golembot/compare/v0.11.0-beta.10...v0.11.0-beta.11) (2026-03-06)
+
+
+### Features
+
+* integrate ClawHub skill registry for search and install ([eb526d0](https://github.com/0xranx/golembot/commit/eb526d0a9ddcc3c1f85ef4f7b862015f52b5611c))
 
 # [0.11.0-beta.10](https://github.com/0xranx/golembot/compare/v0.11.0-beta.9...v0.11.0-beta.10) (2026-03-06)
 
