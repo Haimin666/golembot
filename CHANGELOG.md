@@ -1,3 +1,10 @@
+# [0.11.0-beta.11](https://github.com/0xranx/golembot/compare/v0.11.0-beta.10...v0.11.0-beta.11) (2026-03-06)
+
+
+### Features
+
+* integrate ClawHub skill registry for search and install ([eb526d0](https://github.com/0xranx/golembot/commit/eb526d0a9ddcc3c1f85ef4f7b862015f52b5611c))
+
 # [0.11.0-beta.10](https://github.com/0xranx/golembot/compare/v0.11.0-beta.9...v0.11.0-beta.10) (2026-03-06)
 
 
