@@ -1,3 +1,10 @@
+# [0.11.0-beta.14](https://github.com/0xranx/golembot/compare/v0.11.0-beta.13...v0.11.0-beta.14) (2026-03-06)
+
+
+### Bug Fixes
+
+* stronger [PASS] hint for multi-bot group chats when others are [@mentioned](https://github.com/mentioned) ([a446450](https://github.com/0xranx/golembot/commit/a446450bca76573441596366cdb54ad03fbb6764))
+
 # [0.11.0-beta.13](https://github.com/0xranx/golembot/compare/v0.11.0-beta.12...v0.11.0-beta.13) (2026-03-06)
 
 
