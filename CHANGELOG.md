@@ -1,3 +1,10 @@
+# [0.14.0-beta.1](https://github.com/0xranx/golembot/compare/v0.13.1...v0.14.0-beta.1) (2026-03-07)
+
+
+### Features
+
+* add gateway dashboard with real-time monitoring ([07b56dc](https://github.com/0xranx/golembot/commit/07b56dcc1fd2cae6f9e8b9a1ccea3abefdc2afe2))
+
 ## [0.13.1](https://github.com/0xranx/golembot/compare/v0.13.0...v0.13.1) (2026-03-06)
 
 
