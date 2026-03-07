@@ -123,6 +123,7 @@ program
       [`${BOLD}golembot onboard${RESET}`, 'Setup wizard'],
       [`${BOLD}golembot run${RESET}`,     'Start chatting'],
       [`${BOLD}golembot gateway${RESET}`, 'IM + HTTP service'],
+      [`${BOLD}golembot fleet ls${RESET}`, 'List running bots'],
       [`${BOLD}golembot doctor${RESET}`,  'Check system setup'],
       [`${BOLD}golembot --help${RESET}`,  'All commands'],
     ];
@@ -389,18 +390,33 @@ program
   .command('status')
   .description('Show the current assistant status')
   .option('-d, --dir <dir>', 'assistant directory', '.')
-  .action(async (opts) => {
+  .option('--json', 'output JSON (agent-friendly)')
+  .action(async (opts: { dir: string; json?: boolean }) => {
     const dir = resolve(opts.dir);
     const { loadConfig, scanSkills } = await import('./workspace.js');
     try {
       const config = await loadConfig(dir);
       const skills = await scanSkills(dir);
+      const channelNames = config.channels ? Object.keys(config.channels).filter(k => !!(config.channels as any)[k]) : [];
+
+      if (opts.json) {
+        console.log(JSON.stringify({
+          name: config.name,
+          engine: config.engine,
+          model: config.model ?? null,
+          skills: skills.map(s => ({ name: s.name, description: s.description })),
+          channels: channelNames,
+          gateway: config.gateway ? { port: config.gateway.port ?? 3000, authEnabled: !!config.gateway.token } : null,
+          directory: dir,
+        }));
+        return;
+      }
+
       console.log(`\n🤖 GolemBot Assistant Status\n`);
       console.log(`   Name:       ${config.name}`);
       console.log(`   Engine:     ${config.engine}`);
       if (config.model) console.log(`   Model:      ${config.model}`);
       console.log(`   Skills:     ${skills.length > 0 ? skills.map(s => s.name).join(', ') : '(none)'}`);
-      const channelNames = config.channels ? Object.keys(config.channels).filter(k => !!(config.channels as any)[k]) : [];
       console.log(`   Channels:   ${channelNames.length > 0 ? channelNames.join(', ') : '(none)'}`);
       if (config.gateway) {
         const gw = config.gateway;
@@ -409,6 +425,10 @@ program
       console.log(`   Directory:  ${dir}`);
       console.log();
     } catch (e: unknown) {
+      if (opts.json) {
+        console.log(JSON.stringify({ error: (e as Error).message }));
+        process.exit(1);
+      }
       console.error(`❌ Failed to read assistant status: ${(e as Error).message}`);
       console.error(`   Make sure the current directory contains golem.yaml, or use -d to specify the assistant directory.`);
       process.exit(1);
@@ -602,6 +622,51 @@ skill
     const { scanSkills, generateAgentsMd } = await import('./workspace.js');
     const skills = await scanSkills(dir);
     await generateAgentsMd(dir, skills);
+  });
+
+const fleet = program
+  .command('fleet')
+  .description('Manage and view all running GolemBot instances');
+
+fleet
+  .command('serve')
+  .description('Start the Fleet Dashboard web server')
+  .option('-p, --port <port>', 'port number', '4000')
+  .option('--host <host>', 'hostname to bind', '127.0.0.1')
+  .action(async (opts) => {
+    const { startFleetServer } = await import('./fleet.js');
+    await startFleetServer({ port: Number(opts.port), hostname: opts.host });
+  });
+
+fleet
+  .command('ls')
+  .description('List all running bot instances')
+  .option('--json', 'output JSON (agent-friendly)')
+  .action(async (opts: { json?: boolean }) => {
+    const { listInstances, fetchInstanceMetrics } = await import('./fleet.js');
+    const instances = await listInstances();
+    const enriched = await Promise.all(instances.map(fetchInstanceMetrics));
+
+    if (opts.json) {
+      console.log(JSON.stringify(enriched));
+      return;
+    }
+
+    if (enriched.length === 0) {
+      console.log('No running bots found. Start one with: golembot gateway');
+      return;
+    }
+
+    console.log(`\n  ${BOLD}Running GolemBot Instances${RESET} (${enriched.length})\n`);
+    for (const inst of enriched) {
+      const engine = `${DIM}(${inst.engine})${RESET}`;
+      const model = inst.model ? ` ${DIM}${inst.model}${RESET}` : '';
+      const msgs = inst.metrics ? `${inst.metrics.totalMessages} msgs` : (inst.authEnabled ? 'auth required' : 'unreachable');
+      const port = new URL(inst.url).port || '3000';
+      console.log(`  ${CYAN}●${RESET}  ${BOLD}${inst.name}${RESET} ${engine}${model}`);
+      console.log(`     ${DIM}Port ${port} · PID ${inst.pid} · ${msgs}${RESET}`);
+    }
+    console.log();
   });
 
 program

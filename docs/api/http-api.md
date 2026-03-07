@@ -92,6 +92,61 @@ Health check endpoint (no authentication required).
 }
 ```
 
+### `GET /` (Dashboard)
+
+When running in gateway mode (`golembot gateway`), the root path serves an HTML Dashboard with:
+- Bot status, engine, model, and uptime
+- Channel connection status (connected / failed / not configured)
+- Real-time message statistics and cost tracking
+- Live activity feed via SSE
+- Quick Test panel for sending messages directly from the browser
+- HTTP API and embed SDK code examples with copy buttons
+
+No authentication required (landing page).
+
+### `GET /api/status`
+
+Returns the current bot status and metrics as JSON. Requires authentication.
+
+**Response:**
+```json
+{
+  "name": "my-bot",
+  "engine": "claude-code",
+  "model": "claude-opus-4-6",
+  "version": "0.13.1",
+  "uptime": 3600000,
+  "channels": [
+    { "type": "telegram", "status": "connected" },
+    { "type": "slack", "status": "not_configured" }
+  ],
+  "skills": [{ "name": "general", "description": "General assistant" }],
+  "metrics": {
+    "totalMessages": 42,
+    "totalCostUsd": 1.23,
+    "avgDurationMs": 2000,
+    "messagesBySource": { "telegram": 30, "http": 12 }
+  },
+  "recentMessages": []
+}
+```
+
+### `GET /api/events`
+
+Real-time activity stream via Server-Sent Events. Each message processed by the gateway is broadcast as an SSE event. Requires authentication.
+
+**Response:** `text/event-stream`
+
+```
+data: {"ts":"2026-03-07T12:00:00Z","source":"telegram","sender":"alice","messagePreview":"hello","responsePreview":"hi there","durationMs":1500,"costUsd":0.01}
+```
+
+When authentication is enabled, pass the token as a query parameter (since `EventSource` cannot set headers):
+
+```
+GET /api/events?token=my-secret
+```
+
 ## Authentication
 
 All endpoints except `/health` require a Bearer token:

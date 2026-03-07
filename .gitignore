@@ -6,3 +6,7 @@ dist/
 .env.local
 docs/.vitepress/cache/
 docs/drafts/
+# GolemBot runtime files (local bot instance, not part of the library)
+golem.yaml
+skills/
+memory/

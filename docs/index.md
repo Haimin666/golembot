@@ -74,7 +74,8 @@ npm install -g golembot
 mkdir my-bot && cd my-bot
 golembot onboard          # guided setup wizard
 golembot run              # interactive REPL
-golembot gateway          # start IM + HTTP service
+golembot gateway          # start IM + HTTP service + Dashboard
+golembot fleet ls         # list all running bots
 golembot skill search "data analysis"  # browse ClawHub skills
 ```
 

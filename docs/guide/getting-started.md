@@ -68,7 +68,20 @@ This opens an interactive REPL. Type your message and press Enter. The Coding Ag
 golembot gateway
 ```
 
-This starts both an HTTP API and any configured IM channel adapters. GolemBot supports the following IM platforms out of the box:
+This starts an HTTP API, a web Dashboard (at `http://localhost:3000/`), and any configured IM channel adapters. The Dashboard shows real-time metrics, channel status, and lets you test the API directly from the browser.
+
+<img src="/assets/dashboard.png" alt="GolemBot Dashboard" style="border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.1);margin:16px 0" />
+
+To view all running bots at a glance:
+
+```bash
+golembot fleet ls          # list running bots (CLI)
+golembot fleet serve       # start Fleet Dashboard (web, port 4000)
+```
+
+<img src="/assets/fleet-dashboard.png" alt="GolemBot Fleet Dashboard" style="border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.1);margin:16px 0" />
+
+GolemBot supports the following IM platforms out of the box:
 
 | Platform | Connection Mode |
 |----------|----------------|

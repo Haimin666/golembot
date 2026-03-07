@@ -79,9 +79,24 @@ golembot onboard      # 引导式安装（推荐）
 # 或手动：
 golembot init -e claude-code -n my-bot
 golembot run          # REPL 对话
-golembot gateway      # 启动 IM + HTTP 服务
+golembot gateway      # 启动 IM + HTTP 服务 + Dashboard
+golembot fleet ls     # 列出所有运行中的 bot
 golembot skill search "数据分析"  # 浏览 13,000+ ClawHub 社区技能
 ```
+
+### Dashboard 与 Fleet 总看板
+
+每个 `golembot gateway` 实例都自带 Web Dashboard，展示实时指标、通道状态和快速测试控制台：
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/0xranx/golembot/main/docs/assets/dashboard.png" alt="GolemBot Dashboard" width="720">
+</p>
+
+同时运行多个 bot？`golembot fleet serve` 将它们聚合到一个 Fleet 总看板：
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/0xranx/golembot/main/docs/assets/fleet-dashboard.png" alt="GolemBot Fleet Dashboard" width="720">
+</p>
 
 ## 架构
 
@@ -194,7 +209,7 @@ git clone https://github.com/0xranx/golembot.git
 cd golembot
 pnpm install
 pnpm run build
-pnpm run test          # 单元测试 (776+)
+pnpm run test          # 单元测试 (1252+)
 pnpm run e2e:opencode  # 端到端测试（OpenCode）
 pnpm run e2e:codex     # 端到端测试（Codex）
 ```

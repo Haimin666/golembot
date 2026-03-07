@@ -74,7 +74,8 @@ npm install -g golembot
 mkdir my-bot && cd my-bot
 golembot onboard          # 引导式设置向导
 golembot run              # 交互式 REPL
-golembot gateway          # 启动 IM + HTTP 服务
+golembot gateway          # 启动 IM + HTTP 服务 + Dashboard
+golembot fleet ls         # 列出所有运行中的 bot
 golembot skill search "数据分析"  # 浏览 ClawHub 社区技能
 ```
 

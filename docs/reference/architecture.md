@@ -214,11 +214,14 @@ Core and CLI are separated:
 - **`channels/feishu.ts`** — Feishu (Lark) adapter (`@larksuiteoapi/node-sdk` WebSocket long-connection mode).
 - **`channels/dingtalk.ts`** — DingTalk adapter (`dingtalk-stream` Stream mode).
 - **`channels/wecom.ts`** — WeCom adapter (`@wecom/crypto` + `xml2js` Webhook callback mode).
-- **`gateway.ts`** — Gateway long-running service: reads golem.yaml → creates Assistant → starts HTTP service → iterates channels config to start adapters → routes messages to `assistant.chat()` → replies.
+- **`gateway.ts`** — Gateway long-running service: reads golem.yaml → creates Assistant → starts HTTP service → iterates channels config to start adapters → routes messages to `assistant.chat()` → replies. Auto-registers with Fleet directory on startup.
+- **`dashboard.ts`** — Gateway Dashboard: metrics collection, SSE broadcasting, HTML rendering (channel status, stats, activity feed, quick test).
+- **`ui-shared.ts`** — Shared UI constants (CSS, favicon, engine colors, HTML escape) used by both Dashboard and Fleet.
+- **`fleet.ts`** — Fleet multi-bot management: filesystem registry (`~/.golembot/fleet/`), PID liveness detection, Fleet Dashboard HTML rendering, Fleet HTTP server.
 
 **CLI thin shell:**
 
-- **`cli.ts`** — Command entry points: `init`, `run`, `serve`, `gateway`, `onboard`, `status`, `skill`. Automatically loads `.env` files.
+- **`cli.ts`** — Command entry points: `init`, `run`, `serve`, `gateway`, `onboard`, `status`, `skill`, `fleet`. Automatically loads `.env` files.
 - **`onboard.ts`** — Guided configuration wizard (7-step interactive). Generates golem.yaml, .env, .env.example, .gitignore, and optionally installs scenario templates.
 
 **IM SDK dependency strategy**: `@larksuiteoapi/node-sdk`, `dingtalk-stream`, `@wecom/crypto`, and `xml2js` are all optional peerDependencies. Gateway dynamically imports the corresponding SDK at startup, providing installation prompts if missing.
@@ -363,11 +366,12 @@ golembot gateway
 2. Read golem.yaml (channels + gateway config)
 3. resolveEnvPlaceholders() resolves ${ENV_VAR} placeholders
 4. Create Assistant instance
-5. Start HTTP service (preserving /chat, /reset, /health endpoints)
+5. Start HTTP service (with Dashboard at GET /, /api/status, /api/events endpoints)
 6. Iterate channels config, dynamically import + start corresponding adapters
-7. Adapter receives message → buildSessionKey() → stripMention() → assistant.chat() → reply
-8. Streaming response concatenated into complete text before sending at once (IM platforms don't support streaming)
-9. SIGINT/SIGTERM → gracefully shut down all adapters and HTTP service
+7. Register with Fleet directory (~/.golembot/fleet/<name>-<port>.json)
+8. Adapter receives message → buildSessionKey() → stripMention() → assistant.chat() → reply
+9. Streaming response concatenated into complete text before sending at once (IM platforms don't support streaming)
+10. SIGINT/SIGTERM → unregister from Fleet → gracefully shut down all adapters and HTTP service
 ```
 
 ### Data Flow: One Conversation Turn
@@ -554,9 +558,10 @@ But the externally exposed `StreamEvent` is completely consistent.
 - ~~Docker deployment (Dockerfile + docker-compose.yml)~~ ✅
 - ~~README.md + LICENSE + CONTRIBUTING.md~~ ✅
 
-**Phase 6 — Ecosystem Expansion (To Be Implemented)**
+**Phase 6 — Ecosystem Expansion**
 
-- Skill repository (`golembot skill search/install`, community skill discovery and installation)
+- ~~Skill repository (`golembot skill search/install`, community skill discovery and installation)~~ ✅ (ClawHub integration)
+- ~~Multi-bot Fleet Dashboard (`golembot fleet ls` / `golembot fleet serve`)~~ ✅ (filesystem-based registry, zero-config discovery)
+- ~~Per-bot web Dashboard with real-time metrics and activity feed~~ ✅
 - Permissions integration (`golem.yaml` project-level permission config)
 - WebSocket support (bidirectional communication)
-- Multi-assistant routing (single Gateway serving multiple assistants)

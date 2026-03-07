@@ -32,6 +32,7 @@ import {
   type ChannelStatus,
   type GatewayMetrics,
 } from './dashboard.js';
+import { registerInstance, unregisterInstance } from './fleet.js';
 
 export function splitMessage(text: string, maxLen: number): string[] {
   if (text.length <= maxLen) return [text];
@@ -594,6 +595,19 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
 
   httpServer.listen(port, host, () => {
     printBanner({ host, port, version, config, token, channelStatuses });
+
+    // Register with fleet directory for discovery by `golembot fleet`
+    registerInstance({
+      name: config.name,
+      url: `http://${host}:${port}`,
+      pid: process.pid,
+      engine: config.engine,
+      model: config.model,
+      version,
+      startedAt: new Date().toISOString(),
+      channels: channelStatuses.filter(c => c.status === 'connected').map(c => ({ type: c.type, status: c.status })),
+      authEnabled: !!token,
+    }).catch(() => {}); // best-effort
   });
 
   // Periodically purge idle group state to prevent unbounded memory growth
@@ -611,6 +625,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
       }
     }
     httpServer.forceClose();
+    await unregisterInstance(config.name, port).catch(() => {});
     process.exit(0);
   };
 

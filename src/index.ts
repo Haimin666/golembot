@@ -11,6 +11,8 @@ export type { ChannelAdapter, ChannelMessage } from './channel.js';
 export { buildSessionKey, stripMention } from './channel.js';
 export { startGateway } from './gateway.js';
 export type { DashboardContext, ChannelStatus, GatewayMetrics, RecentMessage } from './dashboard.js';
+export { registerInstance, unregisterInstance, listInstances, isProcessAlive, renderFleetDashboard, startFleetServer } from './fleet.js';
+export type { FleetEntry, FleetInstance, FleetServerOpts } from './fleet.js';
 
 // ── Per-key Mutex ──────────────────────────────────────
 

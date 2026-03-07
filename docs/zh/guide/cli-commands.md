@@ -47,6 +47,56 @@ golembot gateway [-d <dir>] [-p <port>] [-t <token>] [--host <host>] [--api-key 
 
 读取 `golem.yaml` 中的 `channels` 配置，启动对应的 IM 适配器和 HTTP 服务。
 
+Gateway 还会：
+- 在 `GET /` 提供 **Web Dashboard**，包含实时指标、通道状态和快速测试面板。
+- 自动注册到 **Fleet 目录**（`~/.golembot/fleet/`），供 `golembot fleet ls` 发现。
+
+## `golembot fleet`
+
+管理和查看所有运行中的 GolemBot 实例。
+
+### `golembot fleet ls`
+
+列出从 `~/.golembot/fleet/` 发现的所有运行中的 bot 实例。
+
+```bash
+golembot fleet ls [--json]
+```
+
+| 选项 | 说明 | 默认值 |
+|------|------|--------|
+| `--json` | 输出完整实例详情和指标的 JSON | `false` |
+
+每个 gateway 启动时自动注册，关闭时自动注销。崩溃的进程（stale entries）会通过 PID 存活检测自动清理。
+
+### `golembot fleet serve`
+
+启动 Fleet Dashboard Web 服务 — 所有运行中 bot 的聚合视图。
+
+```bash
+golembot fleet serve [-p <port>] [--host <host>]
+```
+
+| 选项 | 说明 | 默认值 |
+|------|------|--------|
+| `-p, --port <port>` | HTTP 端口 | `4000` |
+| `--host <host>` | 绑定地址 | `127.0.0.1` |
+
+**Fleet Dashboard 功能：**
+- 自动发现 `~/.golembot/fleet/` 中的所有运行中 bot
+- 显示引擎、模型、运行时间、消息数和费用
+- 链接到每个 bot 的独立 Dashboard
+- 每 10 秒自动刷新
+- 无 bot 运行时显示引导提示
+
+**Fleet API 端点：**
+
+| 端点 | 说明 |
+|------|------|
+| `GET /` | Fleet Dashboard HTML |
+| `GET /api/fleet` | 所有实例 + 指标的 JSON 数组 |
+| `GET /health` | `{ "status": "ok" }` |
+
 ## `golembot onboard`
 
 运行交互式设置向导。
@@ -62,7 +112,26 @@ golembot onboard [-d <dir>] [--template <name>]
 显示当前助手配置信息：名称、引擎、模型、已安装技能、已配置通道和 Gateway 设置。
 
 ```bash
-golembot status [-d <dir>]
+golembot status [-d <dir>] [--json]
+```
+
+| 选项 | 说明 | 默认值 |
+|------|------|--------|
+| `-d, --dir <dir>` | 助手目录 | `.` |
+| `--json` | 输出 JSON（适合程序调用） | `false` |
+
+**JSON 输出示例：**
+
+```json
+{
+  "name": "my-bot",
+  "engine": "claude-code",
+  "model": "claude-opus-4-6",
+  "skills": [{ "name": "general", "description": "通用助手" }],
+  "channels": ["telegram"],
+  "gateway": { "port": 3000, "authEnabled": false },
+  "directory": "/home/user/my-bot"
+}
 ```
 
 ## `golembot skill`

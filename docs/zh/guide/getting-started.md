@@ -68,7 +68,20 @@ golembot run
 golembot gateway
 ```
 
-这会同时启动 HTTP API 和已配置的 IM 通道适配器。GolemBot 内置支持以下 IM 平台：
+这会启动 HTTP API、Web Dashboard（`http://localhost:3000/`）以及已配置的 IM 通道适配器。Dashboard 显示实时指标、通道状态，并可直接在浏览器中测试 API。
+
+<img src="/assets/dashboard.png" alt="GolemBot Dashboard" style="border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.1);margin:16px 0" />
+
+查看所有运行中的 bot：
+
+```bash
+golembot fleet ls          # 列出运行中的 bot（CLI）
+golembot fleet serve       # 启动 Fleet Dashboard（Web，端口 4000）
+```
+
+<img src="/assets/fleet-dashboard.png" alt="GolemBot Fleet Dashboard" style="border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.1);margin:16px 0" />
+
+GolemBot 内置支持以下 IM 平台：
 
 | 平台 | 连接方式 |
 |------|---------|

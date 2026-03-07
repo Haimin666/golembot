@@ -53,6 +53,44 @@ data: {"type":"error","message":"Agent invocation timed out"}
 
 健康检查（无需认证）。响应：`{ "status": "ok", "timestamp": "..." }`。
 
+### `GET /`（Dashboard）
+
+在 gateway 模式（`golembot gateway`）下，根路径提供 HTML Dashboard，包含：
+- Bot 状态、引擎、模型和运行时间
+- 通道连接状态（已连接 / 失败 / 未配置）
+- 实时消息统计和费用追踪
+- 通过 SSE 的实时活动流
+- 快速测试面板（可直接在浏览器中发送消息）
+- HTTP API 和 embed SDK 代码示例（带复制按钮）
+
+无需认证（首页）。
+
+### `GET /api/status`
+
+返回当前 bot 状态和指标的 JSON。需要认证。
+
+```json
+{
+  "name": "my-bot",
+  "engine": "claude-code",
+  "version": "0.13.1",
+  "uptime": 3600000,
+  "channels": [{ "type": "telegram", "status": "connected" }],
+  "metrics": { "totalMessages": 42, "totalCostUsd": 1.23, "avgDurationMs": 2000 },
+  "recentMessages": []
+}
+```
+
+### `GET /api/events`
+
+通过 Server-Sent Events 的实时活动流。Gateway 处理的每条消息都会广播为 SSE 事件。需要认证。
+
+启用认证时，通过 query 参数传递 token（`EventSource` 无法设置 headers）：
+
+```
+GET /api/events?token=my-secret
+```
+
 ## 认证
 
 除 `/health` 外的所有端点需要 Bearer Token：

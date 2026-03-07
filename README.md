@@ -79,9 +79,24 @@ golembot onboard      # guided setup (recommended)
 # Or manually:
 golembot init -e claude-code -n my-bot
 golembot run          # REPL conversation
-golembot gateway      # start IM + HTTP service
+golembot gateway      # start IM + HTTP service + Dashboard
+golembot fleet ls     # list all running bots
 golembot skill search "data analysis"  # browse 13,000+ ClawHub skills
 ```
+
+### Dashboard & Fleet
+
+Every `golembot gateway` instance comes with a built-in web Dashboard showing real-time metrics, channel status, and a quick-test console:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/0xranx/golembot/main/docs/assets/dashboard.png" alt="GolemBot Dashboard" width="720">
+</p>
+
+Running multiple bots? `golembot fleet serve` aggregates them into a single Fleet Dashboard:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/0xranx/golembot/main/docs/assets/fleet-dashboard.png" alt="GolemBot Fleet Dashboard" width="720">
+</p>
 
 ## Architecture
 
@@ -194,7 +209,7 @@ git clone https://github.com/0xranx/golembot.git
 cd golembot
 pnpm install
 pnpm run build
-pnpm run test          # Unit tests (776+)
+pnpm run test          # Unit tests (1252+)
 pnpm run e2e:opencode  # End-to-end tests (OpenCode)
 pnpm run e2e:codex     # End-to-end tests (Codex)
 ```

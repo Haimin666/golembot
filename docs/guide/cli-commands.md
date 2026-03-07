@@ -77,6 +77,68 @@ golembot gateway [-d <dir>] [-p <port>] [-t <token>] [--host <host>] [--api-key 
 
 Reads `channels` config from `golem.yaml` and starts the corresponding IM adapters alongside the HTTP service.
 
+The gateway also:
+- Serves a **web Dashboard** at `GET /` with real-time metrics, channel status, and a Quick Test panel.
+- Auto-registers with the **Fleet directory** (`~/.golembot/fleet/`) so `golembot fleet ls` can discover it.
+
+## `golembot fleet`
+
+Manage and view all running GolemBot instances.
+
+### `golembot fleet ls`
+
+List all running bot instances discovered from `~/.golembot/fleet/`.
+
+```bash
+golembot fleet ls [--json]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--json` | Output JSON with full instance details and metrics | `false` |
+
+Each gateway automatically registers itself on startup and unregisters on shutdown. Stale entries (crashed processes) are cleaned up automatically via PID liveness checks.
+
+**Example output:**
+
+```
+  Running GolemBot Instances (2)
+
+  ●  alpha-bot (claude-code) claude-opus-4-6
+     Port 3000 · PID 12345 · 42 msgs
+
+  ●  beta-bot (cursor) claude-4.6-sonnet
+     Port 3001 · PID 12346 · 7 msgs
+```
+
+### `golembot fleet serve`
+
+Start the Fleet Dashboard web server — an aggregate view of all running bots.
+
+```bash
+golembot fleet serve [-p <port>] [--host <host>]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-p, --port <port>` | HTTP port | `4000` |
+| `--host <host>` | Bind address | `127.0.0.1` |
+
+**Fleet Dashboard features:**
+- Auto-discovers all running bots from `~/.golembot/fleet/`
+- Shows engine, model, uptime, message count, and cost per bot
+- Links to each bot's individual Dashboard
+- Auto-refreshes every 10 seconds
+- Empty state guidance when no bots are running
+
+**Fleet API endpoints:**
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /` | Fleet Dashboard HTML |
+| `GET /api/fleet` | JSON array of all instances with metrics |
+| `GET /health` | `{ "status": "ok" }` |
+
 ## `golembot onboard`
 
 Run the interactive setup wizard.
@@ -97,10 +159,29 @@ See [Onboard Wizard](/guide/onboard-wizard) for the full walkthrough.
 Display the current assistant configuration.
 
 ```bash
-golembot status [-d <dir>]
+golembot status [-d <dir>] [--json]
 ```
 
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-d, --dir <dir>` | Assistant directory | `.` |
+| `--json` | Output JSON (agent-friendly) | `false` |
+
 Shows: name, engine, model, installed skills, configured channels, and gateway settings.
+
+**JSON output example:**
+
+```json
+{
+  "name": "my-bot",
+  "engine": "claude-code",
+  "model": "claude-opus-4-6",
+  "skills": [{ "name": "general", "description": "General assistant" }],
+  "channels": ["telegram"],
+  "gateway": { "port": 3000, "authEnabled": false },
+  "directory": "/home/user/my-bot"
+}
+```
 
 ## `golembot skill`
 
