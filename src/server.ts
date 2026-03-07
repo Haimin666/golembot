@@ -1,6 +1,7 @@
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { Server as HttpServer } from 'node:http';
 import type { Assistant } from './index.js';
+import { type DashboardContext, buildDashboardData, renderDashboard, recordMessage } from './dashboard.js';
 
 export interface ServerOpts {
   port?: number;
@@ -28,13 +29,15 @@ function json(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
-function checkAuth(req: IncomingMessage, token: string | undefined): boolean {
+function checkAuth(req: IncomingMessage, url: URL, token: string | undefined): boolean {
   if (!token) return true;
   const auth = req.headers.authorization;
-  return auth === `Bearer ${token}`;
+  if (auth === `Bearer ${token}`) return true;
+  // Support ?token= query param for EventSource (cannot set headers)
+  return url.searchParams.get('token') === token;
 }
 
-export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}): GolemServer {
+export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, dashboard?: DashboardContext): GolemServer {
   const token = opts.token || process.env.GOLEM_TOKEN;
   const activeConnections = new Set<ServerResponse>();
 
@@ -54,8 +57,21 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}): 
       return;
     }
 
+    // Dashboard (no auth — landing page)
+    if (path === '/' && req.method === 'GET') {
+      if (dashboard) {
+        const data = buildDashboardData(dashboard);
+        const html = renderDashboard(data);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(html);
+      } else {
+        json(res, 200, { hint: 'Use POST /chat to interact', endpoints: ['/chat', '/reset', '/health'] });
+      }
+      return;
+    }
+
     // Auth check for everything below
-    if (!checkAuth(req, token)) {
+    if (!checkAuth(req, url, token)) {
       json(res, 401, { error: 'Unauthorized' });
       return;
     }
@@ -84,13 +100,31 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}): 
       activeConnections.add(res);
       res.on('close', () => activeConnections.delete(res));
 
+      const chatStartMs = Date.now();
+      let replyText = '';
+      let costUsd: number | undefined;
+      let durationMs: number | undefined;
       try {
         for await (const event of assistant.chat(body.message, { sessionKey: body.sessionKey })) {
           res.write(`data: ${JSON.stringify(event)}\n\n`);
+          if (event.type === 'text') replyText += event.content;
+          else if (event.type === 'done') { costUsd = event.costUsd; durationMs = event.durationMs; }
         }
       } catch (e: unknown) {
         const errEvent = { type: 'error', message: (e as Error).message };
         res.write(`data: ${JSON.stringify(errEvent)}\n\n`);
+      }
+
+      if (dashboard) {
+        recordMessage(dashboard.metrics, {
+          ts: new Date().toISOString(),
+          source: 'http',
+          sender: body.sessionKey ?? 'anonymous',
+          messagePreview: body.message.slice(0, 120),
+          responsePreview: replyText.slice(0, 120),
+          durationMs: durationMs ?? (Date.now() - chatStartMs),
+          costUsd,
+        });
       }
 
       activeConnections.delete(res);
@@ -111,6 +145,37 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}): 
 
       await assistant.resetSession(body.sessionKey);
       json(res, 200, { ok: true });
+      return;
+    }
+
+    // GET /api/status — dashboard data as JSON
+    if (path === '/api/status' && req.method === 'GET') {
+      if (dashboard) {
+        json(res, 200, buildDashboardData(dashboard));
+      } else {
+        json(res, 200, { hint: 'Dashboard not available (gateway mode only)' });
+      }
+      return;
+    }
+
+    // GET /api/events — SSE real-time activity stream
+    if (path === '/api/events' && req.method === 'GET') {
+      if (!dashboard) {
+        json(res, 404, { error: 'Events not available (gateway mode only)' });
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+      res.write(': connected\n\n');
+      dashboard.metrics.eventSubscribers.add(res);
+      activeConnections.add(res);
+      res.on('close', () => {
+        dashboard.metrics.eventSubscribers.delete(res);
+        activeConnections.delete(res);
+      });
       return;
     }
 

@@ -10,6 +10,7 @@ export { createGolemServer, startServer, type ServerOpts, type GolemServer } fro
 export type { ChannelAdapter, ChannelMessage } from './channel.js';
 export { buildSessionKey, stripMention } from './channel.js';
 export { startGateway } from './gateway.js';
+export type { DashboardContext, ChannelStatus, GatewayMetrics, RecentMessage } from './dashboard.js';
 
 // ── Per-key Mutex ──────────────────────────────────────
 

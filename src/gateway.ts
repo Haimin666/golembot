@@ -1,9 +1,11 @@
-import { resolve, join } from 'node:path';
-import { mkdir } from 'node:fs/promises';
+import { resolve, join, dirname } from 'node:path';
+import { mkdir, readFile as readFileAsync } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { createAssistant, type Assistant } from './index.js';
 import { createGolemServer, type ServerOpts, type GolemServer } from './server.js';
 import {
   loadConfig,
+  scanSkills,
   type GolemConfig,
   type ChannelsConfig,
   type GroupChatConfig,
@@ -22,6 +24,14 @@ import {
   type ChannelMessage,
   type MentionTarget,
 } from './channel.js';
+import {
+  createMetrics,
+  recordMessage,
+  KNOWN_CHANNELS,
+  type DashboardContext,
+  type ChannelStatus,
+  type GatewayMetrics,
+} from './dashboard.js';
 
 export function splitMessage(text: string, maxLen: number): string[] {
   if (text.length <= maxLen) return [text];
@@ -272,10 +282,12 @@ export async function handleMessage(
   channelType: string,
   verbose: boolean,
   dir: string,
+  metrics?: GatewayMetrics,
 ): Promise<void> {
   const userText = msg.chatType === 'group' ? stripMention(msg.text) : msg.text;
   if (!userText) return;
 
+  const senderLabel = msg.senderName || msg.senderId;
   let sessionKey: string;
   let fullText: string;
 
@@ -325,13 +337,12 @@ export async function handleMessage(
     fullText = buildGroupPrompt(hist, msg.senderName ?? msg.senderId, userText, injectPass, groupKey, dir, othersAddressed);
   } else {
     sessionKey = buildSessionKey(msg);
-    const senderLabel = msg.senderName || msg.senderId;
     fullText = `[System: This is a private 1-on-1 conversation with ${senderLabel}.]\n${msg.text}`;
   }
 
   log(
     verbose,
-    `[${channelType}] received from ${msg.senderName || msg.senderId}: "${userText}" → session ${sessionKey}`,
+    `[${channelType}] received from ${senderLabel}: "${userText}" → session ${sessionKey}`,
   );
 
   // Send typing indicator immediately, then refresh every 4s while waiting for AI.
@@ -341,6 +352,24 @@ export async function handleMessage(
     adapter.typing(msg).catch(() => {});
     typingTimer = setInterval(() => adapter.typing!(msg).catch(() => {}), 4000);
   }
+
+  const msgStartMs = Date.now();
+
+  function trackMetrics(extra: { responsePreview: string; passed?: boolean }) {
+    if (!metrics) return;
+    recordMessage(metrics, {
+      ts: new Date().toISOString(),
+      source: channelType,
+      sender: senderLabel,
+      messagePreview: userText.slice(0, 120),
+      durationMs: durationMs ?? (Date.now() - msgStartMs),
+      costUsd,
+      ...extra,
+    });
+  }
+
+  let costUsd: number | undefined;
+  let durationMs: number | undefined;
 
   try {
     let reply = '';
@@ -353,12 +382,16 @@ export async function handleMessage(
       } else if (event.type === 'error') {
         hasError = true;
         console.error(`[${channelType}] Engine error: ${event.message}`);
+      } else if (event.type === 'done') {
+        costUsd = event.costUsd;
+        durationMs = event.durationMs;
       }
     }
 
     // [PASS] sentinel: smart mode bot chose to stay silent
     if (reply.trim() === '[PASS]') {
       log(verbose, `[${channelType}] [PASS] — bot chose not to respond`);
+      trackMetrics({ passed: true, responsePreview: '' });
       return;
     }
 
@@ -385,7 +418,9 @@ export async function handleMessage(
       for (const chunk of chunks) {
         await adapter.reply(msg, chunk, replyOpts);
       }
-      log(verbose, `[${channelType}] replied to ${msg.senderName || msg.senderId}: "${reply.trim().slice(0, 80)}..." (${chunks.length} chunk(s))`);
+      log(verbose, `[${channelType}] replied to ${senderLabel}: "${reply.trim().slice(0, 80)}..." (${chunks.length} chunk(s))`);
+
+      trackMetrics({ responsePreview: reply.trim().slice(0, 120) });
 
       // Update group history with bot reply + increment turn counter
       if (msg.chatType === 'group') {
@@ -409,6 +444,62 @@ export async function handleMessage(
     if (typingTimer !== undefined) clearInterval(typingTimer);
   }
 }
+
+// ── CLI banner ───────────────────────────────────────────────────────────────
+
+const ANSI = {
+  dim: '\x1b[2m', bold: '\x1b[1m', reset: '\x1b[0m',
+  cyan: '\x1b[36m', green: '\x1b[32m', red: '\x1b[31m', yellow: '\x1b[33m',
+} as const;
+
+function printBanner(ctx: {
+  host: string; port: number; version: string;
+  config: GolemConfig; token?: string; channelStatuses: ChannelStatus[];
+}): void {
+  const { dim, bold, reset, cyan, green, red, yellow } = ANSI;
+  const { host, port, version, config, token, channelStatuses } = ctx;
+  const url = `http://${host}:${port}`;
+
+  console.log('');
+  console.log(`  ${bold}🤖 GolemBot Gateway${reset} ${dim}v${version}${reset}`);
+  console.log(`  ${dim}${'─'.repeat(44)}${reset}`);
+  console.log(`  ${dim}Bot:${reset}        ${config.name} ${dim}(${config.engine})${reset}`);
+  if (config.model) console.log(`  ${dim}Model:${reset}      ${config.model}`);
+  console.log(`  ${dim}Auth:${reset}       ${token ? `${green}enabled${reset}` : `${yellow}disabled${reset}`}`);
+  console.log('');
+
+  console.log(`  ${bold}Endpoints${reset}`);
+  console.log(`  ${cyan}➜${reset}  Dashboard   ${cyan}${url}/${reset}`);
+  console.log(`  ${cyan}➜${reset}  HTTP API    ${dim}POST${reset} ${url}/chat`);
+  console.log(`  ${cyan}➜${reset}  Health      ${dim}GET${reset}  ${url}/health`);
+  console.log('');
+
+  const connectedCount = channelStatuses.filter(c => c.status === 'connected').length;
+  console.log(`  ${bold}Channels${reset} ${dim}(${connectedCount} connected)${reset}`);
+  for (const ch of channelStatuses) {
+    const name = ch.type.charAt(0).toUpperCase() + ch.type.slice(1);
+    if (ch.status === 'connected') {
+      console.log(`  ${green}●${reset}  ${name}`);
+    } else if (ch.status === 'failed') {
+      console.log(`  ${red}●${reset}  ${name} ${dim}— ${ch.error}${reset}`);
+    } else {
+      console.log(`  ${dim}○  ${name}${reset}`);
+    }
+  }
+  if (connectedCount === 0) {
+    console.log(`  ${dim}   Add channels in golem.yaml or visit the Dashboard${reset}`);
+  }
+  console.log('');
+
+  const authParam = token ? ` \\\n     -H 'Authorization: Bearer ${token}'` : '';
+  console.log(`  ${bold}Quick test${reset}`);
+  console.log(`  ${dim}$ curl -X POST ${url}/chat${authParam} \\`);
+  console.log(`     -H 'Content-Type: application/json' \\`);
+  console.log(`     -d '{"message":"hello"}'${reset}`);
+  console.log('');
+}
+
+// ── Gateway startup ──────────────────────────────────────────────────────────
 
 export async function startGateway(opts: GatewayOpts): Promise<void> {
   const dir = resolve(opts.dir || '.');
@@ -436,15 +527,30 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
   const host = opts.host ?? gatewayConfig.host ?? '127.0.0.1';
   const token = opts.token ?? gatewayConfig.token;
 
-  const serverOpts: ServerOpts = { port, token, hostname: host };
-  const httpServer: GolemServer = createGolemServer(assistant, serverOpts);
+  // ── Dashboard: metrics + channel statuses ──
+  const metrics: GatewayMetrics = createMetrics();
+  const channelStatuses: ChannelStatus[] = [];
+  const skills = await scanSkills(dir);
 
-  httpServer.listen(port, host, () => {
-    const tokenStatus = token ? 'enabled' : 'disabled';
-    console.log(`🤖 Golem Gateway started at http://${host}:${port}`);
-    console.log(`   HTTP API: POST /chat, POST /reset, GET /health`);
-    console.log(`   Auth: ${tokenStatus}`);
-  });
+  let version = '0.0.0';
+  try {
+    const selfDir = dirname(fileURLToPath(import.meta.url));
+    const pkg = JSON.parse(await readFileAsync(join(selfDir, '..', 'package.json'), 'utf-8'));
+    version = pkg.version ?? version;
+  } catch { /* ok — dev mode or missing */ }
+
+
+  const dashboardCtx: DashboardContext = {
+    config,
+    skills,
+    channelStatuses,
+    metrics,
+    startTime: Date.now(),
+    version,
+  };
+
+  const serverOpts: ServerOpts = { port, token, hostname: host };
+  const httpServer: GolemServer = createGolemServer(assistant, serverOpts, dashboardCtx);
 
   const adapters: ChannelAdapter[] = [];
   const channels: ChannelsConfig | undefined = config.channels;
@@ -456,11 +562,11 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
       try {
         const adapter = await createChannelAdapter(type, channelConfig as Record<string, unknown>, dir);
         await adapter.start((msg: ChannelMessage) =>
-          handleMessage(msg, config, assistant, adapter, type, verbose, dir),
+          handleMessage(msg, config, assistant, adapter, type, verbose, dir, metrics),
         );
 
         adapters.push(adapter);
-        console.log(`   ✅ ${type} channel connected`);
+        channelStatuses.push({ type, status: 'connected' });
 
         // DingTalk Stream SDK only delivers @mention messages to the bot.
         // Warn if the user configured smart/always, which won't work as expected.
@@ -474,14 +580,21 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
           }
         }
       } catch (e) {
-        console.error(`   ❌ ${type} channel failed to start: ${(e as Error).message}`);
+        channelStatuses.push({ type, status: 'failed', error: (e as Error).message });
       }
     }
   }
 
-  if (adapters.length === 0 && !channels) {
-    console.log(`   (no IM channels configured, HTTP API only)`);
+  // Mark unconfigured channels
+  for (const type of KNOWN_CHANNELS) {
+    if (!channelStatuses.some(c => c.type === type)) {
+      channelStatuses.push({ type, status: 'not_configured' });
+    }
   }
+
+  httpServer.listen(port, host, () => {
+    printBanner({ host, port, version, config, token, channelStatuses });
+  });
 
   // Periodically purge idle group state to prevent unbounded memory growth
   const purgeTimer = setInterval(purgeIdleGroups, GROUP_TURN_RESET_MS);

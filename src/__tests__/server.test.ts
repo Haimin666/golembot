@@ -6,6 +6,7 @@ import http from 'node:http';
 import type { StreamEvent, InvokeOpts } from '../engine.js';
 import type { GolemServer } from '../server.js';
 import { createEngine } from '../engine.js';
+import { createMetrics, type DashboardContext } from '../dashboard.js';
 
 vi.mock('../engine.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../engine.js')>();
@@ -341,6 +342,118 @@ describe('Golem HTTP Server', () => {
       });
       expect(lines.find((l: { role: string }) => l.role === 'assistant')).toMatchObject({
         role: 'assistant', content: 'hello',
+      });
+    });
+  });
+
+  describe('dashboard routes', () => {
+    function makeDashboardCtx(): DashboardContext {
+      return {
+        config: { name: 'test-bot', engine: 'claude-code', channels: {} },
+        skills: [{ name: 'general', path: '/skills/general', description: 'General' }],
+        channelStatuses: [{ type: 'telegram', status: 'connected' as const }],
+        metrics: createMetrics(),
+        startTime: Date.now() - 5000,
+        version: '1.0.0',
+      };
+    }
+
+    function startServerWithDashboard(token?: string) {
+      const assistant = createAssistant({ dir });
+      const ctx = makeDashboardCtx();
+      server = createGolemServer(assistant, { token }, ctx);
+      return new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    }
+
+    describe('GET /', () => {
+      it('returns HTML when dashboard context is provided', async () => {
+        await startServerWithDashboard();
+        const res = await request(server, 'GET', '/');
+        expect(res.status).toBe(200);
+        expect(res.headers['content-type']).toContain('text/html');
+        expect(res.body).toContain('<!DOCTYPE html>');
+        expect(res.body).toContain('test-bot');
+      });
+
+      it('returns JSON hint when no dashboard context', async () => {
+        await startServer();
+        const res = await request(server, 'GET', '/');
+        expect(res.status).toBe(200);
+        const body = JSON.parse(res.body);
+        expect(body.hint).toBeDefined();
+      });
+
+      it('does not require auth', async () => {
+        await startServerWithDashboard('secret');
+        const res = await request(server, 'GET', '/');
+        expect(res.status).toBe(200);
+        expect(res.body).toContain('<!DOCTYPE html>');
+      });
+    });
+
+    describe('GET /api/status', () => {
+      it('returns dashboard data as JSON', async () => {
+        await startServerWithDashboard();
+        const res = await request(server, 'GET', '/api/status');
+        expect(res.status).toBe(200);
+        const body = JSON.parse(res.body);
+        expect(body.name).toBe('test-bot');
+        expect(body.engine).toBe('claude-code');
+        expect(body.version).toBe('1.0.0');
+        expect(body.channels).toHaveLength(1);
+      });
+
+      it('requires auth when token is set', async () => {
+        await startServerWithDashboard('secret');
+        const res = await request(server, 'GET', '/api/status');
+        expect(res.status).toBe(401);
+      });
+
+      it('accepts auth via Bearer header', async () => {
+        await startServerWithDashboard('secret');
+        const res = await request(server, 'GET', '/api/status', undefined, { Authorization: 'Bearer secret' });
+        expect(res.status).toBe(200);
+      });
+
+      it('accepts auth via ?token= query param', async () => {
+        await startServerWithDashboard('secret');
+        const res = await request(server, 'GET', '/api/status?token=secret');
+        expect(res.status).toBe(200);
+      });
+    });
+
+    describe('GET /api/events', () => {
+      it('returns SSE stream', async () => {
+        await startServerWithDashboard();
+        const addr = server.address() as { port: number };
+
+        const received: string[] = [];
+        const connected = new Promise<void>((resolve) => {
+          const req = http.request(
+            { hostname: '127.0.0.1', port: addr.port, path: '/api/events', method: 'GET' },
+            (res) => {
+              expect(res.statusCode).toBe(200);
+              expect(res.headers['content-type']).toBe('text/event-stream');
+              res.on('data', (chunk: Buffer) => {
+                received.push(chunk.toString());
+                // Close after receiving the connected comment
+                req.destroy();
+              });
+              resolve();
+            },
+          );
+          req.end();
+        });
+
+        await connected;
+        await new Promise(r => setTimeout(r, 50));
+        expect(received.join('')).toContain(': connected');
+      });
+
+      it('returns 404 when no dashboard context', async () => {
+        await startServer();
+        const res = await request(server, 'GET', '/api/events');
+        expect(res.status).toBe(404);
       });
     });
   });
