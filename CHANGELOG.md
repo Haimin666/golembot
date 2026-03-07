@@ -1,3 +1,10 @@
+# [0.14.0-beta.5](https://github.com/0xranx/golembot/compare/v0.14.0-beta.4...v0.14.0-beta.5) (2026-03-07)
+
+
+### Bug Fixes
+
+* sync latest dashboard screenshots to VitePress public dir ([f7d78d9](https://github.com/0xranx/golembot/commit/f7d78d944894cfa87e538531abcc2b236ffcb413))
+
 # [0.14.0-beta.4](https://github.com/0xranx/golembot/compare/v0.14.0-beta.3...v0.14.0-beta.4) (2026-03-07)
 
 
