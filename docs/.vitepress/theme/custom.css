@@ -30,6 +30,20 @@
   max-height: 180px;
 }
 
+/* Social link icons — use brand colors instead of theme gray */
+.VPSocialLinks .VPSocialLink[href*="github"] {
+  color: #333;
+}
+.dark .VPSocialLinks .VPSocialLink[href*="github"] {
+  color: #fff;
+}
+.VPSocialLinks .VPSocialLink[href*="discord"] {
+  color: #5865F2;
+}
+.VPSocialLinks .VPSocialLink[href*="npmjs"] {
+  color: #CB3837;
+}
+
 /* Feature card icon sizing fix */
 .VPFeature .icon {
   font-size: 28px;
