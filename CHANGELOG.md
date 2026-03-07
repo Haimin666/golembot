@@ -1,3 +1,10 @@
+# [0.14.0-beta.4](https://github.com/0xranx/golembot/compare/v0.14.0-beta.3...v0.14.0-beta.4) (2026-03-07)
+
+
+### Features
+
+* add shutdown button to Gateway Dashboard and fix Fleet card layout ([93850b0](https://github.com/0xranx/golembot/commit/93850b0154f3b42364fa76a080d715e8a1ea296b))
+
 # [0.14.0-beta.3](https://github.com/0xranx/golembot/compare/v0.14.0-beta.2...v0.14.0-beta.3) (2026-03-07)
 
 
