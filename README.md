@@ -28,8 +28,8 @@
 </p>
 
 <p align="center">
-  <video src="https://raw.githubusercontent.com/0xranx/golembot/main/docs/assets/demo.mp4" width="720" autoplay muted loop playsinline>
-    <a href="https://raw.githubusercontent.com/0xranx/golembot/main/docs/assets/demo.mp4">Watch the demo</a>
+  <video src="https://github.com/user-attachments/assets/7abddbd6-56c8-4ae3-8e5b-72e6f0104257" width="720" autoplay muted loop playsinline>
+    <a href="https://github.com/user-attachments/assets/7abddbd6-56c8-4ae3-8e5b-72e6f0104257">Watch the demo</a>
   </video>
 </p>
 <p align="center"><em>One command to connect your Coding Agent to Telegram & Discord</em></p>
