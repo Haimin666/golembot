@@ -1,3 +1,10 @@
+## [0.17.4](https://github.com/0xranx/golembot/compare/v0.17.3...v0.17.4) (2026-03-08)
+
+
+### Bug Fixes
+
+* reload .env before starting gateway from onboard ([fb215a2](https://github.com/0xranx/golembot/commit/fb215a2848111b66453fc1ee1c261f41d6a67d0b))
+
 # [0.14.0-beta.10](https://github.com/0xranx/golembot/compare/v0.14.0-beta.9...v0.14.0-beta.10) (2026-03-08)
 
 
