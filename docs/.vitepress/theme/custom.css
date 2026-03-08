@@ -7,21 +7,30 @@
   --vp-c-brand-soft: rgba(79, 195, 247, 0.14);
 
   --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: linear-gradient(135deg, #D4A574 30%, #7DF9FF);
+  --vp-home-hero-name-background: linear-gradient(135deg, #D4A574 10%, #4FC3F7);
 
-  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(164, 114, 74, 0.3) 30%, rgba(79, 195, 247, 0.3));
-  --vp-home-hero-image-filter: blur(56px);
+  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(212, 165, 116, 0.4) 30%, rgba(79, 195, 247, 0.4));
+  --vp-home-hero-image-filter: blur(64px);
 }
 
 .dark {
   --vp-c-brand-1: #7DF9FF;
   --vp-c-brand-2: #4FC3F7;
   --vp-c-brand-3: #29B6F6;
-  --vp-c-brand-soft: rgba(125, 249, 255, 0.14);
+  --vp-c-brand-soft: rgba(125, 249, 255, 0.15);
 
-  --vp-home-hero-name-background: linear-gradient(135deg, #D4A574 30%, #7DF9FF);
+  --vp-home-hero-name-background: linear-gradient(135deg, #D4A574 10%, #7DF9FF);
 
-  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(164, 114, 74, 0.4) 30%, rgba(125, 249, 255, 0.4));
+  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(212, 165, 116, 0.5) 30%, rgba(125, 249, 255, 0.4));
+}
+
+/* Subtle tech grid in dark mode */
+html.dark body {
+  background-image: 
+    linear-gradient(rgba(125, 249, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(125, 249, 255, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: center top;
 }
 
 /* Hero image sizing — show only the golem head icon */
