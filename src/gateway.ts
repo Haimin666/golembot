@@ -1,6 +1,7 @@
 import { resolve, join, dirname } from 'node:path';
 import { mkdir, readFile as readFileAsync } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { createAssistant, type Assistant } from './index.js';
 import { createGolemServer, type ServerOpts, type GolemServer } from './server.js';
 import {
@@ -209,11 +210,56 @@ export function parseMentions(
   return { text, mentions };
 }
 
+/**
+ * Map of channel type → npm packages required by that adapter.
+ * Used to pre-load peer-deps from the bot's working directory before
+ * the adapter's own dynamic import() attempts to resolve them.
+ */
+const CHANNEL_PEER_DEPS: Record<string, string[]> = {
+  feishu: ['@larksuiteoapi/node-sdk'],
+  dingtalk: ['dingtalk-stream'],
+  wecom: ['@wecom/crypto', 'xml2js'],
+  slack: ['@slack/bolt'],
+  telegram: ['grammy'],
+  discord: ['discord.js'],
+};
+
+/**
+ * Pre-load channel peer-dependencies from the bot's working directory.
+ * When GolemBot is installed globally, `import('grammy')` inside adapter code
+ * resolves from GolemBot's install path — not the bot's node_modules.
+ * We use `createRequire(botDir)` (stable, documented API) to resolve the
+ * package from the bot dir, then `import()` the resolved path so it is
+ * cached in Node's module registry before the adapter tries to load it.
+ */
+async function preloadChannelDeps(type: string, dir: string): Promise<void> {
+  const deps = CHANNEL_PEER_DEPS[type];
+  if (!deps) return;
+  const localRequire = createRequire(join(dir, 'package.json'));
+  for (const dep of deps) {
+    try {
+      // Already resolvable from GolemBot's own node_modules? Skip.
+      await import(dep);
+    } catch {
+      // Try resolving from the bot's working directory instead.
+      try {
+        const resolved = localRequire.resolve(dep);
+        await import(resolved);
+      } catch {
+        // Will fail later with a helpful error message from the adapter.
+      }
+    }
+  }
+}
+
 async function createChannelAdapter(
   type: string,
   channelConfig: Record<string, unknown>,
   dir: string,
 ): Promise<ChannelAdapter> {
+  // Pre-load peer-deps from bot dir so adapters can import() them.
+  await preloadChannelDeps(type, dir);
+
   switch (type) {
     case 'feishu': {
       requireFields(type, channelConfig, ['appId', 'appSecret']);
@@ -504,18 +550,6 @@ function printBanner(ctx: {
 
 export async function startGateway(opts: GatewayOpts): Promise<void> {
   const dir = resolve(opts.dir || '.');
-
-  // Ensure channel peer-dependencies installed in the bot's own node_modules
-  // are resolvable by dynamic import() inside adapter code, even when GolemBot
-  // itself is installed globally (where Node resolves from GolemBot's path).
-  const botNodeModules = join(dir, 'node_modules');
-  const existingNodePath = process.env.NODE_PATH || '';
-  if (!existingNodePath.split(':').includes(botNodeModules)) {
-    process.env.NODE_PATH = existingNodePath ? `${botNodeModules}:${existingNodePath}` : botNodeModules;
-    // @ts-expect-error — Module._initPaths is internal but the only way to
-    // make NODE_PATH changes take effect after process startup.
-    await import('node:module').then(m => m.default._initPaths?.());
-  }
 
   const config: GolemConfig = await loadConfig(dir);
   const verbose = opts.verbose ?? false;
