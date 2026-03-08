@@ -1,3 +1,10 @@
+## [0.16.1](https://github.com/0xranx/golembot/compare/v0.16.0...v0.16.1) (2026-03-08)
+
+
+### Bug Fixes
+
+* improve onboard channel selection hint to mention SPACE key ([2e1fa2d](https://github.com/0xranx/golembot/commit/2e1fa2da3414fc0e0f52b821510993ecd5af0324))
+
 # [0.14.0-beta.5](https://github.com/0xranx/golembot/compare/v0.14.0-beta.4...v0.14.0-beta.5) (2026-03-07)
 
 
