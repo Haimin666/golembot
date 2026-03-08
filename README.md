@@ -27,6 +27,13 @@
   📖 <a href="https://0xranx.github.io/golembot/"><strong>Documentation & Guides → 0xranx.github.io/golembot</strong></a>
 </p>
 
+<p align="center">
+  <video src="https://raw.githubusercontent.com/0xranx/golembot/main/docs/assets/demo.mp4" width="720" autoplay muted loop playsinline>
+    <a href="https://raw.githubusercontent.com/0xranx/golembot/main/docs/assets/demo.mp4">Watch the demo</a>
+  </video>
+</p>
+<p align="center"><em>One command to connect your Coding Agent to Telegram & Discord</em></p>
+
 ---
 
 Cursor, Claude Code, OpenCode, Codex — these Coding Agents can already write code, run scripts, analyze data, and reason through complex tasks. But they're stuck in an IDE or a terminal window.
