@@ -514,6 +514,25 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
   }]);
 
   if (start) {
+    // Re-load .env that was just created during onboard (the CLI-level loader
+    // ran before this file existed, so tokens are missing from process.env).
+    try {
+      const { readFileSync } = await import('node:fs');
+      const { join } = await import('node:path');
+      for (const line of readFileSync(join(dir, '.env'), 'utf-8').split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx < 1) continue;
+        const key = trimmed.slice(0, eqIdx).trim();
+        let val = trimmed.slice(eqIdx + 1).trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        if (val && !process.env[key]) process.env[key] = val;
+      }
+    } catch { /* no .env — env vars already set externally */ }
+
     console.log('');
     const { startGateway } = await import('./gateway.js');
     await startGateway({ dir, verbose: true });
