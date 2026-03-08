@@ -1,4 +1,4 @@
-## [0.16.1](https://github.com/0xranx/golembot/compare/v0.16.0...v0.16.1) (2026-03-08)
+# [0.14.0-beta.6](https://github.com/0xranx/golembot/compare/v0.14.0-beta.5...v0.14.0-beta.6) (2026-03-08)
 
 
 ### Bug Fixes
