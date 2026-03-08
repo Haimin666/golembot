@@ -273,7 +273,7 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
   const { channels } = await inquirer.default.prompt([{
     type: 'checkbox',
     name: 'channels',
-    message: '4/8 Select IM channels to connect (multi-select, press Enter to skip):',
+    message: '4/8 Select IM channels (SPACE to select, ENTER to confirm):',
     choices: [
       { name: 'Feishu / Lark (WebSocket, no public IP needed)', value: 'feishu' },
       { name: 'DingTalk (Stream, no public IP needed)', value: 'dingtalk' },
