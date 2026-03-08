@@ -1,3 +1,10 @@
+# [0.14.0-beta.7](https://github.com/0xranx/golembot/compare/v0.14.0-beta.6...v0.14.0-beta.7) (2026-03-08)
+
+
+### Features
+
+* auto-install channel dependencies during onboard ([2ee94f4](https://github.com/0xranx/golembot/commit/2ee94f4a5e02f89bd5c7720f51e5fb565933bb55))
+
 # [0.14.0-beta.6](https://github.com/0xranx/golembot/compare/v0.14.0-beta.5...v0.14.0-beta.6) (2026-03-08)
 
 
