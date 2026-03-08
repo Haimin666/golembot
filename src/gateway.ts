@@ -504,6 +504,19 @@ function printBanner(ctx: {
 
 export async function startGateway(opts: GatewayOpts): Promise<void> {
   const dir = resolve(opts.dir || '.');
+
+  // Ensure channel peer-dependencies installed in the bot's own node_modules
+  // are resolvable by dynamic import() inside adapter code, even when GolemBot
+  // itself is installed globally (where Node resolves from GolemBot's path).
+  const botNodeModules = join(dir, 'node_modules');
+  const existingNodePath = process.env.NODE_PATH || '';
+  if (!existingNodePath.split(':').includes(botNodeModules)) {
+    process.env.NODE_PATH = existingNodePath ? `${botNodeModules}:${existingNodePath}` : botNodeModules;
+    // @ts-expect-error — Module._initPaths is internal but the only way to
+    // make NODE_PATH changes take effect after process startup.
+    await import('node:module').then(m => m.default._initPaths?.());
+  }
+
   const config: GolemConfig = await loadConfig(dir);
   const verbose = opts.verbose ?? false;
 
