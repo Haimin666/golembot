@@ -221,6 +221,10 @@ pnpm run e2e:opencode  # 端到端测试（OpenCode）
 pnpm run e2e:codex     # 端到端测试（Codex）
 ```
 
+## 参与贡献
+
+欢迎贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详情。
+
 ## 许可证
 
 [MIT](LICENSE)

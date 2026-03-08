@@ -150,6 +150,7 @@ export default defineConfig({
   title: 'GolemBot',
   description: 'Run your Coding Agent everywhere — IM, HTTP, or embedded in your product.',
   base: '/golembot/',
+  sitemap: { hostname: 'https://0xranx.github.io/golembot/' },
 
   head: [
     ['link', { rel: 'icon', href: '/golembot/logo-icon-dark.svg' }],

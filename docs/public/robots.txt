@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /golembot/
+
+Sitemap: https://0xranx.github.io/golembot/sitemap.xml

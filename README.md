@@ -221,6 +221,10 @@ pnpm run e2e:opencode  # End-to-end tests (OpenCode)
 pnpm run e2e:codex     # End-to-end tests (Codex)
 ```
 
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
 ## License
 
 [MIT](LICENSE)
