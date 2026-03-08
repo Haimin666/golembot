@@ -153,6 +153,23 @@ export default defineConfig({
 
   head: [
     ['link', { rel: 'icon', href: '/golembot/logo-icon-dark.svg' }],
+    // Open Graph
+    ['meta', { property: 'og:title', content: 'GolemBot' }],
+    ['meta', { property: 'og:description', content: 'Run your Coding Agent everywhere — IM, HTTP, or embedded in your product.' }],
+    ['meta', { property: 'og:image', content: 'https://0xranx.github.io/golembot/og-image.png' }],
+    ['meta', { property: 'og:url', content: 'https://0xranx.github.io/golembot/' }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:locale', content: 'en_US' }],
+    ['meta', { property: 'og:locale:alternate', content: 'zh_CN' }],
+    // Twitter Card
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+    ['meta', { name: 'twitter:title', content: 'GolemBot' }],
+    ['meta', { name: 'twitter:description', content: 'Run your Coding Agent everywhere — IM, HTTP, or embedded in your product.' }],
+    ['meta', { name: 'twitter:image', content: 'https://0xranx.github.io/golembot/og-image.png' }],
+    // SEO
+    ['meta', { name: 'theme-color', content: '#4FC3F7' }],
+    ['link', { rel: 'alternate', hreflang: 'en', href: 'https://0xranx.github.io/golembot/' }],
+    ['link', { rel: 'alternate', hreflang: 'zh-CN', href: 'https://0xranx.github.io/golembot/zh/' }],
   ],
 
   locales: {
