@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { ChannelAdapter, ChannelMessage, ReplyOptions } from '../channel.js';
 import type { WecomChannelConfig } from '../workspace.js';
+import { importPeer } from '../peer-require.js';
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -60,14 +61,14 @@ export class WecomAdapter implements ChannelAdapter {
     let wecomCrypto: any;
     let xml2js: any;
     try {
-      wecomCrypto = await import('@wecom/crypto');
+      wecomCrypto = await importPeer('@wecom/crypto');
     } catch {
       throw new Error(
         'WeCom adapter requires @wecom/crypto. Install it: npm install @wecom/crypto',
       );
     }
     try {
-      xml2js = await import('xml2js');
+      xml2js = await importPeer('xml2js');
     } catch {
       throw new Error(
         'WeCom adapter requires xml2js. Install it: npm install xml2js',

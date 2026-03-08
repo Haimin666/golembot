@@ -1,5 +1,6 @@
 import type { ChannelAdapter, ChannelMessage, ReplyOptions } from '../channel.js';
 import type { DingtalkChannelConfig } from '../workspace.js';
+import { importPeer } from '../peer-require.js';
 
 export class DingtalkAdapter implements ChannelAdapter {
   readonly name = 'dingtalk';
@@ -16,7 +17,7 @@ export class DingtalkAdapter implements ChannelAdapter {
   async start(onMessage: (msg: ChannelMessage) => void): Promise<void> {
     let sdk: any;
     try {
-      sdk = await import('dingtalk-stream');
+      sdk = await importPeer('dingtalk-stream');
     } catch {
       throw new Error(
         'DingTalk adapter requires dingtalk-stream. Install it: npm install dingtalk-stream',

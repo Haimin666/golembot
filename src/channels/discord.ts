@@ -1,5 +1,6 @@
 import type { ChannelAdapter, ChannelMessage, ReplyOptions } from '../channel.js';
 import type { DiscordChannelConfig } from '../workspace.js';
+import { importPeer } from '../peer-require.js';
 
 export class DiscordAdapter implements ChannelAdapter {
   readonly name = 'discord';
@@ -18,10 +19,7 @@ export class DiscordAdapter implements ChannelAdapter {
   async start(onMessage: (msg: ChannelMessage) => void | Promise<void>): Promise<void> {
     let discordModule: any;
     try {
-      // Use a variable to prevent TS Node16 resolver from treating 'discord.js'
-      // as a local file path (the package name ends in .js).
-      const pkg = 'discord.js';
-      discordModule = await import(pkg);
+      discordModule = await importPeer('discord.js');
     } catch {
       throw new Error(
         'Discord adapter requires discord.js. Install it: npm install discord.js',

@@ -1,6 +1,7 @@
 import type { ChannelAdapter, ChannelMessage, ReplyOptions } from '../channel.js';
 import type { SlackChannelConfig } from '../workspace.js';
 import { markdownToMrkdwn } from './slack-format.js';
+import { importPeer } from '../peer-require.js';
 
 export class SlackAdapter implements ChannelAdapter {
   readonly name = 'slack';
@@ -42,7 +43,7 @@ export class SlackAdapter implements ChannelAdapter {
   async start(onMessage: (msg: ChannelMessage) => void): Promise<void> {
     let boltModule: any;
     try {
-      boltModule = await import('@slack/bolt');
+      boltModule = await importPeer('@slack/bolt');
     } catch {
       throw new Error(
         'Slack adapter requires @slack/bolt. Install it: npm install @slack/bolt',
