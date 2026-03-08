@@ -1,3 +1,10 @@
+## [0.17.3](https://github.com/0xranx/golembot/compare/v0.17.2...v0.17.3) (2026-03-08)
+
+
+### Bug Fixes
+
+* use importPeer() to resolve channel SDKs from bot directory ([be9ff1e](https://github.com/0xranx/golembot/commit/be9ff1e51df883745a3007fc826da65f38790279))
+
 # [0.14.0-beta.9](https://github.com/0xranx/golembot/compare/v0.14.0-beta.8...v0.14.0-beta.9) (2026-03-08)
 
 
