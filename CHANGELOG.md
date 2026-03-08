@@ -1,3 +1,10 @@
+## [0.17.1](https://github.com/0xranx/golembot/compare/v0.17.0...v0.17.1) (2026-03-08)
+
+
+### Bug Fixes
+
+* resolve channel peer-deps from bot working directory ([ea56116](https://github.com/0xranx/golembot/commit/ea5611632b665682304d3ccc5b40f688d2998e01))
+
 # [0.14.0-beta.7](https://github.com/0xranx/golembot/compare/v0.14.0-beta.6...v0.14.0-beta.7) (2026-03-08)
 
 
