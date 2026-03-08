@@ -1,6 +1,7 @@
 import type { ChannelAdapter, ChannelMessage, ReplyOptions, MentionTarget } from '../channel.js';
 import type { FeishuChannelConfig } from '../workspace.js';
 import { hasMarkdown, markdownToPost, markdownToCard, injectMentionsIntoPost } from './feishu-format.js';
+import { importPeer } from '../peer-require.js';
 
 export class FeishuAdapter implements ChannelAdapter {
   readonly name = 'feishu';
@@ -43,7 +44,7 @@ export class FeishuAdapter implements ChannelAdapter {
   async start(onMessage: (msg: ChannelMessage) => void): Promise<void> {
     let lark: any;
     try {
-      lark = await import('@larksuiteoapi/node-sdk');
+      lark = await importPeer('@larksuiteoapi/node-sdk');
     } catch {
       throw new Error(
         'Feishu adapter requires @larksuiteoapi/node-sdk. Install it: npm install @larksuiteoapi/node-sdk',

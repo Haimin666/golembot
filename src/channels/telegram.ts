@@ -1,6 +1,7 @@
 import type { ChannelAdapter, ChannelMessage, ReplyOptions } from '../channel.js';
 import type { TelegramChannelConfig } from '../workspace.js';
 import { markdownToHtml } from './telegram-format.js';
+import { importPeer } from '../peer-require.js';
 
 export class TelegramAdapter implements ChannelAdapter {
   readonly name = 'telegram';
@@ -18,7 +19,7 @@ export class TelegramAdapter implements ChannelAdapter {
   async start(onMessage: (msg: ChannelMessage) => void): Promise<void> {
     let grammyModule: any;
     try {
-      grammyModule = await import('grammy');
+      grammyModule = await importPeer('grammy');
     } catch {
       throw new Error(
         'Telegram adapter requires grammy. Install it: npm install grammy',
