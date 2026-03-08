@@ -1,3 +1,10 @@
+# [0.14.0-beta.9](https://github.com/0xranx/golembot/compare/v0.14.0-beta.8...v0.14.0-beta.9) (2026-03-08)
+
+
+### Bug Fixes
+
+* use createRequire to resolve channel deps from bot directory ([fdf50b2](https://github.com/0xranx/golembot/commit/fdf50b289df5a9bd54a65d02f92dee5b13afbbd1))
+
 # [0.14.0-beta.8](https://github.com/0xranx/golembot/compare/v0.14.0-beta.7...v0.14.0-beta.8) (2026-03-08)
 
 
