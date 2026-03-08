@@ -44,8 +44,16 @@ features:
 
 <div class="home-content">
 
-<div class="demo-video">
-  <video src="/assets/demo.mp4" autoplay muted loop playsinline></video>
+<div class="demo-section">
+  <div class="demo-window">
+    <div class="demo-titlebar">
+      <span class="demo-dot demo-dot-red"></span>
+      <span class="demo-dot demo-dot-yellow"></span>
+      <span class="demo-dot demo-dot-green"></span>
+      <span class="demo-titlebar-text">golembot onboard</span>
+    </div>
+    <video src="/assets/demo.mp4" autoplay muted loop playsinline></video>
+  </div>
   <p class="demo-caption">One command to connect your Coding Agent to Telegram & Discord</p>
 </div>
 
@@ -329,22 +337,57 @@ Connect to any message source. Built-in adapters need no public URL. Add `_adapt
   background: transparent !important;
 }
 
-.demo-video {
-  margin: 48px 0 16px;
+.demo-section {
+  margin: 56px 0 24px;
   text-align: center;
 }
 
-.demo-video video {
+.demo-window {
+  display: inline-block;
   width: 100%;
-  max-width: 720px;
+  max-width: 760px;
   border-radius: 12px;
-  border: 1px solid var(--vp-c-divider);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  background: #1e1e1e;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.demo-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #2d2d2d;
+}
+
+.demo-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.demo-dot-red { background: #ff5f57; }
+.demo-dot-yellow { background: #febc2e; }
+.demo-dot-green { background: #28c840; }
+
+.demo-titlebar-text {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  color: #999;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  margin-right: 52px;
+}
+
+.demo-window video {
+  width: 100%;
+  display: block;
 }
 
 .demo-caption {
-  margin-top: 12px;
-  font-size: 14px;
+  margin-top: 16px;
+  font-size: 15px;
   color: var(--vp-c-text-2);
+  font-weight: 500;
 }
 </style>
