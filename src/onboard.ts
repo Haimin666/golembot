@@ -466,6 +466,27 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
   console.log('   ✅ skills/general');
   console.log('   ✅ skills/im-adapter');
 
+  // Auto-install channel dependencies
+  const CHANNEL_DEPS: Record<string, string[]> = {
+    feishu: ['@larksuiteoapi/node-sdk'],
+    dingtalk: ['dingtalk-stream'],
+    wecom: ['@wecom/crypto', 'xml2js'],
+    slack: ['@slack/bolt'],
+    telegram: ['grammy'],
+    discord: ['discord.js'],
+  };
+  const depsToInstall = channels.flatMap((ch: string) => CHANNEL_DEPS[ch] || []);
+  if (depsToInstall.length > 0) {
+    console.log(`\n📦 Installing channel dependencies: ${depsToInstall.join(', ')}`);
+    const { execSync } = await import('node:child_process');
+    try {
+      execSync(`npm install ${depsToInstall.join(' ')}`, { cwd: dir, stdio: 'inherit' });
+      console.log('   ✅ Dependencies installed');
+    } catch {
+      console.log(`   ⚠ Auto-install failed. Run manually: npm install ${depsToInstall.join(' ')}`);
+    }
+  }
+
   // Install template if selected
   if (templateName) {
     console.log(`\n📦 Installing template: ${templateName}`);
