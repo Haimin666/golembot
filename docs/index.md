@@ -44,6 +44,11 @@ features:
 
 <div class="home-content">
 
+<div class="demo-video">
+  <video src="/assets/demo.mp4" autoplay muted loop playsinline></video>
+  <p class="demo-caption">One command to connect your Coding Agent to Telegram & Discord</p>
+</div>
+
 ## 13,000+ OpenClaw Community Skills
 
 GolemBot's SKILL.md format is **100% compatible** with the [OpenClaw](https://clawhub.ai) ecosystem. Search and install any of the 13,000+ community skills from [ClawHub](https://clawhub.ai) — the largest AI agent skill marketplace. Your agent can even discover and install skills autonomously during conversations.
@@ -322,5 +327,24 @@ Connect to any message source. Built-in adapters need no public URL. Add `_adapt
 .clawhub-demo pre {
   margin: 0;
   background: transparent !important;
+}
+
+.demo-video {
+  margin: 48px 0 16px;
+  text-align: center;
+}
+
+.demo-video video {
+  width: 100%;
+  max-width: 720px;
+  border-radius: 12px;
+  border: 1px solid var(--vp-c-divider);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+.demo-caption {
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--vp-c-text-2);
 }
 </style>

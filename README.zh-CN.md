@@ -27,6 +27,13 @@
   📖 <a href="https://0xranx.github.io/golembot/"><strong>文档与指南 → 0xranx.github.io/golembot</strong></a>
 </p>
 
+<p align="center">
+  <video src="https://raw.githubusercontent.com/0xranx/golembot/main/docs/assets/demo.mp4" width="720" autoplay muted loop playsinline>
+    <a href="https://raw.githubusercontent.com/0xranx/golembot/main/docs/assets/demo.mp4">观看演示</a>
+  </video>
+</p>
+<p align="center"><em>一条命令，将你的 Coding Agent 接入 Telegram 和 Discord</em></p>
+
 ---
 
 Cursor、Claude Code、OpenCode、Codex —— 这些 Coding Agent 已经能写代码、跑脚本、分析数据、进行复杂推理。但它们被困在 IDE 或终端窗口里。

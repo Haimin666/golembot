@@ -44,6 +44,11 @@ features:
 
 <div class="home-content">
 
+<div class="demo-video">
+  <video src="/assets/demo.mp4" autoplay muted loop playsinline></video>
+  <p class="demo-caption">一条命令，将你的 Coding Agent 接入 Telegram 和 Discord</p>
+</div>
+
 ## 13,000+ OpenClaw 社区技能
 
 GolemBot 的 SKILL.md 格式与 [OpenClaw](https://clawhub.ai) 生态 **100% 兼容**。从 [ClawHub](https://clawhub.ai) 搜索和安装 13,000+ 社区技能 —— 最大的 AI agent 技能市场。你的 Agent 甚至可以在对话中自主发现和安装技能。
@@ -316,6 +321,25 @@ for await (const ev of bot.chat('分析上个月的销售数据'))
 .clawhub-demo pre {
   margin: 0;
   background: transparent !important;
+}
+
+.demo-video {
+  margin: 48px 0 16px;
+  text-align: center;
+}
+
+.demo-video video {
+  width: 100%;
+  max-width: 720px;
+  border-radius: 12px;
+  border: 1px solid var(--vp-c-divider);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+.demo-caption {
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--vp-c-text-2);
 }
 
 @media (max-width: 480px) {
