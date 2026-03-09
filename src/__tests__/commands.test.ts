@@ -51,6 +51,7 @@ function makeCtx(overrides?: Partial<CommandContext>): CommandContext {
     setEngine: vi.fn(),
     setModel: vi.fn(),
     resetSession: vi.fn(),
+    listModels: vi.fn().mockResolvedValue(['model-a', 'model-b', 'model-c']),
     ...overrides,
   };
 }
@@ -119,6 +120,25 @@ describe('executeCommand', () => {
     });
     const result = await executeCommand({ name: '/model', args: [] }, ctx);
     expect(result!.text).toContain('No model override');
+  });
+
+  it('/model list fetches available models', async () => {
+    const ctx = makeCtx();
+    const result = await executeCommand({ name: '/model', args: ['list'] }, ctx);
+    expect(result).not.toBeNull();
+    expect(result!.text).toContain('model-a');
+    expect(result!.text).toContain('model-b');
+    expect(result!.text).toContain('model-c');
+    expect(result!.text).toContain('cursor');
+    expect(result!.data!.models).toEqual(['model-a', 'model-b', 'model-c']);
+    expect(ctx.listModels).toHaveBeenCalled();
+  });
+
+  it('/model list with no models returns empty message', async () => {
+    const ctx = makeCtx({ listModels: vi.fn().mockResolvedValue([]) });
+    const result = await executeCommand({ name: '/model', args: ['list'] }, ctx);
+    expect(result!.text).toContain('No models found');
+    expect(result!.data!.models).toEqual([]);
   });
 
   it('/model with args switches model', async () => {

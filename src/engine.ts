@@ -18,8 +18,14 @@ export interface InvokeOpts {
   signal?: AbortSignal;
 }
 
+export interface ListModelsOpts {
+  apiKey?: string;
+  model?: string;
+}
+
 export interface AgentEngine {
   invoke(prompt: string, opts: InvokeOpts): AsyncIterable<StreamEvent>;
+  listModels?(opts: ListModelsOpts): Promise<string[]>;
 }
 
 // ── Re-exports from engine implementations ───────────────

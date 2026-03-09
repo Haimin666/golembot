@@ -289,7 +289,7 @@ async function createChannelAdapter(
 export async function handleMessage(
   msg: ChannelMessage,
   config: GolemConfig,
-  assistant: Pick<Assistant, 'chat' | 'setEngine' | 'setModel' | 'getStatus' | 'resetSession'>,
+  assistant: Pick<Assistant, 'chat' | 'setEngine' | 'setModel' | 'getStatus' | 'resetSession' | 'listModels'>,
   adapter: Pick<ChannelAdapter, 'reply' | 'maxMessageLength' | 'typing' | 'getGroupMembers'>,
   channelType: string,
   verbose: boolean,
@@ -312,6 +312,7 @@ export async function handleMessage(
       setEngine: (e, c) => assistant.setEngine(e, c),
       setModel: (m) => assistant.setModel(m),
       resetSession: (k) => assistant.resetSession(k),
+      listModels: () => assistant.listModels(),
     };
     const result = await executeCommand(parsed, cmdCtx);
     if (result) {

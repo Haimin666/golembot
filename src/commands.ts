@@ -33,6 +33,8 @@ export interface CommandContext {
   setModel: (model: string) => void;
   /** Reset the session for the given key. */
   resetSession: (sessionKey?: string) => Promise<void>;
+  /** List available models for the current engine. */
+  listModels: () => Promise<string[]>;
   /** Current session key (for reset). */
   sessionKey?: string;
 }
@@ -69,7 +71,7 @@ const COMMANDS: Record<string, string> = {
   '/help':    'Show available commands',
   '/status':  'Show current engine, model, and skills',
   '/engine':  'Show or switch engine — /engine [name]',
-  '/model':   'Show or switch model — /model [name]',
+  '/model':   'Show, switch, or list models — /model [list|name]',
   '/skill':   'List installed skills',
   '/reset':   'Clear the current session',
 };
@@ -172,10 +174,14 @@ async function cmdModel(args: string[], ctx: CommandContext): Promise<CommandRes
     const { model, engine } = await ctx.getStatus();
     return {
       text: model
-        ? `Current model: ${model} (engine: ${engine})\nSwitch: /model <name>`
-        : `No model override (using ${engine} default)\nSwitch: /model <name>`,
+        ? `Current model: ${model} (engine: ${engine})\nSwitch: /model <name>\nList available: /model list`
+        : `No model override (using ${engine} default)\nSwitch: /model <name>\nList available: /model list`,
       data: { current: model ?? null, engine },
     };
+  }
+
+  if (args[0].toLowerCase() === 'list') {
+    return cmdModelList(ctx);
   }
 
   const target = args.join(' ');
@@ -183,6 +189,22 @@ async function cmdModel(args: string[], ctx: CommandContext): Promise<CommandRes
   return {
     text: `Model switched to: ${target} (takes effect on next message)`,
     data: { model: target },
+  };
+}
+
+async function cmdModelList(ctx: CommandContext): Promise<CommandResult> {
+  const { engine } = await ctx.getStatus();
+  const models = await ctx.listModels();
+  if (models.length === 0) {
+    return {
+      text: `No models found for engine: ${engine}`,
+      data: { engine, models: [] },
+    };
+  }
+  const lines = models.map(m => `  ${m}`);
+  return {
+    text: `Available models for ${engine} (${models.length}):\n${lines.join('\n')}`,
+    data: { engine, models },
   };
 }
 

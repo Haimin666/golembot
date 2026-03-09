@@ -104,6 +104,7 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
             setEngine: (e, c) => assistant.setEngine(e, c),
             setModel: (m) => assistant.setModel(m),
             resetSession: (k) => assistant.resetSession(k),
+            listModels: () => assistant.listModels(),
           };
           const result = await executeCommand(parsed, cmdCtx);
           if (result) {

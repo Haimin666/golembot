@@ -385,6 +385,7 @@ type MockAssistant = {
   setModel(model: string): void;
   getStatus(): Promise<{ config: { name: string; engine: string }; skills: never[]; engine: string; model: string | undefined }>;
   resetSession(sessionKey?: string): Promise<void>;
+  listModels(): Promise<string[]>;
   callCount: number;
   lastSessionKey: string | undefined;
   lastPrompt: string | undefined;
@@ -396,6 +397,7 @@ const mockAssistantStubs = {
   setModel(_m: string) {},
   async getStatus() { return { config: { name: 'test', engine: 'mock' } as any, skills: [] as never[], engine: 'mock', model: undefined }; },
   async resetSession(_k?: string) {},
+  async listModels() { return ['mock-model-1', 'mock-model-2']; },
 };
 
 function makeMockAssistant(replyText: string): MockAssistant {

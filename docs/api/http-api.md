@@ -46,6 +46,26 @@ data: {"type":"done","sessionId":"abc-123","durationMs":8500}
 
 Each event is a JSON-encoded [StreamEvent](/api/stream-events).
 
+**Slash commands:** When the message starts with `/`, it is handled as a slash command and returns a JSON response (not SSE):
+
+```bash
+curl -X POST http://localhost:3000/chat \
+  -H "Authorization: Bearer my-secret" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "/model list"}'
+```
+
+```json
+{
+  "type": "command",
+  "engine": "claude-code",
+  "models": ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
+  "text": "Available models for claude-code (3):\n  claude-opus-4-6\n  ..."
+}
+```
+
+Available slash commands: `/help`, `/status`, `/engine [name]`, `/model [list|name]`, `/skill`, `/reset`.
+
 ::: warning Error events in SSE
 The `/chat` endpoint always returns `200 OK` — errors are delivered as events inside the stream:
 

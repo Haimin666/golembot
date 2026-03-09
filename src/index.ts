@@ -84,6 +84,8 @@ export interface Assistant {
   setModel(model: string): void;
   /** Return current runtime status (engine, model, config, skills). */
   getStatus(): Promise<{ config: GolemConfig; skills: SkillInfo[]; engine: string; model: string | undefined }>;
+  /** List available models for the current engine. */
+  listModels(): Promise<string[]>;
 }
 
 export interface CreateAssistantOpts {
@@ -307,6 +309,15 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
         engine: engineOverride || config.engine,
         model: modelOverride || config.model,
       };
+    },
+
+    async listModels(): Promise<string[]> {
+      const config = await loadConfig(dir);
+      const engineType = engineOverride || config.engine;
+      const model = modelOverride || config.model;
+      const engine = createEngine(engineType);
+      if (!engine.listModels) return [];
+      return engine.listModels({ apiKey, model });
     },
   };
 }
