@@ -1,16 +1,18 @@
 import { resolve } from 'node:path';
-import { ensureReady, initWorkspace, type GolemConfig, type SkillInfo } from './workspace.js';
+import { ensureReady, loadConfig, scanSkills, patchConfig, initWorkspace, type GolemConfig, type SkillInfo } from './workspace.js';
 import { existsSync } from 'node:fs';
 import { loadSession, saveSession, clearSession, pruneExpiredSessions, appendHistory, getHistoryPath } from './session.js';
 import { createEngine, type StreamEvent, type AgentEngine } from './engine.js';
 
 export type { StreamEvent } from './engine.js';
 export type { GolemConfig, SkillInfo, ChannelsConfig, GatewayConfig, StreamingConfig, FeishuChannelConfig, DingtalkChannelConfig, WecomChannelConfig, SlackChannelConfig, TelegramChannelConfig, DiscordChannelConfig } from './workspace.js';
+export { patchConfig } from './workspace.js';
 export { createGolemServer, startServer, type ServerOpts, type GolemServer } from './server.js';
 export type { ChannelAdapter, ChannelMessage, ReadReceipt } from './channel.js';
 export { buildSessionKey, stripMention } from './channel.js';
 export { startGateway } from './gateway.js';
 export type { DashboardContext, ChannelStatus, GatewayMetrics, RecentMessage } from './dashboard.js';
+export { parseCommand, executeCommand, type CommandResult, type CommandContext } from './commands.js';
 export { registerInstance, unregisterInstance, listInstances, listStoppedInstances, isProcessAlive, stopInstance, startInstance, findInstance, findStoppedInstance, renderFleetDashboard, startFleetServer } from './fleet.js';
 export type { FleetEntry, FleetInstance, FleetServerOpts } from './fleet.js';
 
@@ -76,6 +78,14 @@ export interface Assistant {
   chat(message: string, opts?: ChatOpts): AsyncIterable<StreamEvent>;
   init(opts: { engine: string; name: string }): Promise<void>;
   resetSession(sessionKey?: string): Promise<void>;
+  /** Switch engine at runtime (takes effect on next chat call). When clearModel is true, also resets the model override. */
+  setEngine(engine: string, clearModel?: boolean): void;
+  /** Switch model at runtime (takes effect on next chat call). */
+  setModel(model: string): void;
+  /** Return current runtime status (engine, model, config, skills). */
+  getStatus(): Promise<{ config: GolemConfig; skills: SkillInfo[]; engine: string; model: string | undefined }>;
+  /** List available models for the current engine. */
+  listModels(): Promise<string[]>;
 }
 
 export interface CreateAssistantOpts {
@@ -269,6 +279,45 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
 
     async resetSession(sessionKey?: string): Promise<void> {
       await clearSession(dir, sessionKey || DEFAULT_SESSION_KEY);
+    },
+
+    setEngine(engine: string, clearModel?: boolean): void {
+      engineOverride = engine;
+      if (clearModel) {
+        modelOverride = undefined;
+        patchConfig(dir, { engine, model: undefined }).catch(() => {});
+      } else {
+        patchConfig(dir, { engine }).catch(() => {});
+      }
+    },
+
+    setModel(model: string): void {
+      modelOverride = model || undefined;
+      if (model) {
+        patchConfig(dir, { model }).catch(() => {});
+      } else {
+        patchConfig(dir, { model: undefined }).catch(() => {});
+      }
+    },
+
+    async getStatus(): Promise<{ config: GolemConfig; skills: SkillInfo[]; engine: string; model: string | undefined }> {
+      const config = await loadConfig(dir);
+      const skills = await scanSkills(dir);
+      return {
+        config,
+        skills,
+        engine: engineOverride || config.engine,
+        model: modelOverride || config.model,
+      };
+    },
+
+    async listModels(): Promise<string[]> {
+      const config = await loadConfig(dir);
+      const engineType = engineOverride || config.engine;
+      const model = modelOverride || config.model;
+      const engine = createEngine(engineType);
+      if (!engine.listModels) return [];
+      return engine.listModels({ apiKey, model });
     },
   };
 }

@@ -381,13 +381,28 @@ describe('gateway integration', () => {
 // Use plain functions with a callCount counter to avoid vi.fn() ↔ typed-function mismatch.
 type MockAssistant = {
   chat(message: string, opts?: { sessionKey?: string }): AsyncIterable<StreamEvent>;
+  setEngine(engine: string): void;
+  setModel(model: string): void;
+  getStatus(): Promise<{ config: { name: string; engine: string }; skills: never[]; engine: string; model: string | undefined }>;
+  resetSession(sessionKey?: string): Promise<void>;
+  listModels(): Promise<string[]>;
   callCount: number;
   lastSessionKey: string | undefined;
   lastPrompt: string | undefined;
 };
 
+/** Stubs for the new Assistant methods (shared by all mock factories). */
+const mockAssistantStubs = {
+  setEngine(_e: string) {},
+  setModel(_m: string) {},
+  async getStatus() { return { config: { name: 'test', engine: 'mock' } as any, skills: [] as never[], engine: 'mock', model: undefined }; },
+  async resetSession(_k?: string) {},
+  async listModels() { return ['mock-model-1', 'mock-model-2']; },
+};
+
 function makeMockAssistant(replyText: string): MockAssistant {
   const obj: MockAssistant = {
+    ...mockAssistantStubs,
     callCount: 0,
     lastSessionKey: undefined,
     lastPrompt: undefined,
@@ -404,6 +419,7 @@ function makeMockAssistant(replyText: string): MockAssistant {
 
 function makeThrowingAssistant(): MockAssistant {
   const obj: MockAssistant = {
+    ...mockAssistantStubs,
     callCount: 0,
     lastSessionKey: undefined,
     lastPrompt: undefined,
@@ -420,6 +436,7 @@ function makeThrowingAssistant(): MockAssistant {
 
 function makeErrorEventAssistant(): MockAssistant {
   const obj: MockAssistant = {
+    ...mockAssistantStubs,
     callCount: 0,
     lastSessionKey: undefined,
     lastPrompt: undefined,
@@ -1045,6 +1062,7 @@ describe('handleMessage — full gateway pipeline', () => {
     /** Mock assistant that yields a sequence of StreamEvents with control over timing. */
     function makeStreamingAssistant(events: StreamEvent[]): MockAssistant {
       const obj: MockAssistant = {
+        ...mockAssistantStubs,
         callCount: 0,
         lastSessionKey: undefined,
         lastPrompt: undefined,
@@ -1202,6 +1220,68 @@ describe('handleMessage — full gateway pipeline', () => {
       await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
       expect(adapter.replies.length).toBeGreaterThanOrEqual(1);
       expect(adapter.replies.some(r => r.text.includes('error occurred'))).toBe(true);
+    });
+  });
+
+  // ── Slash commands ─────────────────────────────────────────────────────
+
+  describe('slash commands', () => {
+    it('/help returns command list without calling agent', async () => {
+      const assistant = makeMockAssistant('should not be called');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/help' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(0);
+      expect(adapter.replies.length).toBe(1);
+      expect(adapter.replies[0].text).toContain('/help');
+      expect(adapter.replies[0].text).toContain('/status');
+    });
+
+    it('/reset clears session', async () => {
+      const assistant = makeMockAssistant('should not be called');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/reset' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(0);
+      expect(adapter.replies.length).toBe(1);
+      expect(adapter.replies[0].text).toContain('Session reset');
+    });
+
+    it('/engine shows current engine', async () => {
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/engine' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(0);
+      expect(adapter.replies[0].text).toContain('mock');
+    });
+
+    it('/engine switches engine', async () => {
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/engine opencode' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(0);
+      expect(adapter.replies[0].text).toContain('opencode');
+      expect(adapter.replies[0].text).toContain('switched');
+    });
+
+    it('unknown slash command falls through to agent', async () => {
+      const assistant = makeMockAssistant('agent reply');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/unknown-cmd' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(1);
+    });
+
+    it('slash commands work in group chats (with @mention stripped)', async () => {
+      const assistant = makeMockAssistant('should not be called');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: '@TestBot /help' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(0);
+      expect(adapter.replies.length).toBe(1);
+      expect(adapter.replies[0].text).toContain('/help');
     });
   });
 });

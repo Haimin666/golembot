@@ -2,7 +2,7 @@ import { resolve, join, dirname } from 'node:path';
 import { mkdir, readFile as readFileAsync } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { setPeerBase } from './peer-require.js';
-import { createAssistant, type Assistant } from './index.js';
+import { createAssistant, type Assistant, parseCommand, executeCommand, type CommandContext } from './index.js';
 import { createGolemServer, type ServerOpts, type GolemServer } from './server.js';
 import {
   loadConfig,
@@ -289,7 +289,7 @@ async function createChannelAdapter(
 export async function handleMessage(
   msg: ChannelMessage,
   config: GolemConfig,
-  assistant: Pick<Assistant, 'chat'>,
+  assistant: Pick<Assistant, 'chat' | 'setEngine' | 'setModel' | 'getStatus' | 'resetSession' | 'listModels'>,
   adapter: Pick<ChannelAdapter, 'reply' | 'maxMessageLength' | 'typing' | 'getGroupMembers'>,
   channelType: string,
   verbose: boolean,
@@ -298,6 +298,30 @@ export async function handleMessage(
 ): Promise<void> {
   const userText = msg.chatType === 'group' ? stripMention(msg.text) : msg.text;
   if (!userText) return;
+
+  // ── Slash command interception ──
+  const parsed = parseCommand(userText);
+  if (parsed) {
+    const sessionKey = msg.chatType === 'group'
+      ? `${msg.channelType}:${msg.chatId}`
+      : buildSessionKey(msg);
+    const cmdCtx: CommandContext = {
+      dir,
+      sessionKey,
+      getStatus: () => assistant.getStatus(),
+      setEngine: (e, c) => assistant.setEngine(e, c),
+      setModel: (m) => assistant.setModel(m),
+      resetSession: (k) => assistant.resetSession(k),
+      listModels: () => assistant.listModels(),
+    };
+    const result = await executeCommand(parsed, cmdCtx);
+    if (result) {
+      log(verbose, `[${channelType}] slash command: ${parsed.name}`);
+      await adapter.reply(msg, result.text);
+      return;
+    }
+    // Unknown command — fall through to agent
+  }
 
   const senderLabel = msg.senderName || msg.senderId;
   let sessionKey: string;
@@ -648,12 +672,16 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
     metrics,
     startTime: Date.now(),
     version,
+    getRuntimeStatus: async () => {
+      const s = await assistant.getStatus();
+      return { engine: s.engine, model: s.model };
+    },
   };
 
   // shutdown is assigned later after httpServer is created — use a wrapper
   let shutdownFn: (() => Promise<void>) | undefined;
   const serverOpts: ServerOpts = { port, token, hostname: host, onShutdown: () => shutdownFn?.() };
-  const httpServer: GolemServer = createGolemServer(assistant, serverOpts, dashboardCtx);
+  const httpServer: GolemServer = createGolemServer(assistant, serverOpts, dashboardCtx, dir);
 
   const adapters: ChannelAdapter[] = [];
   const channels: ChannelsConfig | undefined = config.channels;

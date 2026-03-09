@@ -33,6 +33,26 @@ data: {"type":"done","sessionId":"abc-123","durationMs":8500}
 
 ```
 
+**斜杠命令：** 当消息以 `/` 开头时，将作为斜杠命令处理并返回 JSON 响应（非 SSE）：
+
+```bash
+curl -X POST http://localhost:3000/chat \
+  -H "Authorization: Bearer my-secret" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "/model list"}'
+```
+
+```json
+{
+  "type": "command",
+  "engine": "claude-code",
+  "models": ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
+  "text": "Available models for claude-code (3):\n  claude-opus-4-6\n  ..."
+}
+```
+
+可用斜杠命令：`/help`、`/status`、`/engine [name]`、`/model [list|name]`、`/skill`、`/reset`。
+
 ::: warning SSE 中的错误事件
 `/chat` 端点始终返回 `200 OK` — 错误通过流内的事件传递：
 

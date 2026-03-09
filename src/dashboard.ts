@@ -37,6 +37,8 @@ export interface DashboardContext {
   metrics: GatewayMetrics;
   startTime: number;
   version: string;
+  /** Optional: live runtime status (engine/model may differ from config after /engine or /model). */
+  getRuntimeStatus?: () => Promise<{ engine: string; model: string | undefined }>;
 }
 
 export function createMetrics(): GatewayMetrics {
@@ -99,14 +101,26 @@ interface DashboardData {
   port: number;
 }
 
-export function buildDashboardData(ctx: DashboardContext): DashboardData {
+export async function buildDashboardData(ctx: DashboardContext): Promise<DashboardData> {
   const avg = ctx.metrics.totalMessages > 0
     ? Math.round(ctx.metrics.totalDurationMs / ctx.metrics.totalMessages)
     : 0;
+
+  // Use live runtime status if available (reflects /engine and /model changes)
+  let engine = ctx.config.engine;
+  let model = ctx.config.model;
+  if (ctx.getRuntimeStatus) {
+    try {
+      const status = await ctx.getRuntimeStatus();
+      engine = status.engine;
+      model = status.model;
+    } catch { /* fallback to config */ }
+  }
+
   return {
     name: ctx.config.name,
-    engine: ctx.config.engine,
-    model: ctx.config.model,
+    engine,
+    model,
     version: ctx.version,
     uptime: Date.now() - ctx.startTime,
     channels: ctx.channelStatuses,
@@ -407,6 +421,15 @@ function renderClientScript(data: DashboardData): string {
       headers: headers,
       body: JSON.stringify({ message: msg, sessionKey: 'dashboard-test' })
     }).then(function(res){
+      var ct = res.headers.get('content-type') || '';
+      if(ct.indexOf('application/json') !== -1){
+        // Slash command response — plain JSON
+        return res.json().then(function(data){
+          testOutput.textContent = data.text || JSON.stringify(data);
+          testBtn.disabled=false; testBtn.textContent='Send';
+        });
+      }
+      // SSE streaming response
       var reader = res.body.getReader();
       var decoder = new TextDecoder();
       function read(){

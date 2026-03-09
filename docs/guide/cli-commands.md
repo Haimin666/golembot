@@ -35,8 +35,14 @@ golembot run [-d <dir>] [--api-key <key>]
 | Command | Description |
 |---------|-------------|
 | `/help` | Show available commands |
+| `/status` | Show current engine, model, and skills |
+| `/engine [name]` | Show or switch engine |
+| `/model [list\|name]` | Show, list available, or switch model |
+| `/skill` | List installed skills |
 | `/reset` | Clear current session |
 | `/quit`, `/exit` | Exit the REPL |
+
+These slash commands also work in IM channels (Feishu, Telegram, Slack, etc.) and via the HTTP API (`POST /chat` with a slash command as the message returns a JSON response instead of an SSE stream).
 
 Supports multi-line input with `"""` delimiters. Displays duration and cost (when available) on completion.
 

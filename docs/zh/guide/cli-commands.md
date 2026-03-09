@@ -23,7 +23,19 @@ golembot init [-e <engine>] [-n <name>]
 golembot run [-d <dir>] [--api-key <key>]
 ```
 
-**REPL 斜杠命令：** `/help`、`/reset`、`/quit`、`/exit`
+**REPL 斜杠命令：**
+
+| 命令 | 说明 |
+|------|------|
+| `/help` | 显示可用命令 |
+| `/status` | 显示当前引擎、模型和技能 |
+| `/engine [name]` | 查看或切换引擎 |
+| `/model [list\|name]` | 查看、列出可用模型或切换模型 |
+| `/skill` | 列出已安装技能 |
+| `/reset` | 清除当前会话 |
+| `/quit`、`/exit` | 退出 REPL |
+
+这些斜杠命令同样适用于 IM 通道（飞书、Telegram、Slack 等）和 HTTP API（通过 `POST /chat` 发送斜杠命令时返回 JSON 响应而非 SSE 流）。
 
 支持 `"""` 分隔符的多行输入。完成时显示耗时和费用（如可用）。
 
