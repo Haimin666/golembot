@@ -1,3 +1,10 @@
+# [0.18.0-beta.2](https://github.com/0xranx/golembot/compare/v0.18.0-beta.1...v0.18.0-beta.2) (2026-03-09)
+
+
+### Bug Fixes
+
+* CI coverage, dev:gateway script, and engine snapshot tests ([d6fce87](https://github.com/0xranx/golembot/commit/d6fce871ae8ef0cf1d9b6f6278c5ad26b7726432))
+
 # [0.18.0-beta.1](https://github.com/0xranx/golembot/compare/v0.17.4...v0.18.0-beta.1) (2026-03-09)
 
 
