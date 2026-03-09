@@ -25,6 +25,11 @@ maxConcurrent: 20            # 最大并发 chat() 数（默认：10）
 maxQueuePerSession: 2        # 每个用户最大排队数（默认：3）
 sessionTtlDays: 14           # 闲置会话保留天数（默认：30）
 
+# 可选：IM 通道流式消息投递
+streaming:
+  mode: streaming            # buffered（默认）| streaming
+  showToolCalls: true        # 在 IM 中显示 🔧 工具提示（默认：false）
+
 # 可选：群聊行为配置（适用于所有通道）
 groupChat:
   groupPolicy: mention-only  # mention-only（默认）| smart | always
@@ -74,8 +79,32 @@ gateway:
 | `maxQueuePerSession` | `number` | `3` | 每个 sessionKey 最大排队请求数 |
 | `sessionTtlDays` | `number` | `30` | 闲置会话超过此天数后在下次启动时清理 |
 | `systemPrompt` | `string` | — | 角色/人设指令，写入 `AGENTS.md` 的 `## System Instructions` 节，引擎将其作为系统级上下文读取一次。**不会**拼接到每条用户消息前，多轮对话的 token 消耗保持平稳 |
+| `streaming` | `object` | — | IM 通道流式消息投递配置 |
 | `channels` | `object` | — | IM 通道配置 |
 | `gateway` | `object` | — | Gateway 服务设置 |
+
+### `streaming`
+
+控制 Gateway 如何向 IM 通道投递消息。
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `mode` | `string` | `buffered` | `buffered` — 等待完整回复后一次性发送。`streaming` — 在段落边界和工具调用事件处增量发送 |
+| `showToolCalls` | `boolean` | `false` | 为 `true` 时，Agent 每次调用工具前会向聊天发送 `🔧 toolName...` 提示 |
+
+**buffered** 模式（默认）下，bot 等 Agent 执行完毕后发送一条完整消息。**streaming** 模式下，bot 在语义边界处将文本刷新到 IM：
+
+- **段落分隔**（`\n\n`）— 已完成的段落立即发送
+- **工具调用** — 在发送工具提示前刷新已积累的文本
+- **完成** — 刷新剩余文本
+
+Streaming 模式为多步骤 Agent 长回复提供更快的视觉反馈。
+
+```yaml
+streaming:
+  mode: streaming
+  showToolCalls: true
+```
 
 ### `channels`
 
@@ -164,7 +193,7 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxx
 
 | 引擎 | 格式 | 示例 | 查看可用值 |
 |------|------|------|------------|
-| `cursor` | Cursor 模型名称 | `claude-sonnet-4-5` | Cursor → Settings → Models |
+| `cursor` | Cursor 模型名称 | `sonnet-4.6` | Cursor → Settings → Models |
 | `claude-code` | Anthropic model ID | `claude-sonnet-4-6` | `claude models` |
 | `opencode` | `provider/model` | `anthropic/claude-sonnet-4-5` | `opencode models` |
 | `codex` | OpenAI 模型名称 | `codex-mini-latest` | `codex models` |
@@ -188,6 +217,10 @@ interface GolemConfig {
   maxQueuePerSession?: number;  // 默认 3
   sessionTtlDays?: number;      // 默认 30
   systemPrompt?: string;
+  streaming?: {
+    mode?: 'buffered' | 'streaming';  // 默认：'buffered'
+    showToolCalls?: boolean;          // 默认：false
+  };
   groupChat?: {
     groupPolicy?: 'mention-only' | 'smart' | 'always';  // 默认：'mention-only'
     historyLimit?: number;   // 默认：20
