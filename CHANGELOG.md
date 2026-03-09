@@ -1,3 +1,10 @@
+# [0.18.0-beta.1](https://github.com/0xranx/golembot/compare/v0.17.4...v0.18.0-beta.1) (2026-03-09)
+
+
+### Features
+
+* streaming message delivery and Feishu read receipts ([7208ee3](https://github.com/0xranx/golembot/commit/7208ee3c0bb30c0341c6ccc88732974051dc8268))
+
 # [0.14.0-beta.11](https://github.com/0xranx/golembot/compare/v0.14.0-beta.10...v0.14.0-beta.11) (2026-03-08)
 
 
