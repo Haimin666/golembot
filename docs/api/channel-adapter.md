@@ -28,6 +28,9 @@ interface ChannelAdapter {
    *  Returns a map of display name → platform-specific user ID.
    *  Called by the gateway when the AI reply contains @mentions. */
   getGroupMembers?(chatId: string): Promise<Map<string, string>>;
+  /** Optional: handler called when a user reads a message sent by the bot.
+   *  Currently supported by the Feishu adapter. */
+  readReceiptHandler?: (receipt: ReadReceipt) => void;
 }
 ```
 
@@ -40,6 +43,18 @@ interface ChannelAdapter {
 | `stop()` | Gracefully disconnect |
 | `typing(msg)` | *(optional)* Send a "typing…" indicator to the chat. Called before the AI call and refreshed every 4 s. Implement for better UX on platforms that support it (e.g. Telegram `sendChatAction`, Discord `sendTyping`). |
 | `getGroupMembers(chatId)` | *(optional)* Return a `Map<displayName, platformId>` of group members. The gateway calls this when an AI reply contains `@name` patterns to resolve them into native mentions. Implementations should cache results for performance. |
+
+## ReadReceipt Type
+
+```typescript
+interface ReadReceipt {
+  channelType: string;   // 'feishu'
+  messageId: string;     // Message ID that was read
+  readerId: string;      // User ID of the reader
+  chatId: string;        // Chat/conversation ID
+  readTime: string;      // Timestamp (milliseconds since epoch)
+}
+```
 
 ## ChannelMessage Type
 

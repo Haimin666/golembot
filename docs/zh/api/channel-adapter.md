@@ -28,6 +28,20 @@ interface ChannelAdapter {
    *  返回 displayName → platformId 的 Map。
    *  当 AI 回复包含 @name 时由 Gateway 调用。 */
   getGroupMembers?(chatId: string): Promise<Map<string, string>>;
+  /** 可选：用户阅读 bot 消息时的回调。目前飞书适配器支持。 */
+  readReceiptHandler?: (receipt: ReadReceipt) => void;
+}
+```
+
+## ReadReceipt 类型
+
+```typescript
+interface ReadReceipt {
+  channelType: string;   // 'feishu'
+  messageId: string;     // 被阅读的消息 ID
+  readerId: string;      // 阅读者用户 ID
+  chatId: string;        // 会话 ID
+  readTime: string;      // 时间戳（毫秒级 epoch）
 }
 ```
 

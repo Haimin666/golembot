@@ -24,6 +24,11 @@ maxConcurrent: 20            # max parallel chats (default: 10)
 maxQueuePerSession: 2        # max queued requests per user (default: 3)
 sessionTtlDays: 14           # prune idle sessions after N days (default: 30)
 
+# Optional: streaming message delivery for IM channels
+streaming:
+  mode: streaming            # buffered (default) | streaming
+  showToolCalls: true        # show 🔧 tool hints in IM (default: false)
+
 # Optional: group chat behaviour (applies to all channels)
 groupChat:
   groupPolicy: mention-only  # mention-only (default) | smart | always
@@ -73,8 +78,32 @@ gateway:
 | `maxQueuePerSession` | `number` | `3` | Maximum number of requests that can be queued per session key |
 | `sessionTtlDays` | `number` | `30` | Sessions not used for this many days are pruned at next startup |
 | `systemPrompt` | `string` | — | Role/persona instructions injected into `AGENTS.md` as a `## System Instructions` section. The engine reads this once as system-level context — it is **not** prepended to every message, so token cost stays flat across multi-turn conversations |
+| `streaming` | `object` | — | Streaming message delivery for IM channels |
 | `channels` | `object` | — | IM channel configurations |
 | `gateway` | `object` | — | Gateway service settings |
+
+### `streaming`
+
+Controls how the gateway delivers messages to IM channels.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `mode` | `string` | `buffered` | `buffered` — accumulate the full reply and send once. `streaming` — send text incrementally at paragraph boundaries and tool call events |
+| `showToolCalls` | `boolean` | `false` | When `true`, send a `🔧 toolName...` hint to the chat each time the agent invokes a tool |
+
+In **buffered** mode (default), the bot waits until the agent finishes and sends one complete message. In **streaming** mode, the bot flushes text to IM at semantic boundaries:
+
+- **Paragraph breaks** (`\n\n`) — completed paragraphs are sent immediately
+- **Tool calls** — accumulated text is flushed before the tool hint
+- **Done** — any remaining text is flushed
+
+Streaming mode provides faster visual feedback for long, multi-step agent responses.
+
+```yaml
+streaming:
+  mode: streaming
+  showToolCalls: true
+```
 
 ### `channels`
 
@@ -163,7 +192,7 @@ The `model` value format is different for each engine:
 
 | Engine | Format | Example | Where to find values |
 |--------|--------|---------|----------------------|
-| `cursor` | Cursor model name | `claude-sonnet-4-5` | Cursor → Settings → Models |
+| `cursor` | Cursor model name | `sonnet-4.6` | Cursor → Settings → Models |
 | `claude-code` | Anthropic model ID | `claude-sonnet-4-6` | `claude models` |
 | `opencode` | `provider/model` | `anthropic/claude-sonnet-4-5` | `opencode models` |
 | `codex` | OpenAI model name | `codex-mini-latest` | `codex models` |
@@ -212,6 +241,10 @@ interface GolemConfig {
   maxQueuePerSession?: number;  // default 3
   sessionTtlDays?: number;      // default 30
   systemPrompt?: string;
+  streaming?: {
+    mode?: 'buffered' | 'streaming';  // default: 'buffered'
+    showToolCalls?: boolean;          // default: false
+  };
   groupChat?: {
     groupPolicy?: 'mention-only' | 'smart' | 'always';  // default: 'mention-only'
     historyLimit?: number;   // default: 20
