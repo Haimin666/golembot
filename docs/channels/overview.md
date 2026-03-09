@@ -186,6 +186,29 @@ channels:
     token: ${TOKEN}
 ```
 
+## Image Support (Multimodal)
+
+GolemBot supports **image messages** across all 6 built-in channels. When a user sends an image (photo, screenshot, file attachment), the adapter downloads it and passes it through the full pipeline:
+
+```
+User sends image → Adapter downloads to Buffer → gateway passes to assistant.chat()
+→ image saved to .golem/images/ → file path appended to prompt → agent reads the file
+→ cleanup after response
+```
+
+| Channel | Image Source | Caption/Text |
+|---------|-------------|-------------|
+| Feishu | `image` messages + inline images in `post` (rich text) | Post text content extracted |
+| Slack | File attachments with image content type | Message text preserved |
+| Telegram | `message.photo` (picks largest size) | `message.caption` used as text |
+| Discord | `message.attachments` with image content type | Message text preserved |
+| DingTalk | `picture` messages + images in `richText` | Rich text content extracted |
+| WeCom | `image` messages via media API | Text set to `(image)` |
+
+**How it works:** Images are saved as temporary files in `.golem/images/` and referenced by absolute path in the prompt. This works universally with all engines (Cursor, Claude Code, OpenCode, Codex) since every coding CLI can read local files. Files are automatically cleaned up after the agent responds.
+
+**HTTP API:** The `POST /chat` endpoint also accepts base64-encoded images — see [HTTP API](/api/http-api#post-chat).
+
 ## Proactive Messaging (Scheduled Tasks)
 
 Beyond responding to incoming messages, GolemBot can **proactively send messages** to IM channels on a schedule. Define tasks in `golem.yaml`:

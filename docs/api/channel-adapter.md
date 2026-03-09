@@ -63,6 +63,18 @@ interface ReadReceipt {
 }
 ```
 
+## ImageAttachment Type
+
+```typescript
+interface ImageAttachment {
+  mimeType: string;    // e.g. 'image/png', 'image/jpeg', 'image/webp'
+  data: Buffer;        // Raw image bytes
+  fileName?: string;   // Original filename (if available)
+}
+```
+
+Used in `ChannelMessage.images` and `assistant.chat()` opts. All 6 built-in adapters populate this when users send image messages.
+
 ## ChannelMessage Type
 
 ```typescript
@@ -73,6 +85,7 @@ interface ChannelMessage {
   chatId: string;          // Chat/conversation ID
   chatType: 'dm' | 'group';
   text: string;            // Message text content
+  images?: ImageAttachment[];  // Image attachments (if any)
   raw: unknown;            // Raw SDK event object
   /**
    * Set to `true` by adapters that can detect a bot @mention through

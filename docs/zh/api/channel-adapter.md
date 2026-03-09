@@ -50,6 +50,18 @@ interface ReadReceipt {
 }
 ```
 
+## ImageAttachment 类型
+
+```typescript
+interface ImageAttachment {
+  mimeType: string;    // 如 'image/png'、'image/jpeg'、'image/webp'
+  data: Buffer;        // 原始图片字节数据
+  fileName?: string;   // 原始文件名（如果有）
+}
+```
+
+用于 `ChannelMessage.images` 和 `assistant.chat()` 的 opts 参数。全部 6 个内置 Adapter 在用户发送图片消息时都会填充此字段。
+
 ## ChannelMessage 类型
 
 ```typescript
@@ -60,6 +72,7 @@ interface ChannelMessage {
   chatId: string;          // 会话/群组 ID
   chatType: 'dm' | 'group';
   text: string;            // 消息文本
+  images?: ImageAttachment[];  // 图片附件（如果有）
   raw: unknown;            // 原始 SDK 事件对象
   /**
    * 由能通过平台原生方式检测到 @mention 的 Adapter 设置（如 Discord 的 <@userId> token）。

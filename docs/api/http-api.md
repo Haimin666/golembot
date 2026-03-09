@@ -18,14 +18,27 @@ Content-Type: application/json
 ```json
 {
   "message": "Analyze the sales data",
-  "sessionKey": "user-123"
+  "sessionKey": "user-123",
+  "images": [
+    {
+      "mimeType": "image/png",
+      "data": "<base64-encoded image data>",
+      "fileName": "screenshot.png"
+    }
+  ]
 }
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `message` | `string` | Yes | The user's message |
+| `message` | `string` | Yes* | The user's message (*optional when `images` is provided) |
 | `sessionKey` | `string` | No | Session identifier (default: `"default"`) |
+| `images` | `array` | No | Array of base64-encoded image attachments |
+| `images[].mimeType` | `string` | No | MIME type (default: `"image/png"`) |
+| `images[].data` | `string` | Yes | Base64-encoded image data |
+| `images[].fileName` | `string` | No | Original filename |
+
+When `images` are provided without a `message`, the message defaults to `"(image)"`. Images are saved to `.golem/images/`, referenced by path in the prompt, and cleaned up after the response.
 
 **Response:** `text/event-stream`
 

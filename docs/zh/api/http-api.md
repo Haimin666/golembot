@@ -18,9 +18,27 @@ Content-Type: application/json
 ```json
 {
   "message": "分析销售数据",
-  "sessionKey": "user-123"
+  "sessionKey": "user-123",
+  "images": [
+    {
+      "mimeType": "image/png",
+      "data": "<base64 编码的图片数据>",
+      "fileName": "screenshot.png"
+    }
+  ]
 }
 ```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `message` | `string` | 是* | 用户消息（*当提供 `images` 时可省略） |
+| `sessionKey` | `string` | 否 | 会话标识（默认：`"default"`） |
+| `images` | `array` | 否 | base64 编码的图片附件数组 |
+| `images[].mimeType` | `string` | 否 | MIME 类型（默认：`"image/png"`） |
+| `images[].data` | `string` | 是 | base64 编码的图片数据 |
+| `images[].fileName` | `string` | 否 | 原始文件名 |
+
+当提供 `images` 但没有 `message` 时，消息默认为 `"(image)"`。图片保存到 `.golem/images/`，通过路径引用注入 prompt，回复后自动清理。
 
 **响应：** `text/event-stream`
 
