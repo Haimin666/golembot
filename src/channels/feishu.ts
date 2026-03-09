@@ -1,4 +1,4 @@
-import type { ChannelAdapter, ChannelMessage, ReplyOptions, MentionTarget } from '../channel.js';
+import type { ChannelAdapter, ChannelMessage, ReplyOptions, MentionTarget, ReadReceipt } from '../channel.js';
 import type { FeishuChannelConfig } from '../workspace.js';
 import { hasMarkdown, markdownToPost, markdownToCard, injectMentionsIntoPost } from './feishu-format.js';
 import { importPeer } from '../peer-require.js';
@@ -6,6 +6,7 @@ import { importPeer } from '../peer-require.js';
 export class FeishuAdapter implements ChannelAdapter {
   readonly name = 'feishu';
   readonly maxMessageLength = 4000;
+  readReceiptHandler?: (receipt: ReadReceipt) => void;
   private config: FeishuChannelConfig;
   private client: any;
   private wsClient: any;
@@ -79,8 +80,37 @@ export class FeishuAdapter implements ChannelAdapter {
     // Best-effort initial fetch (non-blocking).
     fetchBotOpenId().catch(() => {});
 
-    const eventDispatcher = new lark.EventDispatcher({}).register({
-      'im.message.receive_v1': async (data: any) => {
+    const events: Record<string, (data: any) => void | Promise<void>> = {};
+
+    // Read receipt event — fired when a user reads a message sent by the bot.
+    // Requires the `im:message.message_read_v1` event subscription in Feishu console.
+    if (this.readReceiptHandler) {
+      const handler = this.readReceiptHandler;
+      events['im.message.message_read_v1'] = (data: any) => {
+        try {
+          const reader = data?.reader;
+          const readerId = reader?.reader_id?.open_id;
+          const messageIdList: string[] = data?.message_id_list ?? [];
+          const readTime = reader?.read_time
+            ? new Date(Number(reader.read_time)).toISOString()
+            : new Date().toISOString();
+
+          for (const mid of messageIdList) {
+            handler({
+              channelType: 'feishu',
+              messageId: mid,
+              readerId: readerId ?? 'unknown',
+              chatId: '', // not provided in the event payload
+              readTime,
+            });
+          }
+        } catch {
+          // best-effort — never crash on read receipt processing
+        }
+      };
+    }
+
+    events['im.message.receive_v1'] = async (data: any) => {
         const { message, sender } = data;
 
         // Deduplicate re-delivered events.
@@ -171,8 +201,9 @@ export class FeishuAdapter implements ChannelAdapter {
         };
 
         onMessage(channelMsg);
-      },
-    });
+      };
+
+    const eventDispatcher = new lark.EventDispatcher({}).register(events);
 
     this.wsClient = new lark.WSClient({
       ...baseConfig,

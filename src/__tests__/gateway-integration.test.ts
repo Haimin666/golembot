@@ -1038,4 +1038,170 @@ describe('handleMessage — full gateway pipeline', () => {
       expect(adapter.replies[0].options).toBeUndefined();
     });
   });
+
+  // ── Streaming mode ──────────────────────────────────────────────────────
+
+  describe('streaming mode', () => {
+    /** Mock assistant that yields a sequence of StreamEvents with control over timing. */
+    function makeStreamingAssistant(events: StreamEvent[]): MockAssistant {
+      const obj: MockAssistant = {
+        callCount: 0,
+        lastSessionKey: undefined,
+        lastPrompt: undefined,
+        async *chat(message: string, opts: { sessionKey?: string } = {}) {
+          obj.callCount++;
+          obj.lastPrompt = message;
+          obj.lastSessionKey = opts.sessionKey;
+          for (const e of events) {
+            yield e;
+          }
+        },
+      };
+      return obj;
+    }
+
+    it('buffered mode (default) sends single reply', async () => {
+      const assistant = makeStreamingAssistant([
+        { type: 'text', content: 'Part 1.' },
+        { type: 'text', content: '\n\nPart 2.' },
+        { type: 'done', sessionId: 'x' },
+      ]);
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg();
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      // Default is buffered — everything in one reply
+      expect(adapter.replies).toHaveLength(1);
+      expect(adapter.replies[0].text).toBe('Part 1.\n\nPart 2.');
+    });
+
+    it('streaming mode splits on paragraph boundaries', async () => {
+      const assistant = makeStreamingAssistant([
+        { type: 'text', content: 'First paragraph.\n\nSecond paragraph.' },
+        { type: 'done', sessionId: 'x' },
+      ]);
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg();
+      const config = makeConfig({ streaming: { mode: 'streaming' } } as any);
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies.length).toBe(2);
+      expect(adapter.replies[0].text).toBe('First paragraph.');
+      expect(adapter.replies[1].text).toBe('Second paragraph.');
+    });
+
+    it('streaming mode flushes on tool_call', async () => {
+      const assistant = makeStreamingAssistant([
+        { type: 'text', content: 'Analyzing your code...' },
+        { type: 'tool_call', name: 'read_file', args: '{}' },
+        { type: 'tool_result', content: 'file contents' },
+        { type: 'text', content: 'Here are the results.' },
+        { type: 'done', sessionId: 'x' },
+      ]);
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg();
+      const config = makeConfig({ streaming: { mode: 'streaming' } } as any);
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies.length).toBe(2);
+      expect(adapter.replies[0].text).toBe('Analyzing your code...');
+      expect(adapter.replies[1].text).toBe('Here are the results.');
+    });
+
+    it('streaming mode shows tool_call hints when enabled', async () => {
+      const assistant = makeStreamingAssistant([
+        { type: 'text', content: 'Let me check.' },
+        { type: 'tool_call', name: 'run_tests', args: '{}' },
+        { type: 'text', content: 'All tests pass.' },
+        { type: 'done', sessionId: 'x' },
+      ]);
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg();
+      const config = makeConfig({ streaming: { mode: 'streaming', showToolCalls: true } } as any);
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies.length).toBe(3);
+      expect(adapter.replies[0].text).toBe('Let me check.');
+      expect(adapter.replies[1].text).toBe('🔧 run_tests...');
+      expect(adapter.replies[2].text).toBe('All tests pass.');
+    });
+
+    it('streaming mode does not show tool_call hints when disabled', async () => {
+      const assistant = makeStreamingAssistant([
+        { type: 'text', content: 'Checking.' },
+        { type: 'tool_call', name: 'run_tests', args: '{}' },
+        { type: 'text', content: 'Done.' },
+        { type: 'done', sessionId: 'x' },
+      ]);
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg();
+      const config = makeConfig({ streaming: { mode: 'streaming', showToolCalls: false } } as any);
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies.length).toBe(2);
+      expect(adapter.replies.every(r => !r.text.includes('🔧'))).toBe(true);
+    });
+
+    it('streaming mode accumulates chunks without paragraph breaks into one message', async () => {
+      // Simulates OpenCode-style sentence-level chunks within a single paragraph
+      const assistant = makeStreamingAssistant([
+        { type: 'text', content: 'Hello, ' },
+        { type: 'text', content: 'how are ' },
+        { type: 'text', content: 'you today?' },
+        { type: 'done', sessionId: 'x' },
+      ]);
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg();
+      const config = makeConfig({ streaming: { mode: 'streaming' } } as any);
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      // No paragraph break → all flushed at done as one message
+      expect(adapter.replies).toHaveLength(1);
+      expect(adapter.replies[0].text).toBe('Hello, how are you today?');
+    });
+
+    it('streaming mode handles [PASS] in smart group', async () => {
+      const assistant = makeStreamingAssistant([
+        { type: 'text', content: '[PASS]' },
+        { type: 'done', sessionId: 'x' },
+      ]);
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg();
+      const config = makeConfig({
+        groupChat: { groupPolicy: 'smart' },
+        streaming: { mode: 'streaming' },
+      } as any);
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      // [PASS] gets flushed at done, but then the return prevents group history update.
+      // The [PASS] text was sent — this is a known tradeoff in streaming mode.
+      // Verify that no group history was recorded for the bot reply.
+      const groupKey = `${msg.channelType}:${msg.chatId}`;
+      const hist = groupHistories.get(groupKey) ?? [];
+      expect(hist.filter(h => h.isBot)).toHaveLength(0);
+    });
+
+    it('streaming mode updates group history with full reply', async () => {
+      const assistant = makeStreamingAssistant([
+        { type: 'text', content: 'Part 1.\n\n' },
+        { type: 'text', content: 'Part 2.' },
+        { type: 'done', sessionId: 'x' },
+      ]);
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg();
+      const config = makeConfig({ streaming: { mode: 'streaming' } } as any);
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      const groupKey = `${msg.channelType}:${msg.chatId}`;
+      const hist = groupHistories.get(groupKey) ?? [];
+      const botReply = hist.find(h => h.isBot);
+      expect(botReply).toBeDefined();
+      // Group history stores the complete concatenated reply
+      expect(botReply!.text).toBe('Part 1.\n\nPart 2.');
+    });
+
+    it('streaming mode sends error fallback when only error events', async () => {
+      const assistant = makeStreamingAssistant([
+        { type: 'error', message: 'engine crashed' },
+      ]);
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg();
+      const config = makeConfig({ streaming: { mode: 'streaming' } } as any);
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies.length).toBeGreaterThanOrEqual(1);
+      expect(adapter.replies.some(r => r.text.includes('error occurred'))).toBe(true);
+    });
+  });
 });

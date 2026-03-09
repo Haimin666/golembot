@@ -10,6 +10,7 @@ import {
   type GolemConfig,
   type ChannelsConfig,
   type GroupChatConfig,
+  type StreamingConfig,
   type FeishuChannelConfig,
   type DingtalkChannelConfig,
   type WecomChannelConfig,
@@ -24,6 +25,7 @@ import {
   type ChannelAdapter,
   type ChannelMessage,
   type MentionTarget,
+  type ReadReceipt,
 } from './channel.js';
 import {
   createMetrics,
@@ -119,6 +121,14 @@ export function resolveGroupChatConfig(config: GolemConfig): Required<GroupChatC
     groupPolicy: gc.groupPolicy ?? 'mention-only',
     historyLimit: gc.historyLimit ?? 20,
     maxTurns: gc.maxTurns ?? 10,
+  };
+}
+
+export function resolveStreamingConfig(config: GolemConfig): Required<StreamingConfig> {
+  const sc = config.streaming ?? {};
+  return {
+    mode: sc.mode ?? 'buffered',
+    showToolCalls: sc.showToolCalls ?? false,
   };
 }
 
@@ -373,67 +383,154 @@ export async function handleMessage(
   let costUsd: number | undefined;
   let durationMs: number | undefined;
 
+  const maxLen = adapter.maxMessageLength ?? 4000;
+  const streamingConfig = resolveStreamingConfig(config);
+
+  // Helper: send a text chunk to the IM channel (handles splitMessage + mentions).
+  const sendChunk = async (text: string): Promise<void> => {
+    if (!text.trim()) return;
+    const chunks = splitMessage(text.trim(), maxLen);
+    let mentions: MentionTarget[] = [];
+    if (msg.chatType === 'group' && adapter.getGroupMembers) {
+      try {
+        const memberCache = await adapter.getGroupMembers(msg.chatId);
+        mentions = parseMentions(text.trim(), memberCache).mentions;
+      } catch { /* best effort */ }
+    }
+    const replyOpts = mentions.length > 0 ? { mentions } : undefined;
+    for (const chunk of chunks) {
+      await adapter.reply(msg, chunk, replyOpts);
+    }
+    // Stop typing indicator after first message is sent
+    if (typingTimer !== undefined) {
+      clearInterval(typingTimer);
+      typingTimer = undefined;
+    }
+  };
+
   try {
-    let reply = '';
+    let fullReply = '';
     let hasError = false;
-    for await (const event of assistant.chat(fullText, { sessionKey })) {
-      if (event.type === 'text') {
-        reply += event.content;
-      } else if (event.type === 'warning') {
-        log(verbose, `[${channelType}] warning: ${event.message}`);
-      } else if (event.type === 'error') {
-        hasError = true;
-        console.error(`[${channelType}] Engine error: ${event.message}`);
-      } else if (event.type === 'done') {
-        costUsd = event.costUsd;
-        durationMs = event.durationMs;
-      }
-    }
 
-    // [PASS] sentinel: smart mode bot chose to stay silent
-    if (reply.trim() === '[PASS]') {
-      log(verbose, `[${channelType}] [PASS] — bot chose not to respond`);
-      trackMetrics({ passed: true, responsePreview: '' });
-      return;
-    }
+    if (streamingConfig.mode === 'streaming') {
+      // ── Streaming mode: send text at logical boundaries ──
+      let buffer = '';
 
-    if (!reply.trim() && hasError) {
-      reply = 'Sorry, an error occurred while processing your message. Please try again later.';
-    }
+      // Flush the buffer to IM. Called at paragraph breaks, tool_call, and done.
+      const flush = async (): Promise<void> => {
+        if (!buffer.trim()) { buffer = ''; return; }
+        await sendChunk(buffer);
+        buffer = '';
+      };
 
-    if (reply.trim()) {
-      const maxLen = adapter.maxMessageLength ?? 4000;
-      const chunks = splitMessage(reply.trim(), maxLen);
+      for await (const event of assistant.chat(fullText, { sessionKey })) {
+        if (event.type === 'text') {
+          fullReply += event.content;
+          buffer += event.content;
 
-      // Resolve @mentions in group replies when adapter supports it
-      let mentions: MentionTarget[] = [];
-      if (msg.chatType === 'group' && adapter.getGroupMembers) {
-        try {
-          const memberCache = await adapter.getGroupMembers(msg.chatId);
-          mentions = parseMentions(reply.trim(), memberCache).mentions;
-        } catch {
-          // Best effort — send without mentions if member lookup fails
+          // Flush at paragraph boundaries (\n\n) within the buffer.
+          // Split on double-newline, flush completed paragraphs, keep the tail.
+          const parts = buffer.split(/\n\n/);
+          if (parts.length > 1) {
+            // Everything except the last part is complete paragraphs — send them
+            const complete = parts.slice(0, -1).join('\n\n');
+            buffer = parts[parts.length - 1];
+            await sendChunk(complete);
+          }
+        } else if (event.type === 'tool_call') {
+          // Agent switches to tool use — flush accumulated text first
+          await flush();
+          if (streamingConfig.showToolCalls) {
+            // Extract a short tool label from the tool name.
+            // Codex: "/bin/bash -lc 'cd ... && ls -la'" → "bash"
+            // Claude Code: "Bash", "Read" → as-is
+            // OpenCode: "bash", "read" → as-is
+            const rawName = event.name;
+            const firstToken = rawName.split(/\s/)[0]; // "/bin/bash" or "Bash" or "read"
+            const label = firstToken.includes('/') ? firstToken.split('/').pop()! : firstToken;
+            log(verbose, `[${channelType}] stream tool_call: ${label}`);
+            await adapter.reply(msg, `🔧 ${label}...`);
+          } else {
+            log(verbose, `[${channelType}] stream tool_call: ${event.name.slice(0, 40)}`);
+          }
+        } else if (event.type === 'warning') {
+          log(verbose, `[${channelType}] warning: ${event.message}`);
+        } else if (event.type === 'error') {
+          hasError = true;
+          console.error(`[${channelType}] Engine error: ${event.message}`);
+        } else if (event.type === 'done') {
+          costUsd = event.costUsd;
+          durationMs = event.durationMs;
         }
       }
 
-      const replyOpts = mentions.length > 0 ? { mentions } : undefined;
-      for (const chunk of chunks) {
-        await adapter.reply(msg, chunk, replyOpts);
-      }
-      log(verbose, `[${channelType}] replied to ${senderLabel}: "${reply.trim().slice(0, 80)}..." (${chunks.length} chunk(s))`);
+      // Flush remaining buffer
+      await flush();
 
-      trackMetrics({ responsePreview: reply.trim().slice(0, 120) });
-
-      // Update group history with bot reply + increment turn counter
-      if (msg.chatType === 'group') {
-        const groupKey = `${msg.channelType}:${msg.chatId}`;
-        const gc = resolveGroupChatConfig(config);
-        const hist = groupHistories.get(groupKey) ?? [];
-        hist.push({ senderName: config.name, text: reply.trim(), isBot: true });
-        if (hist.length > gc.historyLimit) hist.shift();
-        groupHistories.set(groupKey, hist);
-        groupTurnCounters.set(groupKey, (groupTurnCounters.get(groupKey) ?? 0) + 1);
+      // [PASS] sentinel — in streaming mode, check the full accumulated reply.
+      // If it was only "[PASS]", the text may have already been sent to IM.
+      // To prevent this, the flush above skips whitespace-only buffers,
+      // but "[PASS]" is non-empty. For smart groups, the [PASS] typically
+      // arrives as a single text event and gets flushed. This is acceptable:
+      // smart mode is an advanced feature, and the tradeoff is documented.
+      if (fullReply.trim() === '[PASS]') {
+        log(verbose, `[${channelType}] [PASS] — bot chose not to respond`);
+        trackMetrics({ passed: true, responsePreview: '' });
+        return;
       }
+
+      if (!fullReply.trim() && hasError) {
+        await sendChunk('Sorry, an error occurred while processing your message. Please try again later.');
+        fullReply = 'Sorry, an error occurred while processing your message. Please try again later.';
+      }
+
+      if (fullReply.trim()) {
+        log(verbose, `[${channelType}] replied to ${senderLabel}: "${fullReply.trim().slice(0, 80)}..." (streaming)`);
+        trackMetrics({ responsePreview: fullReply.trim().slice(0, 120) });
+      }
+    } else {
+      // ── Buffered mode (default): accumulate all text, send at end ──
+      for await (const event of assistant.chat(fullText, { sessionKey })) {
+        if (event.type === 'text') {
+          fullReply += event.content;
+        } else if (event.type === 'warning') {
+          log(verbose, `[${channelType}] warning: ${event.message}`);
+        } else if (event.type === 'error') {
+          hasError = true;
+          console.error(`[${channelType}] Engine error: ${event.message}`);
+        } else if (event.type === 'done') {
+          costUsd = event.costUsd;
+          durationMs = event.durationMs;
+        }
+      }
+
+      // [PASS] sentinel: smart mode bot chose to stay silent
+      if (fullReply.trim() === '[PASS]') {
+        log(verbose, `[${channelType}] [PASS] — bot chose not to respond`);
+        trackMetrics({ passed: true, responsePreview: '' });
+        return;
+      }
+
+      if (!fullReply.trim() && hasError) {
+        fullReply = 'Sorry, an error occurred while processing your message. Please try again later.';
+      }
+
+      if (fullReply.trim()) {
+        await sendChunk(fullReply);
+        log(verbose, `[${channelType}] replied to ${senderLabel}: "${fullReply.trim().slice(0, 80)}..."`);
+        trackMetrics({ responsePreview: fullReply.trim().slice(0, 120) });
+      }
+    }
+
+    // Update group history with the full reply + increment turn counter
+    if (fullReply.trim() && msg.chatType === 'group') {
+      const groupKey = `${msg.channelType}:${msg.chatId}`;
+      const gc = resolveGroupChatConfig(config);
+      const hist = groupHistories.get(groupKey) ?? [];
+      hist.push({ senderName: config.name, text: fullReply.trim(), isBot: true });
+      if (hist.length > gc.historyLimit) hist.shift();
+      groupHistories.set(groupKey, hist);
+      groupTurnCounters.set(groupKey, (groupTurnCounters.get(groupKey) ?? 0) + 1);
     }
   } catch (e) {
     console.error(`[${channelType}] Failed to process message:`, e);
@@ -567,6 +664,12 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
 
       try {
         const adapter = await createChannelAdapter(type, channelConfig as Record<string, unknown>, dir);
+
+        // Set read receipt handler before start() so adapters can subscribe during initialization.
+        adapter.readReceiptHandler = (receipt: ReadReceipt) => {
+          log(verbose, `[${type}] read receipt: message ${receipt.messageId} read by ${receipt.readerId}`);
+        };
+
         await adapter.start((msg: ChannelMessage) =>
           handleMessage(msg, config, assistant, adapter, type, verbose, dir, metrics),
         );

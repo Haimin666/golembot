@@ -5,9 +5,9 @@ import { loadSession, saveSession, clearSession, pruneExpiredSessions, appendHis
 import { createEngine, type StreamEvent, type AgentEngine } from './engine.js';
 
 export type { StreamEvent } from './engine.js';
-export type { GolemConfig, SkillInfo, ChannelsConfig, GatewayConfig, FeishuChannelConfig, DingtalkChannelConfig, WecomChannelConfig, SlackChannelConfig, TelegramChannelConfig, DiscordChannelConfig } from './workspace.js';
+export type { GolemConfig, SkillInfo, ChannelsConfig, GatewayConfig, StreamingConfig, FeishuChannelConfig, DingtalkChannelConfig, WecomChannelConfig, SlackChannelConfig, TelegramChannelConfig, DiscordChannelConfig } from './workspace.js';
 export { createGolemServer, startServer, type ServerOpts, type GolemServer } from './server.js';
-export type { ChannelAdapter, ChannelMessage } from './channel.js';
+export type { ChannelAdapter, ChannelMessage, ReadReceipt } from './channel.js';
 export { buildSessionKey, stripMention } from './channel.js';
 export { startGateway } from './gateway.js';
 export type { DashboardContext, ChannelStatus, GatewayMetrics, RecentMessage } from './dashboard.js';

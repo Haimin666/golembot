@@ -71,6 +71,17 @@ export interface GroupChatConfig {
   maxTurns?: number;
 }
 
+export interface StreamingConfig {
+  /**
+   * How the gateway delivers AI replies to IM channels:
+   * - `buffered` (default): accumulate all text, send as a single message after completion
+   * - `streaming`: send text incrementally at logical boundaries (paragraph breaks, tool calls)
+   */
+  mode?: 'buffered' | 'streaming';
+  /** When true, send a brief hint message when the agent invokes a tool (e.g. "🔧 read_file..."). Default: false. */
+  showToolCalls?: boolean;
+}
+
 export interface GolemConfig {
   name: string;
   engine: string;
@@ -90,6 +101,8 @@ export interface GolemConfig {
   systemPrompt?: string;
   /** Group chat behaviour. Applies to all group messages across all channels. */
   groupChat?: GroupChatConfig;
+  /** Control how AI replies are delivered to IM channels. */
+  streaming?: StreamingConfig;
 }
 
 export interface SkillInfo {
@@ -152,6 +165,9 @@ export async function loadConfig(dir: string): Promise<GolemConfig> {
   if (doc.groupChat && typeof doc.groupChat === 'object') {
     config.groupChat = doc.groupChat as GroupChatConfig;
   }
+  if (doc.streaming && typeof doc.streaming === 'object') {
+    config.streaming = doc.streaming as StreamingConfig;
+  }
 
   return config;
 }
@@ -167,6 +183,7 @@ export async function writeConfig(dir: string, config: GolemConfig): Promise<voi
   if (config.channels) content.channels = config.channels;
   if (config.gateway) content.gateway = config.gateway;
   if (config.groupChat) content.groupChat = config.groupChat;
+  if (config.streaming) content.streaming = config.streaming;
   await writeFile(configPath, yaml.dump(content, { lineWidth: -1 }), 'utf-8');
 }
 

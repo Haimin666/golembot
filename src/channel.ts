@@ -28,6 +28,18 @@ export interface ReplyOptions {
   mentions?: MentionTarget[];
 }
 
+/**
+ * Read receipt emitted when a user reads a message sent by the bot.
+ * Currently only supported by Feishu (via `im.message.message_read_v1` event).
+ */
+export interface ReadReceipt {
+  channelType: string;
+  messageId: string;
+  readerId: string;
+  chatId: string;
+  readTime: string;
+}
+
 export interface ChannelAdapter {
   readonly name: string;
   /** Optional: override the default 4000-char message split limit for this channel. */
@@ -47,6 +59,12 @@ export interface ChannelAdapter {
    * Called by the gateway when the AI reply contains @mentions.
    */
   getGroupMembers?(chatId: string): Promise<Map<string, string>>;
+  /**
+   * Optional: handler for read receipt events. Set by the gateway before `start()`.
+   * When a user reads a message sent by the bot, the adapter calls this handler.
+   * Currently only Feishu supports this via the `im.message.message_read_v1` event.
+   */
+  readReceiptHandler?: (receipt: ReadReceipt) => void;
 }
 
 export function buildSessionKey(msg: ChannelMessage): string {
