@@ -1,3 +1,10 @@
+# [0.21.0](https://github.com/0xranx/golembot/compare/v0.20.0...v0.21.0) (2026-03-09)
+
+
+### Features
+
+* add scheduled tasks panel to Dashboard with disable/enable/run controls ([39c3d40](https://github.com/0xranx/golembot/commit/39c3d40ffc62fcea24298988e4bb7a76340196e4))
+
 # [0.20.0](https://github.com/0xranx/golembot/compare/v0.19.0...v0.20.0) (2026-03-09)
 
 
