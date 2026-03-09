@@ -1468,4 +1468,42 @@ describe('handleMessage — full gateway pipeline', () => {
       expect(adapter.replies[0].text).toContain('group-task');
     });
   });
+
+  // ── Image message handling ──────────────────────────────────────────────
+
+  describe('image message handling', () => {
+    it('passes image-only message to assistant (not dropped)', async () => {
+      const assistant = makeMockAssistant('I see your image');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({
+        text: '',
+        images: [{ mimeType: 'image/png', data: Buffer.from('fake-png'), fileName: 'test.png' }],
+      });
+      // Override text to empty — the guard should still pass because images are present
+      msg.text = '(image)';
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(1);
+      expect(adapter.replies.length).toBeGreaterThan(0);
+    });
+
+    it('passes images alongside text to assistant', async () => {
+      const assistant = makeMockAssistant('Got it');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({
+        text: 'What is in this picture?',
+        images: [{ mimeType: 'image/jpeg', data: Buffer.from('fake-jpg') }],
+      });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(1);
+      expect(adapter.replies[0].text).toBe('Got it');
+    });
+
+    it('drops message with no text and no images', async () => {
+      const assistant = makeMockAssistant('should not reach');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(assistant.callCount).toBe(0);
+    });
+  });
 });

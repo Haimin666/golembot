@@ -1,4 +1,4 @@
-import type { ChannelAdapter, ChannelMessage, ReplyOptions } from '../channel.js';
+import type { ChannelAdapter, ChannelMessage, ReplyOptions, ImageAttachment } from '../channel.js';
 import type { DiscordChannelConfig } from '../workspace.js';
 import { importPeer } from '../peer-require.js';
 
@@ -48,7 +48,25 @@ export class DiscordAdapter implements ChannelAdapter {
 
     this.client.on('messageCreate', async (message: any) => {
       if (message.author.bot) return;
-      if (!message.content) return; // skip embed-only messages
+
+      // Download image attachments
+      const images: ImageAttachment[] = [];
+      if (message.attachments?.size > 0) {
+        for (const [, attachment] of message.attachments) {
+          if (!attachment.contentType?.startsWith('image/')) continue;
+          try {
+            const resp = await fetch(attachment.url);
+            if (resp.ok) {
+              const buf = Buffer.from(await resp.arrayBuffer());
+              images.push({ mimeType: attachment.contentType, data: buf, fileName: attachment.name });
+            }
+          } catch (e) {
+            console.error('[discord] Failed to download attachment:', (e as Error).message);
+          }
+        }
+      }
+
+      if (!message.content && images.length === 0) return; // skip embed-only messages
       // Deduplicate re-delivered events.
       if (message.id) {
         if (this.seenMsgIds.has(message.id)) return;
@@ -63,15 +81,17 @@ export class DiscordAdapter implements ChannelAdapter {
 
       // Detect mention via Discord's native <@userId> token (works even without botName).
       const mentionPattern = new RegExp(`<@!?${botId}>`);
-      const mentioned = mentionPattern.test(message.content);
+      const mentioned = mentionPattern.test(message.content || '');
 
       // Normalize Discord mention tokens (<@botId>, <@!botId>):
       // - If botName is set: replace with @botName so gateway's detectMention works.
       // - If no botName: strip the token entirely so the engine receives clean text.
-      let text = message.content.replace(
+      let text = (message.content || '').replace(
         new RegExp(`<@!?${botId}>`, 'g'),
         botName ? `@${botName}` : '',
       ).trim();
+
+      if (!text && images.length > 0) text = '(image)';
 
       onMessage({
         channelType: 'discord',
@@ -80,6 +100,7 @@ export class DiscordAdapter implements ChannelAdapter {
         chatId: isDM ? `dm-${message.author.id}` : message.channelId,
         chatType: isDM ? 'dm' : 'group',
         text,
+        images: images.length > 0 ? images : undefined,
         mentioned,
         raw: message,
       });

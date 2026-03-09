@@ -1,14 +1,16 @@
-import { resolve } from 'node:path';
+import { resolve, join, extname } from 'node:path';
+import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { ensureReady, loadConfig, scanSkills, patchConfig, initWorkspace, type GolemConfig, type SkillInfo } from './workspace.js';
 import { existsSync } from 'node:fs';
 import { loadSession, saveSession, clearSession, pruneExpiredSessions, appendHistory, getHistoryPath } from './session.js';
 import { createEngine, type StreamEvent, type AgentEngine } from './engine.js';
+import type { ImageAttachment } from './channel.js';
 
 export type { StreamEvent } from './engine.js';
 export type { GolemConfig, SkillInfo, ChannelsConfig, GatewayConfig, StreamingConfig, FeishuChannelConfig, DingtalkChannelConfig, WecomChannelConfig, SlackChannelConfig, TelegramChannelConfig, DiscordChannelConfig } from './workspace.js';
 export { patchConfig } from './workspace.js';
 export { createGolemServer, startServer, type ServerOpts, type GolemServer } from './server.js';
-export type { ChannelAdapter, ChannelMessage, ReadReceipt } from './channel.js';
+export type { ChannelAdapter, ChannelMessage, ReadReceipt, ImageAttachment } from './channel.js';
 export { buildSessionKey, stripMention } from './channel.js';
 export { startGateway } from './gateway.js';
 export type { DashboardContext, ChannelStatus, GatewayMetrics, RecentMessage } from './dashboard.js';
@@ -21,6 +23,20 @@ export { TaskStore } from './task-store.js';
 export type { TaskRecord, TaskExecution } from './task-store.js';
 export { ProactiveCoordinator, createProactiveCoordinator } from './proactive.js';
 export type { ProactiveCoordinatorOpts } from './proactive.js';
+
+// ── Helpers ───────────────────────────────────────────
+
+function mimeToExt(mime: string): string {
+  const map: Record<string, string> = {
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/bmp': '.bmp',
+    'image/svg+xml': '.svg',
+  };
+  return map[mime] || '.png';
+}
 
 // ── Per-key Mutex ──────────────────────────────────────
 
@@ -78,6 +94,8 @@ class KeyedMutex {
 
 export interface ChatOpts {
   sessionKey?: string;
+  /** Images attached to the user message. Saved to disk and referenced in the prompt. */
+  images?: ImageAttachment[];
 }
 
 export interface Assistant {
@@ -131,6 +149,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     message: string,
     sessionKey: string,
     isRetry: boolean,
+    images?: ImageAttachment[],
   ): AsyncIterable<StreamEvent> {
     const { config, skills } = await ensureReady(dir);
 
@@ -140,6 +159,22 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
 
     const sessionId = await loadSession(dir, sessionKey, engineType);
     const skillPaths = skills.map(s => s.path);
+
+    // Save attached images to workspace temp dir so the agent can read them
+    const imagePaths: string[] = [];
+    const imageDir = join(dir, '.golem', 'images');
+    if (images && images.length > 0) {
+      await mkdir(imageDir, { recursive: true });
+      const ts = Date.now();
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        const ext = mimeToExt(img.mimeType);
+        const fileName = img.fileName || `img_${ts}_${i}${ext}`;
+        const filePath = join(imageDir, fileName);
+        await writeFile(filePath, img.data);
+        imagePaths.push(filePath);
+      }
+    }
 
     // When starting a fresh session, check if there is a per-session history file
     // from prior conversations. If so, prepend a hint so the agent can read it and
@@ -153,6 +188,12 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
           `Read ${hPath} to restore context before responding.]\n\n` +
           message;
       }
+    }
+
+    // Append image file paths to the message so the agent can read/view them
+    if (imagePaths.length > 0) {
+      const imageRefs = imagePaths.map(p => p).join('\n');
+      finalMessage += `\n\n[User attached ${imagePaths.length} image(s). File paths:\n${imageRefs}\nPlease read/view these files to see the images.]`;
     }
 
     // Prune once per process
@@ -189,6 +230,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
         apiKey,
         skipPermissions: config.skipPermissions,
         signal: controller.signal,
+        imagePaths: imagePaths.length > 0 ? imagePaths : undefined,
       })) {
         if (event.type === 'done') {
           if (event.sessionId) lastSessionId = event.sessionId;
@@ -205,6 +247,10 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
       }
     } finally {
       clearTimeout(timer);
+      // Clean up temp image files
+      for (const p of imagePaths) {
+        rm(p).catch(() => {});
+      }
     }
 
     // Write assistant turn to history (even partial on timeout)
@@ -228,12 +274,12 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
       if (isResumeFail) {
         await clearSession(dir, sessionKey);
         yield { type: 'warning' as const, message: 'Session could not be resumed. Starting fresh conversation.' };
-        yield* doChat(message, sessionKey, true);
+        yield* doChat(message, sessionKey, true, images);
       }
     }
   }
 
-  async function* chatImpl(message: string, sessionKey: string): AsyncIterable<StreamEvent> {
+  async function* chatImpl(message: string, sessionKey: string, images?: ImageAttachment[]): AsyncIterable<StreamEvent> {
     // Rate limits use opts values directly — no file I/O before acquiring the mutex,
     // so same-key serialization order is preserved (first caller wins the lock).
     const maxConcurrent = maxConcurrentOpt ?? 10;
@@ -257,7 +303,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     }
 
     try {
-      yield* doChat(message, sessionKey, false);
+      yield* doChat(message, sessionKey, false, images);
     } finally {
       activeChatCount--;
       mutex.release(sessionKey);
@@ -267,7 +313,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
   return {
     chat(message: string, chatOpts?: ChatOpts): AsyncIterable<StreamEvent> {
       const key = chatOpts?.sessionKey || DEFAULT_SESSION_KEY;
-      return chatImpl(message, key);
+      return chatImpl(message, key, chatOpts?.images);
     },
 
     async init(initOpts: { engine: string; name: string }): Promise<void> {

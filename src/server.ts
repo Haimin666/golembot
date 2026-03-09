@@ -88,7 +88,7 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
 
     // POST /chat — SSE streaming
     if (path === '/chat' && req.method === 'POST') {
-      let body: { message?: string; sessionKey?: string };
+      let body: { message?: string; sessionKey?: string; images?: Array<{ mimeType?: string; data?: string; fileName?: string }> };
       try {
         body = JSON.parse(await readBody(req));
       } catch {
@@ -96,14 +96,33 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
         return;
       }
 
-      if (!body.message || typeof body.message !== 'string') {
+      // Allow image-only messages (no text required when images are present)
+      const hasImages = Array.isArray(body.images) && body.images.length > 0;
+      if ((!body.message || typeof body.message !== 'string') && !hasImages) {
         json(res, 400, { error: 'Missing "message" field' });
         return;
       }
 
+      // Convert base64-encoded images to ImageAttachment[]
+      const images: Array<{ mimeType: string; data: Buffer; fileName?: string }> = [];
+      if (hasImages) {
+        for (const img of body.images!) {
+          if (!img.data) continue;
+          try {
+            images.push({
+              mimeType: img.mimeType || 'image/png',
+              data: Buffer.from(img.data, 'base64'),
+              fileName: img.fileName,
+            });
+          } catch { /* skip malformed entries */ }
+        }
+      }
+
+      const chatMessage = body.message || '(image)';
+
       // ── Slash command interception ──
       if (dir) {
-        const parsed = parseCommand(body.message);
+        const parsed = parseCommand(chatMessage);
         if (parsed) {
           const cronCtx = getCronCtx?.();
           const cmdCtx: CommandContext = {
@@ -140,7 +159,7 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
       let costUsd: number | undefined;
       let durationMs: number | undefined;
       try {
-        for await (const event of assistant.chat(body.message, { sessionKey: body.sessionKey })) {
+        for await (const event of assistant.chat(chatMessage, { sessionKey: body.sessionKey, images: images.length > 0 ? images : undefined })) {
           res.write(`data: ${JSON.stringify(event)}\n\n`);
           if (event.type === 'text') replyText += event.content;
           else if (event.type === 'done') { costUsd = event.costUsd; durationMs = event.durationMs; }
@@ -155,7 +174,7 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
           ts: new Date().toISOString(),
           source: 'http',
           sender: body.sessionKey ?? 'anonymous',
-          messagePreview: body.message.slice(0, 120),
+          messagePreview: chatMessage.slice(0, 120),
           responsePreview: replyText.slice(0, 120),
           durationMs: durationMs ?? (Date.now() - chatStartMs),
           costUsd,

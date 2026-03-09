@@ -301,7 +301,7 @@ export async function handleMessage(
   cronCtx?: { taskStore: TaskStore; scheduler: Scheduler; runTask: (id: string) => Promise<string> },
 ): Promise<void> {
   const userText = msg.chatType === 'group' ? stripMention(msg.text) : msg.text;
-  if (!userText) return;
+  if (!userText && (!msg.images || msg.images.length === 0)) return;
 
   // ── Slash command interception ──
   const parsed = parseCommand(userText);
@@ -454,7 +454,7 @@ export async function handleMessage(
         buffer = '';
       };
 
-      for await (const event of assistant.chat(fullText, { sessionKey })) {
+      for await (const event of assistant.chat(fullText, { sessionKey, images: msg.images })) {
         if (event.type === 'text') {
           fullReply += event.content;
           buffer += event.content;
@@ -521,7 +521,7 @@ export async function handleMessage(
       }
     } else {
       // ── Buffered mode (default): accumulate all text, send at end ──
-      for await (const event of assistant.chat(fullText, { sessionKey })) {
+      for await (const event of assistant.chat(fullText, { sessionKey, images: msg.images })) {
         if (event.type === 'text') {
           fullReply += event.content;
         } else if (event.type === 'warning') {

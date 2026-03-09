@@ -1,3 +1,13 @@
+/** An image attached to an incoming IM message. */
+export interface ImageAttachment {
+  /** MIME type, e.g. "image/png", "image/jpeg". */
+  mimeType: string;
+  /** Raw image bytes. */
+  data: Buffer;
+  /** Optional original filename. */
+  fileName?: string;
+}
+
 export interface ChannelMessage {
   channelType: string;
   senderId: string;
@@ -5,6 +15,8 @@ export interface ChannelMessage {
   chatId: string;
   chatType: 'dm' | 'group';
   text: string;
+  /** Images attached to the message (downloaded by the adapter). */
+  images?: ImageAttachment[];
   raw: unknown;
   /**
    * Set to `true` by adapters that can reliably detect a bot @mention through

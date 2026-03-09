@@ -16,6 +16,8 @@ export interface InvokeOpts {
   apiKey?: string;
   skipPermissions?: boolean;
   signal?: AbortSignal;
+  /** Absolute paths to image files attached to the user message. Engines may use these for native multimodal support. */
+  imagePaths?: string[];
 }
 
 export interface ListModelsOpts {
