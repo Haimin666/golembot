@@ -248,7 +248,18 @@ async function cmdCron(args: string[], ctx: CommandContext): Promise<CommandResu
   }
 
   const sub = (args[0] ?? 'list').toLowerCase();
-  const id = args[1];
+  const rawId = args.slice(1).join(' ') || undefined;
+
+  // Resolve name → id if rawId doesn't match any task id directly
+  let id = rawId;
+  if (rawId) {
+    const tasks = await ctx.taskStore.listTasks();
+    const byId = tasks.find(t => t.id === rawId);
+    if (!byId) {
+      const byName = tasks.find(t => t.name === rawId);
+      if (byName) id = byName.id;
+    }
+  }
 
   switch (sub) {
     case 'list':

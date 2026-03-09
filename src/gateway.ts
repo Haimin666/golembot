@@ -672,6 +672,10 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
   } catch { /* ok — dev mode or missing */ }
 
 
+  // TaskStore is created here (before channels) so we can pass it to dashboardCtx.
+  // The coordinator is created later, after channels are ready.
+  const taskStore = new TaskStore(dir);
+
   const dashboardCtx: DashboardContext = {
     config,
     skills,
@@ -683,6 +687,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
       const s = await assistant.getStatus();
       return { engine: s.engine, model: s.model };
     },
+    taskStore,
   };
 
   // shutdown is assigned later after httpServer is created — use a wrapper
@@ -741,7 +746,6 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
   }
 
   // ── Scheduled tasks ─────────────────────────────────────────────────────────
-  const taskStore = new TaskStore(dir);
   const scheduler = new Scheduler();
   let coordinator: ProactiveCoordinator | undefined;
 
