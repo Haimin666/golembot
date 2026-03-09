@@ -1,6 +1,7 @@
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { Server as HttpServer } from 'node:http';
 import type { Assistant } from './index.js';
+import { parseCommand, executeCommand, type CommandContext } from './commands.js';
 import { type DashboardContext, buildDashboardData, renderDashboard, recordMessage } from './dashboard.js';
 
 export interface ServerOpts {
@@ -38,7 +39,7 @@ function checkAuth(req: IncomingMessage, url: URL, token: string | undefined): b
   return url.searchParams.get('token') === token;
 }
 
-export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, dashboard?: DashboardContext): GolemServer {
+export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, dashboard?: DashboardContext, dir?: string): GolemServer {
   const token = opts.token || process.env.GOLEM_TOKEN;
   const activeConnections = new Set<ServerResponse>();
 
@@ -61,7 +62,7 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
     // Dashboard (no auth — landing page)
     if (path === '/' && req.method === 'GET') {
       if (dashboard) {
-        const data = buildDashboardData(dashboard);
+        const data = await buildDashboardData(dashboard);
         const html = renderDashboard(data);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(html);
@@ -90,6 +91,26 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
       if (!body.message || typeof body.message !== 'string') {
         json(res, 400, { error: 'Missing "message" field' });
         return;
+      }
+
+      // ── Slash command interception ──
+      if (dir) {
+        const parsed = parseCommand(body.message);
+        if (parsed) {
+          const cmdCtx: CommandContext = {
+            dir,
+            sessionKey: body.sessionKey,
+            getStatus: () => assistant.getStatus(),
+            setEngine: (e) => assistant.setEngine(e),
+            setModel: (m) => assistant.setModel(m),
+            resetSession: (k) => assistant.resetSession(k),
+          };
+          const result = await executeCommand(parsed, cmdCtx);
+          if (result) {
+            json(res, 200, { type: 'command', ...result.data, text: result.text });
+            return;
+          }
+        }
       }
 
       res.writeHead(200, {
@@ -152,7 +173,7 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
     // GET /api/status — dashboard data as JSON
     if (path === '/api/status' && req.method === 'GET') {
       if (dashboard) {
-        json(res, 200, buildDashboardData(dashboard));
+        json(res, 200, await buildDashboardData(dashboard));
       } else {
         json(res, 200, { hint: 'Dashboard not available (gateway mode only)' });
       }
@@ -210,10 +231,10 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
   return server;
 }
 
-export async function startServer(assistant: Assistant, opts: ServerOpts = {}): Promise<void> {
+export async function startServer(assistant: Assistant, opts: ServerOpts = {}, dir?: string): Promise<void> {
   const port = opts.port || Number(process.env.GOLEM_PORT) || 3000;
   const hostname = opts.hostname || '127.0.0.1';
-  const server = createGolemServer(assistant, opts);
+  const server = createGolemServer(assistant, opts, undefined, dir);
 
   return new Promise((resolve) => {
     server.listen(port, hostname, () => {

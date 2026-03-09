@@ -172,6 +172,23 @@ export async function loadConfig(dir: string): Promise<GolemConfig> {
   return config;
 }
 
+/**
+ * Patch specific fields in golem.yaml without losing unknown fields or expanding
+ * `${ENV_VAR}` placeholders. This is the safe way to update config at runtime.
+ */
+export async function patchConfig(dir: string, patch: Partial<Pick<GolemConfig, 'engine' | 'model'>>): Promise<void> {
+  const configPath = join(dir, 'golem.yaml');
+  const raw = await readFile(configPath, 'utf-8');
+  const doc = yaml.load(raw) as Record<string, unknown>;
+  if (!doc) throw new Error('Invalid golem.yaml');
+
+  for (const [key, value] of Object.entries(patch)) {
+    if (value !== undefined) doc[key] = value;
+  }
+
+  await writeFile(configPath, yaml.dump(doc, { lineWidth: -1 }), 'utf-8');
+}
+
 export async function writeConfig(dir: string, config: GolemConfig): Promise<void> {
   const configPath = join(dir, 'golem.yaml');
   const content: Record<string, unknown> = {
