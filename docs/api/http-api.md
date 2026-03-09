@@ -64,7 +64,20 @@ curl -X POST http://localhost:3000/chat \
 }
 ```
 
-Available slash commands: `/help`, `/status`, `/engine [name]`, `/model [list|name]`, `/skill`, `/reset`.
+Available slash commands: `/help`, `/status`, `/engine [name]`, `/model [list|name]`, `/skill`, `/cron`, `/reset`.
+
+**Scheduled task management via HTTP:**
+
+The `/cron` slash commands work via `POST /chat` like any other slash command. For example, to list all scheduled tasks:
+
+```bash
+curl -X POST http://localhost:3000/chat \
+  -H "Authorization: Bearer my-secret" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"/cron list"}'
+```
+
+Subcommands: `list`, `run <id>`, `enable <id>`, `disable <id>`, `del <id>`, `history <id>`.
 
 ::: warning Error events in SSE
 The `/chat` endpoint always returns `200 OK` — errors are delivered as events inside the stream:

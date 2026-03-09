@@ -186,6 +186,26 @@ channels:
     token: ${TOKEN}
 ```
 
+## Proactive Messaging (Scheduled Tasks)
+
+Beyond responding to incoming messages, GolemBot can **proactively send messages** to IM channels on a schedule. Define tasks in `golem.yaml`:
+
+```yaml
+tasks:
+  - name: daily-standup
+    schedule: "0 9 * * 1-5"
+    prompt: Summarize yesterday's git commits by author.
+    target:
+      channel: feishu
+      chatId: "oc_xxx"
+```
+
+The agent runs on schedule, executes the prompt, and pushes the result to the specified channel via `adapter.send()`. Manage tasks with `/cron` commands from CLI, HTTP API, or directly in IM.
+
+**Adapter support:** Feishu, Slack, Telegram, Discord, and WeCom all support `send()`. DingTalk does not yet support proactive sending (webhook reply only).
+
+See [Configuration > tasks](/guide/configuration#tasks) for full syntax.
+
 ## Starting the Gateway
 
 ```bash

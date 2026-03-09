@@ -74,6 +74,7 @@ Embed into Slack bots, internal tools, SaaS products, customer support — anyth
 | **Transparency** | `ls` the directory = see what the assistant knows and does | Black box pipelines |
 | **Engine lock-in** | Change one line in config to swap engines | Rewrite everything |
 | **Skills** | 13,000+ community skills from ClawHub, one command to install | Write your own tools and prompts from scratch |
+| **Scheduled tasks** | Built-in cron scheduler — daily standups, dependency audits, test reports pushed to IM | Build your own job system |
 
 ## Quick Start
 

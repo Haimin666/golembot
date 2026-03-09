@@ -40,6 +40,9 @@ features:
       src: /icons/folder.svg
     title: 目录即助手
     details: 技能、记忆、配置和工作产物全部在一个目录里。完全透明，可版本控制，可通过 git 共享。
+  - icon: "&#x23F0;"
+    title: 定时任务
+    details: 在 golem.yaml 中声明 cron 任务 — 每日站会摘要、依赖审计、测试健康报告。Agent 按计划执行并将结果推送到 Slack、Telegram、飞书等任意通道。通过 /cron 命令在 CLI、HTTP 或 IM 中管理。
 ---
 
 <div class="home-content">

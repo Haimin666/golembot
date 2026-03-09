@@ -40,6 +40,9 @@ features:
       src: /icons/folder.svg
     title: Directory Is the Assistant
     details: Skills, memory, config, and work artifacts all live in one directory. Fully transparent, version-controllable, and shareable via git.
+  - icon: "&#x23F0;"
+    title: Scheduled Tasks
+    details: Define cron tasks in golem.yaml — daily standups, dependency audits, test health reports. The agent runs on schedule and pushes results to Slack, Telegram, Feishu, or any channel. Manage with /cron commands from CLI, HTTP, or IM.
 ---
 
 <div class="home-content">

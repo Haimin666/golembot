@@ -15,6 +15,12 @@ export type { DashboardContext, ChannelStatus, GatewayMetrics, RecentMessage } f
 export { parseCommand, executeCommand, type CommandResult, type CommandContext } from './commands.js';
 export { registerInstance, unregisterInstance, listInstances, listStoppedInstances, isProcessAlive, stopInstance, startInstance, findInstance, findStoppedInstance, renderFleetDashboard, startFleetServer } from './fleet.js';
 export type { FleetEntry, FleetInstance, FleetServerOpts } from './fleet.js';
+export { Scheduler, parseCron, normalizeSchedule, getNextCronTime, getNextCronDelay } from './scheduler.js';
+export type { ScheduledTaskDef, TaskTarget, CronFields } from './scheduler.js';
+export { TaskStore } from './task-store.js';
+export type { TaskRecord, TaskExecution } from './task-store.js';
+export { ProactiveCoordinator, createProactiveCoordinator } from './proactive.js';
+export type { ProactiveCoordinatorOpts } from './proactive.js';
 
 // ── Per-key Mutex ──────────────────────────────────────
 

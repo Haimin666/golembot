@@ -6,6 +6,8 @@
  */
 
 import { ensureReady, type GolemConfig, type SkillInfo } from './workspace.js';
+import type { TaskStore, TaskRecord } from './task-store.js';
+import type { Scheduler } from './scheduler.js';
 
 // ── Types ────────────────────────────────────────────────
 
@@ -37,6 +39,12 @@ export interface CommandContext {
   listModels: () => Promise<string[]>;
   /** Current session key (for reset). */
   sessionKey?: string;
+  /** Task store for /cron commands (only available in gateway mode). */
+  taskStore?: TaskStore;
+  /** Scheduler for /cron commands (only available in gateway mode). */
+  scheduler?: Scheduler;
+  /** Run a scheduled task immediately. */
+  runTask?: (taskId: string) => Promise<string>;
 }
 
 interface ParsedCommand {
@@ -74,6 +82,7 @@ const COMMANDS: Record<string, string> = {
   '/model':   'Show, switch, or list models — /model [list|name]',
   '/skill':   'List installed skills',
   '/reset':   'Clear the current session',
+  '/cron':    'Manage scheduled tasks — /cron [list|run|enable|disable|del|history] [id]',
 };
 
 /**
@@ -99,6 +108,8 @@ export async function executeCommand(
       return cmdSkill(ctx);
     case '/reset':
       return cmdReset(ctx);
+    case '/cron':
+      return cmdCron(cmd.args, ctx);
     default:
       return null;
   }
@@ -226,5 +237,139 @@ async function cmdReset(ctx: CommandContext): Promise<CommandResult> {
   return {
     text: 'Session reset.',
     data: { ok: true },
+  };
+}
+
+// ── /cron ────────────────────────────────────────────────
+
+async function cmdCron(args: string[], ctx: CommandContext): Promise<CommandResult> {
+  if (!ctx.taskStore) {
+    return { text: 'Scheduled tasks are only available in gateway mode.' };
+  }
+
+  const sub = (args[0] ?? 'list').toLowerCase();
+  const id = args[1];
+
+  switch (sub) {
+    case 'list':
+      return cronList(ctx);
+    case 'run':
+      return cronRun(id, ctx);
+    case 'enable':
+      return cronSetEnabled(id, true, ctx);
+    case 'disable':
+      return cronSetEnabled(id, false, ctx);
+    case 'del':
+    case 'delete':
+    case 'rm':
+      return cronDel(id, ctx);
+    case 'history':
+      return cronHistory(id, ctx);
+    default:
+      return {
+        text: `Unknown subcommand: ${sub}\nUsage: /cron [list|run|enable|disable|del|history] [id]`,
+      };
+  }
+}
+
+async function cronList(ctx: CommandContext): Promise<CommandResult> {
+  const tasks = await ctx.taskStore!.listTasks();
+  if (tasks.length === 0) {
+    return { text: 'No scheduled tasks.', data: { tasks: [] } };
+  }
+
+  const lines = tasks.map((t) => {
+    const status = t.enabled ? 'ON ' : 'OFF';
+    const last = t.lastRun
+      ? `${t.lastStatus ?? '?'} @ ${t.lastRun.replace('T', ' ').slice(0, 19)}`
+      : 'never';
+    return `  ${t.id}  ${status}  ${t.schedule.padEnd(18)}  ${t.name.padEnd(20)}  last: ${last}`;
+  });
+
+  return {
+    text: `Scheduled tasks (${tasks.length}):\n${lines.join('\n')}`,
+    data: {
+      tasks: tasks.map((t) => ({
+        id: t.id,
+        name: t.name,
+        schedule: t.schedule,
+        enabled: t.enabled,
+        lastRun: t.lastRun ?? null,
+        lastStatus: t.lastStatus ?? null,
+      })),
+    },
+  };
+}
+
+async function cronRun(id: string | undefined, ctx: CommandContext): Promise<CommandResult> {
+  if (!id) return { text: 'Usage: /cron run <id>' };
+  if (!ctx.runTask) {
+    return { text: 'Not available (gateway mode only).' };
+  }
+  const reply = await ctx.runTask(id);
+  return { text: reply, data: { taskId: id, reply } };
+}
+
+async function cronSetEnabled(
+  id: string | undefined,
+  enabled: boolean,
+  ctx: CommandContext,
+): Promise<CommandResult> {
+  if (!id) return { text: `Usage: /cron ${enabled ? 'enable' : 'disable'} <id>` };
+
+  const ok = await ctx.taskStore!.updateTask(id, { enabled });
+  if (!ok) return { text: `Task not found: ${id}` };
+
+  if (ctx.scheduler) {
+    if (enabled) ctx.scheduler.enableTask(id);
+    else ctx.scheduler.disableTask(id);
+  }
+
+  return {
+    text: `Task ${id} ${enabled ? 'enabled' : 'disabled'}.`,
+    data: { taskId: id, enabled },
+  };
+}
+
+async function cronDel(id: string | undefined, ctx: CommandContext): Promise<CommandResult> {
+  if (!id) return { text: 'Usage: /cron del <id>' };
+
+  const ok = await ctx.taskStore!.removeTask(id);
+  if (!ok) return { text: `Task not found: ${id}` };
+
+  if (ctx.scheduler) ctx.scheduler.removeTask(id);
+
+  return {
+    text: `Task ${id} deleted.`,
+    data: { taskId: id, deleted: true },
+  };
+}
+
+async function cronHistory(id: string | undefined, ctx: CommandContext): Promise<CommandResult> {
+  if (!id) return { text: 'Usage: /cron history <id>' };
+
+  const entries = await ctx.taskStore!.getHistory(id, 10);
+  if (entries.length === 0) {
+    return { text: `No history for task ${id}.`, data: { taskId: id, history: [] } };
+  }
+
+  const lines = entries.map((e) => {
+    const time = e.startedAt.replace('T', ' ').slice(0, 19);
+    const dur = e.durationMs < 1000 ? `${e.durationMs}ms` : `${(e.durationMs / 1000).toFixed(1)}s`;
+    const preview = e.reply.length > 80 ? e.reply.slice(0, 80) + '…' : e.reply;
+    return `  ${time}  ${e.status.padEnd(7)}  ${dur.padEnd(8)}  ${preview}`;
+  });
+
+  return {
+    text: `History for task ${id} (last ${entries.length}):\n${lines.join('\n')}`,
+    data: {
+      taskId: id,
+      history: entries.map((e) => ({
+        startedAt: e.startedAt,
+        status: e.status,
+        durationMs: e.durationMs,
+        reply: e.reply,
+      })),
+    },
   };
 }

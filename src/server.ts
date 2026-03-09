@@ -3,6 +3,14 @@ import type { Server as HttpServer } from 'node:http';
 import type { Assistant } from './index.js';
 import { parseCommand, executeCommand, type CommandContext } from './commands.js';
 import { type DashboardContext, buildDashboardData, renderDashboard, recordMessage } from './dashboard.js';
+import type { TaskStore } from './task-store.js';
+import type { Scheduler } from './scheduler.js';
+
+export interface CronContext {
+  taskStore: TaskStore;
+  scheduler: Scheduler;
+  runTask: (id: string) => Promise<string>;
+}
 
 export interface ServerOpts {
   port?: number;
@@ -39,7 +47,7 @@ function checkAuth(req: IncomingMessage, url: URL, token: string | undefined): b
   return url.searchParams.get('token') === token;
 }
 
-export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, dashboard?: DashboardContext, dir?: string): GolemServer {
+export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, dashboard?: DashboardContext, dir?: string, getCronCtx?: () => CronContext | undefined): GolemServer {
   const token = opts.token || process.env.GOLEM_TOKEN;
   const activeConnections = new Set<ServerResponse>();
 
@@ -97,6 +105,7 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
       if (dir) {
         const parsed = parseCommand(body.message);
         if (parsed) {
+          const cronCtx = getCronCtx?.();
           const cmdCtx: CommandContext = {
             dir,
             sessionKey: body.sessionKey,
@@ -105,6 +114,9 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
             setModel: (m) => assistant.setModel(m),
             resetSession: (k) => assistant.resetSession(k),
             listModels: () => assistant.listModels(),
+            taskStore: cronCtx?.taskStore,
+            scheduler: cronCtx?.scheduler,
+            runTask: cronCtx?.runTask,
           };
           const result = await executeCommand(parsed, cmdCtx);
           if (result) {

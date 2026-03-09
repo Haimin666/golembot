@@ -1,6 +1,8 @@
 import { readFile, readdir, writeFile, mkdir, stat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import yaml from 'js-yaml';
+import type { ScheduledTaskDef, TaskTarget } from './scheduler.js';
+export type { ScheduledTaskDef, TaskTarget } from './scheduler.js';
 
 export interface FeishuChannelConfig {
   appId: string;
@@ -103,6 +105,7 @@ export interface GolemConfig {
   groupChat?: GroupChatConfig;
   /** Control how AI replies are delivered to IM channels. */
   streaming?: StreamingConfig;
+  tasks?: ScheduledTaskDef[];
 }
 
 export interface SkillInfo {
@@ -168,6 +171,17 @@ export async function loadConfig(dir: string): Promise<GolemConfig> {
   if (doc.streaming && typeof doc.streaming === 'object') {
     config.streaming = doc.streaming as StreamingConfig;
   }
+  if (Array.isArray(doc.tasks)) {
+    config.tasks = (doc.tasks as Record<string, unknown>[]).map((t, i) => ({
+      id: typeof t.id === 'string' ? t.id : '',
+      name: typeof t.name === 'string' ? t.name : `task-${i}`,
+      schedule: typeof t.schedule === 'string' ? t.schedule : '',
+      prompt: typeof t.prompt === 'string' ? t.prompt : '',
+      target: t.target && typeof t.target === 'object' ? resolveEnvPlaceholders(t.target as TaskTarget) : undefined,
+      enabled: typeof t.enabled === 'boolean' ? t.enabled : true,
+      timeout: typeof t.timeout === 'number' ? t.timeout : undefined,
+    }));
+  }
 
   return config;
 }
@@ -214,6 +228,7 @@ export async function writeConfig(dir: string, config: GolemConfig): Promise<voi
   if (config.gateway) content.gateway = config.gateway;
   if (config.groupChat) content.groupChat = config.groupChat;
   if (config.streaming) content.streaming = config.streaming;
+  if (config.tasks) content.tasks = config.tasks;
   await writeFile(configPath, yaml.dump(content, { lineWidth: -1 }), 'utf-8');
 }
 

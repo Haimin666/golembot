@@ -36,6 +36,9 @@ import {
   type GatewayMetrics,
 } from './dashboard.js';
 import { registerInstance, unregisterInstance } from './fleet.js';
+import { Scheduler } from './scheduler.js';
+import { TaskStore } from './task-store.js';
+import { createProactiveCoordinator, type ProactiveCoordinator } from './proactive.js';
 
 export function splitMessage(text: string, maxLen: number): string[] {
   if (text.length <= maxLen) return [text];
@@ -295,6 +298,7 @@ export async function handleMessage(
   verbose: boolean,
   dir: string,
   metrics?: GatewayMetrics,
+  cronCtx?: { taskStore: TaskStore; scheduler: Scheduler; runTask: (id: string) => Promise<string> },
 ): Promise<void> {
   const userText = msg.chatType === 'group' ? stripMention(msg.text) : msg.text;
   if (!userText) return;
@@ -313,6 +317,9 @@ export async function handleMessage(
       setModel: (m) => assistant.setModel(m),
       resetSession: (k) => assistant.resetSession(k),
       listModels: () => assistant.listModels(),
+      taskStore: cronCtx?.taskStore,
+      scheduler: cronCtx?.scheduler,
+      runTask: cronCtx?.runTask,
     };
     const result = await executeCommand(parsed, cmdCtx);
     if (result) {
@@ -681,9 +688,11 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
   // shutdown is assigned later after httpServer is created — use a wrapper
   let shutdownFn: (() => Promise<void>) | undefined;
   const serverOpts: ServerOpts = { port, token, hostname: host, onShutdown: () => shutdownFn?.() };
-  const httpServer: GolemServer = createGolemServer(assistant, serverOpts, dashboardCtx, dir);
+  const httpServer: GolemServer = createGolemServer(assistant, serverOpts, dashboardCtx, dir,
+    () => coordinator ? { taskStore, scheduler, runTask: (id) => coordinator!.runTask(id) } : undefined);
 
   const adapters: ChannelAdapter[] = [];
+  const adapterMap = new Map<string, ChannelAdapter>();
   const channels: ChannelsConfig | undefined = config.channels;
 
   if (channels) {
@@ -699,10 +708,12 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
         };
 
         await adapter.start((msg: ChannelMessage) =>
-          handleMessage(msg, config, assistant, adapter, type, verbose, dir, metrics),
+          handleMessage(msg, config, assistant, adapter, type, verbose, dir, metrics,
+            coordinator ? { taskStore, scheduler, runTask: (id) => coordinator!.runTask(id) } : undefined),
         );
 
         adapters.push(adapter);
+        adapterMap.set(type, adapter);
         channelStatuses.push({ type, status: 'connected' });
 
         // DingTalk Stream SDK only delivers @mention messages to the bot.
@@ -726,6 +737,28 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
   for (const type of KNOWN_CHANNELS) {
     if (!channelStatuses.some(c => c.type === type)) {
       channelStatuses.push({ type, status: 'not_configured' });
+    }
+  }
+
+  // ── Scheduled tasks ─────────────────────────────────────────────────────────
+  const taskStore = new TaskStore(dir);
+  const scheduler = new Scheduler();
+  let coordinator: ProactiveCoordinator | undefined;
+
+  if (config.tasks && config.tasks.length > 0) {
+    try {
+      const mergedTasks = await taskStore.mergeConfigTasks(config.tasks);
+      coordinator = createProactiveCoordinator({
+        assistant,
+        taskStore,
+        adapters: adapterMap,
+        scheduler,
+        verbose,
+      });
+      coordinator.start(mergedTasks);
+      log(verbose, `[scheduler] ${mergedTasks.filter(t => t.enabled).length} task(s) scheduled`);
+    } catch (e) {
+      console.error('[scheduler] Failed to initialize tasks:', (e as Error).message);
     }
   }
 
@@ -754,6 +787,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
   const shutdown = async () => {
     console.log('\nShutting down Gateway...');
     clearInterval(purgeTimer);
+    if (coordinator) coordinator.stop();
     for (const adapter of adapters) {
       try {
         await adapter.stop();

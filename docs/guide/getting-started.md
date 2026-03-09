@@ -63,6 +63,7 @@ This opens an interactive REPL. Type your message and press Enter. The Coding Ag
 - `/engine [name]` — show or switch engine
 - `/model [list|name]` — show, list available, or switch model
 - `/skill` — list installed skills
+- `/cron` — manage scheduled tasks (list, run, enable, disable, history)
 - `/reset` — clear the current session
 - `/quit` or `/exit` — exit
 

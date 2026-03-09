@@ -31,6 +31,11 @@ interface ChannelAdapter {
   /** Optional: handler called when a user reads a message sent by the bot.
    *  Currently supported by the Feishu adapter. */
   readReceiptHandler?: (receipt: ReadReceipt) => void;
+  /** Optional: proactively send a message to a chat (no incoming message context needed).
+   *  Used by the scheduled task system to push results to IM channels. */
+  send?(chatId: string, text: string): Promise<void>;
+  /** Whether this adapter supports proactive send(). Defaults to true if send() is defined. */
+  readonly canSend?: boolean;
 }
 ```
 
@@ -43,6 +48,8 @@ interface ChannelAdapter {
 | `stop()` | Gracefully disconnect |
 | `typing(msg)` | *(optional)* Send a "typing…" indicator to the chat. Called before the AI call and refreshed every 4 s. Implement for better UX on platforms that support it (e.g. Telegram `sendChatAction`, Discord `sendTyping`). |
 | `getGroupMembers(chatId)` | *(optional)* Return a `Map<displayName, platformId>` of group members. The gateway calls this when an AI reply contains `@name` patterns to resolve them into native mentions. Implementations should cache results for performance. |
+| `send(chatId, text)` | *(optional)* Proactively send a message to a chat without an incoming message context. Used by the scheduled task system (`/cron`) to push task results to IM channels. |
+| `canSend` | *(optional, read-only)* Whether the adapter supports proactive `send()`. Defaults to `true` if `send()` is defined. |
 
 ## ReadReceipt Type
 

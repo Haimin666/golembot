@@ -292,6 +292,31 @@ export class FeishuAdapter implements ChannelAdapter {
     }
   }
 
+  async send(chatId: string, text: string): Promise<void> {
+    if (!this.client) return;
+
+    if (hasMarkdown(text)) {
+      const card = markdownToCard(text);
+      await this.client.im.v1.message.create({
+        params: { receive_id_type: 'chat_id' },
+        data: {
+          receive_id: chatId,
+          content: JSON.stringify(card),
+          msg_type: 'interactive',
+        },
+      });
+    } else {
+      await this.client.im.v1.message.create({
+        params: { receive_id_type: 'chat_id' },
+        data: {
+          receive_id: chatId,
+          content: JSON.stringify({ text }),
+          msg_type: 'text',
+        },
+      });
+    }
+  }
+
   async stop(): Promise<void> {
     // WSClient doesn't expose a clean close method in current SDK version;
     // setting to null allows GC to collect.

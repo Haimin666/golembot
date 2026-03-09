@@ -185,6 +185,26 @@ channels:
     token: ${TOKEN}
 ```
 
+## 主动消息（定时任务）
+
+除了响应入站消息，GolemBot 还支持按计划**主动推送消息**到 IM 通道。在 `golem.yaml` 中定义任务：
+
+```yaml
+tasks:
+  - name: daily-standup
+    schedule: "0 9 * * 1-5"
+    prompt: 按作者汇总昨天的 git commit。
+    target:
+      channel: feishu
+      chatId: "oc_xxx"
+```
+
+Agent 按计划运行，执行 prompt，并通过 `adapter.send()` 将结果推送到指定通道。可通过 `/cron` 命令在 CLI、HTTP API 或 IM 中管理任务。
+
+**Adapter 支持情况：** 飞书、Slack、Telegram、Discord、企业微信均支持 `send()`。钉钉暂不支持主动发送（仅支持 webhook 回复）。
+
+完整语法见[配置说明 > tasks](/zh/guide/configuration#tasks)。
+
 ## 启动 Gateway
 
 ```bash

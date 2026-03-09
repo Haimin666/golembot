@@ -94,6 +94,13 @@ export class TelegramAdapter implements ChannelAdapter {
     });
   }
 
+  async send(chatId: string, text: string): Promise<void> {
+    if (!this.bot) return;
+    await this.bot.api.sendMessage(Number(chatId), markdownToHtml(text), {
+      parse_mode: 'HTML',
+    });
+  }
+
   async typing(msg: ChannelMessage): Promise<void> {
     if (!this.bot) return;
     await this.bot.api.sendChatAction(Number(msg.chatId), 'typing').catch(() => {});

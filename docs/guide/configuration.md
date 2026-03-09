@@ -35,6 +35,19 @@ groupChat:
   historyLimit: 20           # recent messages to inject as context (default: 20)
   maxTurns: 10               # max consecutive bot replies per group (default: 10)
 
+# Optional: scheduled tasks
+tasks:
+  - id: daily-standup
+    name: daily-standup
+    schedule: "0 9 * * 1-5"
+    prompt: |
+      Summarize all git commits in the last 24 hours,
+      grouped by author. Flag any breaking changes.
+    enabled: true
+    target:
+      channel: feishu
+      chatId: "oc_xxxxx"
+
 # Optional: IM channel configuration
 channels:
   feishu:
@@ -79,6 +92,7 @@ gateway:
 | `sessionTtlDays` | `number` | `30` | Sessions not used for this many days are pruned at next startup |
 | `systemPrompt` | `string` | — | Role/persona instructions injected into `AGENTS.md` as a `## System Instructions` section. The engine reads this once as system-level context — it is **not** prepended to every message, so token cost stays flat across multi-turn conversations |
 | `streaming` | `object` | — | Streaming message delivery for IM channels |
+| `tasks` | `array` | — | Scheduled tasks — see [`tasks`](#tasks) section |
 | `channels` | `object` | — | IM channel configurations |
 | `gateway` | `object` | — | Gateway service settings |
 
@@ -147,6 +161,44 @@ groupChat:
   historyLimit: 30       # inject last 30 messages as context (default: 20)
   maxTurns: 5            # stop after 5 consecutive bot replies (default: 10)
 ```
+
+### `tasks`
+
+Define scheduled tasks that run automatically on a cron schedule. Each task sends a prompt to the engine and (optionally) delivers the result to an IM channel.
+
+```yaml
+tasks:
+  - id: daily-standup
+    name: daily-standup
+    schedule: "0 9 * * 1-5"
+    prompt: |
+      Summarize all git commits in the last 24 hours,
+      grouped by author. Flag any breaking changes.
+    enabled: true
+    target:
+      channel: feishu
+      chatId: "oc_xxxxx"
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `string` | Yes | Unique identifier for the task |
+| `name` | `string` | Yes | Human-readable task name |
+| `schedule` | `string` | Yes | When to run — see schedule formats below |
+| `prompt` | `string` | Yes | The prompt sent to the engine on each run |
+| `enabled` | `boolean` | No | Whether the task is active (default: `true`) |
+| `target` | `object` | No | Where to deliver the result. If omitted, the result is logged only |
+| `target.channel` | `string` | — | IM channel type (`feishu`, `dingtalk`, `wecom`, `slack`, `telegram`, `discord`) |
+| `target.chatId` | `string` | — | Chat or group ID to send the result to |
+
+**Supported schedule formats:**
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| Standard 5-field cron | `0 9 * * 1-5` | Minute, hour, day-of-month, month, day-of-week |
+| Interval shorthand | `every 30m` | Run every 30 minutes |
+| Daily shorthand | `daily 09:00` | Run once per day at the given time |
+| Weekly shorthand | `weekly mon 09:00` | Run once per week on the given day and time |
 
 ### Conversation History
 
@@ -250,6 +302,17 @@ interface GolemConfig {
     historyLimit?: number;   // default: 20
     maxTurns?: number;       // default: 10
   };
+  tasks?: Array<{
+    id: string;
+    name: string;
+    schedule: string;
+    prompt: string;
+    enabled?: boolean;       // default: true
+    target?: {
+      channel: string;
+      chatId: string;
+    };
+  }>;
   channels?: {
     feishu?: { appId: string; appSecret: string };
     dingtalk?: { clientId: string; clientSecret: string };

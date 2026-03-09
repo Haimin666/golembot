@@ -91,6 +91,14 @@ export class DiscordAdapter implements ChannelAdapter {
     await raw.reply({ content: text });
   }
 
+  async send(chatId: string, text: string): Promise<void> {
+    if (!this.client) return;
+    const channel = await this.client.channels.fetch(chatId);
+    if (channel?.isTextBased?.()) {
+      await channel.send({ content: text });
+    }
+  }
+
   async typing(msg: ChannelMessage): Promise<void> {
     const raw = msg.raw as any;
     await raw.channel?.sendTyping?.().catch(() => {});

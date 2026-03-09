@@ -48,6 +48,12 @@ export interface ChannelAdapter {
   reply(msg: ChannelMessage, text: string, options?: ReplyOptions): Promise<void>;
   stop(): Promise<void>;
   /**
+   * Optional: send a proactive message to a chat (no incoming message context needed).
+   * Used by scheduled tasks / cron jobs to push results to IM channels.
+   * Not all adapters support this — check before calling.
+   */
+  send?(chatId: string, text: string): Promise<void>;
+  /**
    * Optional: send a "typing…" indicator to the chat.
    * Called before a long-running AI invocation so the user sees immediate feedback.
    * Implementations should be idempotent and best-effort (errors are ignored).

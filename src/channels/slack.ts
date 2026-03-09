@@ -114,6 +114,14 @@ export class SlackAdapter implements ChannelAdapter {
     });
   }
 
+  async send(chatId: string, text: string): Promise<void> {
+    if (!this.app) return;
+    await this.app.client.chat.postMessage({
+      channel: chatId,
+      text: markdownToMrkdwn(text),
+    });
+  }
+
   async stop(): Promise<void> {
     if (this.app) {
       await this.app.stop();

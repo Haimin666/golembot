@@ -51,7 +51,23 @@ curl -X POST http://localhost:3000/chat \
 }
 ```
 
-可用斜杠命令：`/help`、`/status`、`/engine [name]`、`/model [list|name]`、`/skill`、`/reset`。
+可用斜杠命令：`/help`、`/status`、`/engine [name]`、`/model [list|name]`、`/skill`、`/cron`、`/reset`。
+
+**定时任务管理：** `/cron` 命令同样可以通过 `POST /chat` 使用：
+
+```bash
+# 列出所有定时任务
+curl -X POST http://localhost:3000/chat \
+  -H "Authorization: Bearer my-secret" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "/cron list"}'
+
+# 立即触发指定任务
+curl -X POST http://localhost:3000/chat \
+  -H "Authorization: Bearer my-secret" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "/cron run daily-standup"}'
+```
 
 ::: warning SSE 中的错误事件
 `/chat` 端点始终返回 `200 OK` — 错误通过流内的事件传递：

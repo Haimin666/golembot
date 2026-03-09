@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { parseCommand, executeCommand, type CommandContext } from '../commands.js';
+import type { TaskStore } from '../task-store.js';
+import type { Scheduler } from '../scheduler.js';
 
 // ── parseCommand ─────────────────────────────────────────
 
@@ -181,5 +183,153 @@ describe('executeCommand', () => {
   it('unknown command returns null', async () => {
     const result = await executeCommand({ name: '/unknown', args: [] }, makeCtx());
     expect(result).toBeNull();
+  });
+});
+
+// ── /cron ─────────────────────────────────────────────────
+
+const mockTasks = [
+  {
+    id: 'task-1',
+    name: 'Daily Report',
+    schedule: '0 9 * * *',
+    prompt: 'Generate daily report',
+    enabled: true,
+    createdAt: '2026-01-01T00:00:00Z',
+    lastRun: '2026-03-08T09:00:00Z',
+    lastStatus: 'success' as const,
+  },
+  {
+    id: 'task-2',
+    name: 'Weekly Cleanup',
+    schedule: '0 0 * * 0',
+    prompt: 'Run weekly cleanup',
+    enabled: false,
+    createdAt: '2026-01-15T00:00:00Z',
+  },
+];
+
+const mockHistory = [
+  {
+    taskId: 'task-1',
+    taskName: 'Daily Report',
+    startedAt: '2026-03-08T09:00:00Z',
+    completedAt: '2026-03-08T09:01:30Z',
+    status: 'success' as const,
+    reply: 'Report generated successfully.',
+    durationMs: 90000,
+  },
+  {
+    taskId: 'task-1',
+    taskName: 'Daily Report',
+    startedAt: '2026-03-07T09:00:00Z',
+    completedAt: '2026-03-07T09:02:00Z',
+    status: 'error' as const,
+    reply: 'Failed to fetch data.',
+    durationMs: 120000,
+    error: 'timeout',
+  },
+];
+
+function makeMockTaskStore(): TaskStore {
+  return {
+    listTasks: vi.fn().mockResolvedValue(mockTasks),
+    getTask: vi.fn().mockImplementation(async (id: string) =>
+      mockTasks.find((t) => t.id === id),
+    ),
+    getHistory: vi.fn().mockResolvedValue(mockHistory),
+    updateTask: vi.fn().mockResolvedValue(true),
+    removeTask: vi.fn().mockResolvedValue(true),
+  } as unknown as TaskStore;
+}
+
+function makeMockScheduler(): Scheduler {
+  return {
+    enableTask: vi.fn(),
+    disableTask: vi.fn(),
+    removeTask: vi.fn(),
+  } as unknown as Scheduler;
+}
+
+function makeCronCtx(overrides?: Partial<CommandContext>): CommandContext {
+  return makeCtx({
+    taskStore: makeMockTaskStore(),
+    scheduler: makeMockScheduler(),
+    runTask: vi.fn().mockResolvedValue('Task executed successfully.'),
+    ...overrides,
+  });
+}
+
+describe('/cron', () => {
+  it('/cron (no args) lists tasks', async () => {
+    const ctx = makeCronCtx();
+    const result = await executeCommand({ name: '/cron', args: [] }, ctx);
+    expect(result).not.toBeNull();
+    expect(result!.text).toContain('Daily Report');
+    expect(result!.text).toContain('Weekly Cleanup');
+    expect(result!.data!.tasks).toHaveLength(2);
+  });
+
+  it('/cron list lists tasks', async () => {
+    const ctx = makeCronCtx();
+    const result = await executeCommand({ name: '/cron', args: ['list'] }, ctx);
+    expect(result).not.toBeNull();
+    expect(result!.text).toContain('Daily Report');
+    expect(result!.text).toContain('Weekly Cleanup');
+    expect(result!.data!.tasks).toHaveLength(2);
+  });
+
+  it('/cron run <id> runs the task and returns reply', async () => {
+    const ctx = makeCronCtx();
+    const result = await executeCommand({ name: '/cron', args: ['run', 'task-1'] }, ctx);
+    expect(result).not.toBeNull();
+    expect(result!.text).toBe('Task executed successfully.');
+    expect(result!.data!.taskId).toBe('task-1');
+    expect(ctx.runTask).toHaveBeenCalledWith('task-1');
+  });
+
+  it('/cron enable <id> enables the task', async () => {
+    const ctx = makeCronCtx();
+    const result = await executeCommand({ name: '/cron', args: ['enable', 'task-1'] }, ctx);
+    expect(result).not.toBeNull();
+    expect(result!.text).toContain('enabled');
+    expect((ctx.taskStore!.updateTask as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-1', { enabled: true });
+    expect((ctx.scheduler!.enableTask as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-1');
+  });
+
+  it('/cron disable <id> disables the task', async () => {
+    const ctx = makeCronCtx();
+    const result = await executeCommand({ name: '/cron', args: ['disable', 'task-2'] }, ctx);
+    expect(result).not.toBeNull();
+    expect(result!.text).toContain('disabled');
+    expect((ctx.taskStore!.updateTask as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-2', { enabled: false });
+    expect((ctx.scheduler!.disableTask as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-2');
+  });
+
+  it('/cron del <id> deletes the task', async () => {
+    const ctx = makeCronCtx();
+    const result = await executeCommand({ name: '/cron', args: ['del', 'task-1'] }, ctx);
+    expect(result).not.toBeNull();
+    expect(result!.text).toContain('deleted');
+    expect((ctx.taskStore!.removeTask as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-1');
+    expect((ctx.scheduler!.removeTask as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-1');
+  });
+
+  it('/cron history <id> returns execution history', async () => {
+    const ctx = makeCronCtx();
+    const result = await executeCommand({ name: '/cron', args: ['history', 'task-1'] }, ctx);
+    expect(result).not.toBeNull();
+    expect(result!.text).toContain('History for task task-1');
+    expect(result!.text).toContain('success');
+    expect(result!.text).toContain('error');
+    expect(result!.data!.history).toHaveLength(2);
+    expect((ctx.taskStore!.getHistory as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-1', 10);
+  });
+
+  it('/cron when taskStore is not available returns gateway mode message', async () => {
+    const ctx = makeCtx(); // no taskStore
+    const result = await executeCommand({ name: '/cron', args: [] }, ctx);
+    expect(result).not.toBeNull();
+    expect(result!.text).toContain('gateway mode');
   });
 });

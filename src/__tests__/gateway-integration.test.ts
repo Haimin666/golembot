@@ -1283,5 +1283,189 @@ describe('handleMessage — full gateway pipeline', () => {
       expect(adapter.replies.length).toBe(1);
       expect(adapter.replies[0].text).toContain('/help');
     });
+
+    it('/help output includes /cron command', async () => {
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/help' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies[0].text).toContain('/cron');
+    });
+  });
+
+  // ── /cron E2E through gateway handleMessage ──────────────────────────────
+  describe('/cron commands via IM', () => {
+    let TaskStore: typeof import('../task-store.js').TaskStore;
+    let Scheduler: typeof import('../scheduler.js').Scheduler;
+
+    beforeEach(async () => {
+      const taskMod = await import('../task-store.js');
+      TaskStore = taskMod.TaskStore;
+      const schedMod = await import('../scheduler.js');
+      Scheduler = schedMod.Scheduler;
+    });
+
+    function makeCronCtx(taskStore: InstanceType<typeof TaskStore>, scheduler: InstanceType<typeof Scheduler>) {
+      return {
+        taskStore,
+        scheduler,
+        runTask: async (id: string) => `Executed task ${id}`,
+      };
+    }
+
+    it('/cron list shows tasks via IM', async () => {
+      const taskStore = new TaskStore(dir);
+      const scheduler = new Scheduler();
+      await taskStore.addTask({
+        id: 'e2e1', name: 'daily-report', schedule: '0 9 * * *', prompt: 'test',
+        enabled: true, createdAt: '2026-01-01T00:00:00Z',
+      });
+
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/cron list' });
+      const cronCtx = makeCronCtx(taskStore, scheduler);
+
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir, undefined, cronCtx);
+      expect(assistant.callCount).toBe(0);
+      expect(adapter.replies.length).toBe(1);
+      expect(adapter.replies[0].text).toContain('daily-report');
+      expect(adapter.replies[0].text).toContain('e2e1');
+    });
+
+    it('/cron (no args) defaults to list', async () => {
+      const taskStore = new TaskStore(dir);
+      const scheduler = new Scheduler();
+
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/cron' });
+      const cronCtx = makeCronCtx(taskStore, scheduler);
+
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir, undefined, cronCtx);
+      expect(assistant.callCount).toBe(0);
+      expect(adapter.replies[0].text).toContain('No scheduled tasks');
+    });
+
+    it('/cron run triggers task execution', async () => {
+      const taskStore = new TaskStore(dir);
+      const scheduler = new Scheduler();
+      const runTask = vi.fn().mockResolvedValue('Task result here');
+      const cronCtx = { taskStore, scheduler, runTask };
+
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/cron run myid' });
+
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir, undefined, cronCtx);
+      expect(runTask).toHaveBeenCalledWith('myid');
+      expect(adapter.replies[0].text).toContain('Task result here');
+    });
+
+    it('/cron enable updates task and scheduler', async () => {
+      const taskStore = new TaskStore(dir);
+      const scheduler = new Scheduler();
+      await taskStore.addTask({
+        id: 'en1', name: 'test-task', schedule: '0 * * * *', prompt: 'x',
+        enabled: false, createdAt: '2026-01-01T00:00:00Z',
+      });
+
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/cron enable en1' });
+      const cronCtx = makeCronCtx(taskStore, scheduler);
+
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir, undefined, cronCtx);
+      expect(adapter.replies[0].text).toContain('enabled');
+
+      // Verify the task was actually updated in the store
+      const task = await taskStore.getTask('en1');
+      expect(task!.enabled).toBe(true);
+    });
+
+    it('/cron disable updates task', async () => {
+      const taskStore = new TaskStore(dir);
+      const scheduler = new Scheduler();
+      await taskStore.addTask({
+        id: 'dis1', name: 'test-task', schedule: '0 * * * *', prompt: 'x',
+        enabled: true, createdAt: '2026-01-01T00:00:00Z',
+      });
+
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/cron disable dis1' });
+      const cronCtx = makeCronCtx(taskStore, scheduler);
+
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir, undefined, cronCtx);
+      expect(adapter.replies[0].text).toContain('disabled');
+      const task = await taskStore.getTask('dis1');
+      expect(task!.enabled).toBe(false);
+    });
+
+    it('/cron del removes task from store', async () => {
+      const taskStore = new TaskStore(dir);
+      const scheduler = new Scheduler();
+      await taskStore.addTask({
+        id: 'del1', name: 'doomed', schedule: '0 * * * *', prompt: 'x',
+        enabled: true, createdAt: '2026-01-01T00:00:00Z',
+      });
+
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/cron del del1' });
+      const cronCtx = makeCronCtx(taskStore, scheduler);
+
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir, undefined, cronCtx);
+      expect(adapter.replies[0].text).toContain('deleted');
+      const task = await taskStore.getTask('del1');
+      expect(task).toBeUndefined();
+    });
+
+    it('/cron history shows execution history', async () => {
+      const taskStore = new TaskStore(dir);
+      const scheduler = new Scheduler();
+      await taskStore.recordExecution({
+        taskId: 'h1', taskName: 'test', startedAt: '2026-01-01T09:00:00Z',
+        completedAt: '2026-01-01T09:01:00Z', status: 'success',
+        reply: 'Report generated successfully', durationMs: 60000,
+      });
+
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/cron history h1' });
+      const cronCtx = makeCronCtx(taskStore, scheduler);
+
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir, undefined, cronCtx);
+      expect(adapter.replies[0].text).toContain('success');
+      expect(adapter.replies[0].text).toContain('Report generated');
+    });
+
+    it('/cron without cronCtx returns gateway-only message', async () => {
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ text: '/cron list' });
+
+      // No cronCtx passed
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies[0].text).toContain('gateway mode');
+    });
+
+    it('/cron works in group chat via @mention', async () => {
+      const taskStore = new TaskStore(dir);
+      const scheduler = new Scheduler();
+      await taskStore.addTask({
+        id: 'grp1', name: 'group-task', schedule: '0 12 * * *', prompt: 'remind',
+        enabled: true, createdAt: '2026-01-01T00:00:00Z',
+      });
+
+      const assistant = makeMockAssistant('x');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: '@golem /cron list' });
+      const cronCtx = makeCronCtx(taskStore, scheduler);
+
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir, undefined, cronCtx);
+      expect(assistant.callCount).toBe(0);
+      expect(adapter.replies[0].text).toContain('group-task');
+    });
   });
 });

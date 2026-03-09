@@ -30,6 +30,11 @@ interface ChannelAdapter {
   getGroupMembers?(chatId: string): Promise<Map<string, string>>;
   /** 可选：用户阅读 bot 消息时的回调。目前飞书适配器支持。 */
   readReceiptHandler?: (receipt: ReadReceipt) => void;
+  /** 可选：主动发送消息到指定会话（无需入站消息上下文）。
+   *  被定时任务系统用于将结果推送到 IM 通道。 */
+  send?(chatId: string, text: string): Promise<void>;
+  /** 该 Adapter 是否支持主动 send()。未定义时默认为 send() 存在则为 true。 */
+  readonly canSend?: boolean;
 }
 ```
 
