@@ -1,3 +1,10 @@
+# [0.18.0-beta.3](https://github.com/0xranx/golembot/compare/v0.18.0-beta.2...v0.18.0-beta.3) (2026-03-09)
+
+
+### Bug Fixes
+
+* skip registry install test without GITHUB_TOKEN ([9cd7f10](https://github.com/0xranx/golembot/commit/9cd7f10308560f15decfd53a9693f4e5da9a7be9))
+
 # [0.18.0-beta.2](https://github.com/0xranx/golembot/compare/v0.18.0-beta.1...v0.18.0-beta.2) (2026-03-09)
 
 
