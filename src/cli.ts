@@ -248,7 +248,7 @@ program
     const cmdCtx: CommandContext = {
       dir,
       getStatus: () => assistant.getStatus(),
-      setEngine: (e) => assistant.setEngine(e),
+      setEngine: (e, c) => assistant.setEngine(e, c),
       setModel: (m) => assistant.setModel(m),
       resetSession: (k) => assistant.resetSession(k),
     };

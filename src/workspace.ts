@@ -178,15 +178,28 @@ export async function loadConfig(dir: string): Promise<GolemConfig> {
  */
 export async function patchConfig(dir: string, patch: Partial<Pick<GolemConfig, 'engine' | 'model'>>): Promise<void> {
   const configPath = join(dir, 'golem.yaml');
-  const raw = await readFile(configPath, 'utf-8');
-  const doc = yaml.load(raw) as Record<string, unknown>;
-  if (!doc) throw new Error('Invalid golem.yaml');
+  let raw = await readFile(configPath, 'utf-8');
 
   for (const [key, value] of Object.entries(patch)) {
-    if (value !== undefined) doc[key] = value;
+    // Match top-level YAML key (not indented) — e.g. "engine: opencode"
+    const re = new RegExp(`^${key}:.*$`, 'm');
+    if (value !== undefined) {
+      if (re.test(raw)) {
+        raw = raw.replace(re, `${key}: ${value}`);
+      } else {
+        // Key doesn't exist yet — insert after the first line (name: ...)
+        const idx = raw.indexOf('\n');
+        raw = idx >= 0
+          ? raw.slice(0, idx + 1) + `${key}: ${value}\n` + raw.slice(idx + 1)
+          : raw + `\n${key}: ${value}\n`;
+      }
+    } else {
+      // undefined = remove the key entirely
+      raw = raw.replace(new RegExp(`^${key}:.*\n?`, 'm'), '');
+    }
   }
 
-  await writeFile(configPath, yaml.dump(doc, { lineWidth: -1 }), 'utf-8');
+  await writeFile(configPath, raw, 'utf-8');
 }
 
 export async function writeConfig(dir: string, config: GolemConfig): Promise<void> {

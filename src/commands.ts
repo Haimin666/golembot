@@ -27,8 +27,8 @@ export interface CommandContext {
     engine: string;
     model: string | undefined;
   }>;
-  /** Switch engine at runtime (takes effect on next chat). */
-  setEngine: (engine: string) => void;
+  /** Switch engine at runtime (takes effect on next chat). When clearModel is true, also resets the model. */
+  setEngine: (engine: string, clearModel?: boolean) => void;
   /** Switch model at runtime (takes effect on next chat). */
   setModel: (model: string) => void;
   /** Reset the session for the given key. */
@@ -157,10 +157,13 @@ async function cmdEngine(args: string[], ctx: CommandContext): Promise<CommandRe
     };
   }
 
-  ctx.setEngine(target);
+  const { model: prevModel } = await ctx.getStatus();
+  // Clear model when switching engines — model name formats are engine-specific
+  // (e.g. opencode uses "openrouter/anthropic/claude-sonnet-4-5", claude-code uses "claude-sonnet-4-6")
+  ctx.setEngine(target, !!prevModel);
   return {
-    text: `Engine switched to: ${target} (takes effect on next message)`,
-    data: { engine: target },
+    text: `Engine switched to: ${target} (takes effect on next message)${prevModel ? '\nModel reset to engine default (formats differ between engines)' : ''}`,
+    data: { engine: target, modelReset: !!prevModel },
   };
 }
 

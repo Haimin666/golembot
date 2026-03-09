@@ -92,7 +92,7 @@ describe('executeCommand', () => {
     const result = await executeCommand({ name: '/engine', args: ['claude-code'] }, ctx);
     expect(result!.text).toContain('claude-code');
     expect(result!.text).toContain('switched');
-    expect(ctx.setEngine).toHaveBeenCalledWith('claude-code');
+    expect(ctx.setEngine).toHaveBeenCalledWith('claude-code', true);
   });
 
   it('/engine with invalid name returns error', async () => {

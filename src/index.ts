@@ -78,8 +78,8 @@ export interface Assistant {
   chat(message: string, opts?: ChatOpts): AsyncIterable<StreamEvent>;
   init(opts: { engine: string; name: string }): Promise<void>;
   resetSession(sessionKey?: string): Promise<void>;
-  /** Switch engine at runtime (takes effect on next chat call). */
-  setEngine(engine: string): void;
+  /** Switch engine at runtime (takes effect on next chat call). When clearModel is true, also resets the model override. */
+  setEngine(engine: string, clearModel?: boolean): void;
   /** Switch model at runtime (takes effect on next chat call). */
   setModel(model: string): void;
   /** Return current runtime status (engine, model, config, skills). */
@@ -279,14 +279,23 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
       await clearSession(dir, sessionKey || DEFAULT_SESSION_KEY);
     },
 
-    setEngine(engine: string): void {
+    setEngine(engine: string, clearModel?: boolean): void {
       engineOverride = engine;
-      patchConfig(dir, { engine }).catch(() => {});
+      if (clearModel) {
+        modelOverride = undefined;
+        patchConfig(dir, { engine, model: undefined }).catch(() => {});
+      } else {
+        patchConfig(dir, { engine }).catch(() => {});
+      }
     },
 
     setModel(model: string): void {
-      modelOverride = model;
-      patchConfig(dir, { model }).catch(() => {});
+      modelOverride = model || undefined;
+      if (model) {
+        patchConfig(dir, { model }).catch(() => {});
+      } else {
+        patchConfig(dir, { model: undefined }).catch(() => {});
+      }
     },
 
     async getStatus(): Promise<{ config: GolemConfig; skills: SkillInfo[]; engine: string; model: string | undefined }> {
