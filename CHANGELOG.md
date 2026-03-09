@@ -1,3 +1,10 @@
+# [0.22.0](https://github.com/0xranx/golembot/compare/v0.21.0...v0.22.0) (2026-03-09)
+
+
+### Features
+
+* add image multimodal message support across all IM channels ([99742c0](https://github.com/0xranx/golembot/commit/99742c0b849f78af4acbec0b5e45eeef7c64e52d))
+
 # [0.21.0](https://github.com/0xranx/golembot/compare/v0.20.0...v0.21.0) (2026-03-09)
 
 
