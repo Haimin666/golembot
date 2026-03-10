@@ -1,3 +1,10 @@
+## [0.24.1](https://github.com/0xranx/golembot/compare/v0.24.0...v0.24.1) (2026-03-10)
+
+
+### Bug Fixes
+
+* **slack:** pre-validate auth token before starting Socket Mode ([2e34474](https://github.com/0xranx/golembot/commit/2e3447437d4c7f6be0e5597d56e4638ff240cf48))
+
 # [0.24.0](https://github.com/0xranx/golembot/compare/v0.23.0...v0.24.0) (2026-03-10)
 
 
