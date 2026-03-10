@@ -166,7 +166,7 @@ golembot onboard [-d <dir>] [--template <name>]
 
 ## `golembot status`
 
-显示当前助手配置信息：名称、引擎、模型、已安装技能、已配置通道和 Gateway 设置。
+显示当前助手配置信息：名称、引擎、模型、已安装技能、活跃会话数、已配置通道和 Gateway 设置。
 
 ```bash
 golembot status [-d <dir>] [--json]
@@ -185,6 +185,7 @@ golembot status [-d <dir>] [--json]
   "engine": "claude-code",
   "model": "claude-opus-4-6",
   "skills": [{ "name": "general", "description": "通用助手" }],
+  "sessions": 3,
   "channels": ["telegram"],
   "gateway": { "port": 3000, "authEnabled": false },
   "directory": "/home/user/my-bot"

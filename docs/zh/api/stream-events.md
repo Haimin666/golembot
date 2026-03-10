@@ -12,7 +12,7 @@ type StreamEvent =
   | { type: 'warning'; message: string }
   | { type: 'error'; message: string }
   | { type: 'done'; sessionId?: string; durationMs?: number;
-      costUsd?: number; numTurns?: number };
+      costUsd?: number; numTurns?: number; fullText?: string };
 ```
 
 ## 事件类型
@@ -24,7 +24,7 @@ type StreamEvent =
 | `tool_result` | 工具调用的结果 |
 | `warning` | 来自引擎的非致命警告 |
 | `error` | 处理过程中发生错误 |
-| `done` | 一轮对话结束。可选字段：`sessionId`、`durationMs`、`costUsd`（Claude Code/OpenCode）、`numTurns`（Claude Code） |
+| `done` | 一轮对话结束。可选字段：`sessionId`、`durationMs`、`costUsd`（Claude Code/OpenCode）、`numTurns`（Claude Code）、`fullText`（Cursor/Claude Code，完整回复文本） |
 
 ## 消费事件
 

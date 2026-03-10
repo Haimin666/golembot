@@ -12,6 +12,20 @@ model: claude-sonnet         # optional, preferred model
 # Optional: bypass agent permission prompts
 skipPermissions: true
 
+# Optional: granular agent permissions (Cursor engine only)
+permissions:
+  allowedPaths:
+    - ./src
+    - ./tests
+  deniedPaths:
+    - ./.env
+    - ./secrets
+  allowedCommands:
+    - npm test
+    - npm run build
+  deniedCommands:
+    - rm -rf *
+
 # Optional: role/persona definition — injected into AGENTS.md as a System Instructions
 # section, read by the engine once per session (not prepended to every message)
 systemPrompt: |
@@ -91,10 +105,43 @@ gateway:
 | `maxQueuePerSession` | `number` | `3` | Maximum number of requests that can be queued per session key |
 | `sessionTtlDays` | `number` | `30` | Sessions not used for this many days are pruned at next startup |
 | `systemPrompt` | `string` | — | Role/persona instructions injected into `AGENTS.md` as a `## System Instructions` section. The engine reads this once as system-level context — it is **not** prepended to every message, so token cost stays flat across multi-turn conversations |
+| `permissions` | `object` | — | Granular agent permissions — see [`permissions`](#permissions) section. Currently Cursor engine only |
 | `streaming` | `object` | — | Streaming message delivery for IM channels |
 | `tasks` | `array` | — | Scheduled tasks — see [`tasks`](#tasks) section |
 | `channels` | `object` | — | IM channel configurations |
 | `gateway` | `object` | — | Gateway service settings |
+
+### `permissions`
+
+Granular agent access control. When configured, `golembot init` generates `.cursor/cli.json` and the Cursor engine omits `--trust` so the CLI enforces these rules.
+
+::: warning Cursor only
+Currently only the **Cursor** engine supports granular permissions via `.cursor/cli.json`. For other engines, this config is parsed but has no effect.
+:::
+
+```yaml
+permissions:
+  allowedPaths:
+    - ./src
+    - ./tests
+  deniedPaths:
+    - ./.env
+    - ./secrets
+  allowedCommands:
+    - npm test
+    - npm run build
+  deniedCommands:
+    - rm -rf *
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `allowedPaths` | `string[]` | Paths the agent is allowed to read/write (relative to workspace) |
+| `deniedPaths` | `string[]` | Paths the agent must not access |
+| `allowedCommands` | `string[]` | Shell commands the agent is allowed to run |
+| `deniedCommands` | `string[]` | Shell commands the agent must not run |
+
+All fields are optional. Empty or omitted arrays have no effect. Run `golembot init` after changing permissions to regenerate `.cursor/cli.json`.
 
 ### `streaming`
 
@@ -293,6 +340,12 @@ interface GolemConfig {
   maxQueuePerSession?: number;  // default 3
   sessionTtlDays?: number;      // default 30
   systemPrompt?: string;
+  permissions?: {
+    allowedPaths?: string[];
+    deniedPaths?: string[];
+    allowedCommands?: string[];
+    deniedCommands?: string[];
+  };
   streaming?: {
     mode?: 'buffered' | 'streaming';  // default: 'buffered'
     showToolCalls?: boolean;          // default: false

@@ -12,7 +12,7 @@ type StreamEvent =
   | { type: 'warning'; message: string }
   | { type: 'error'; message: string }
   | { type: 'done'; sessionId?: string; durationMs?: number;
-      costUsd?: number; numTurns?: number };
+      costUsd?: number; numTurns?: number; fullText?: string };
 ```
 
 ## Event Types
@@ -84,6 +84,7 @@ Signals the end of a conversation turn.
 | `durationMs` | Wall-clock duration | All engines |
 | `costUsd` | API cost in USD | Claude Code, OpenCode |
 | `numTurns` | Number of agent turns | Claude Code |
+| `fullText` | Complete agent response text | Cursor, Claude Code |
 
 ## Consuming Events
 

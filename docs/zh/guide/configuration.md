@@ -12,6 +12,20 @@ model: claude-sonnet         # 可选，首选模型
 # 可选：跳过 Agent 权限确认
 skipPermissions: true
 
+# 可选：细粒度 Agent 权限控制（仅 Cursor 引擎）
+permissions:
+  allowedPaths:
+    - ./src
+    - ./tests
+  deniedPaths:
+    - ./.env
+    - ./secrets
+  allowedCommands:
+    - npm test
+    - npm run build
+  deniedCommands:
+    - rm -rf *
+
 # 可选：角色/人设定义 — 写入 AGENTS.md 的 System Instructions 节，
 # 引擎每次会话读取一次（不是每条消息前都拼接）
 systemPrompt: |
@@ -92,10 +106,43 @@ gateway:
 | `maxQueuePerSession` | `number` | `3` | 每个 sessionKey 最大排队请求数 |
 | `sessionTtlDays` | `number` | `30` | 闲置会话超过此天数后在下次启动时清理 |
 | `systemPrompt` | `string` | — | 角色/人设指令，写入 `AGENTS.md` 的 `## System Instructions` 节，引擎将其作为系统级上下文读取一次。**不会**拼接到每条用户消息前，多轮对话的 token 消耗保持平稳 |
+| `permissions` | `object` | — | 细粒度 Agent 权限控制，详见 [`permissions`](#permissions)。目前仅 Cursor 引擎支持 |
 | `streaming` | `object` | — | IM 通道流式消息投递配置 |
 | `tasks` | `array` | — | 定时任务列表，详见 [`tasks`](#tasks) |
 | `channels` | `object` | — | IM 通道配置 |
 | `gateway` | `object` | — | Gateway 服务设置 |
+
+### `permissions`
+
+细粒度 Agent 访问控制。配置后，`golembot init` 会生成 `.cursor/cli.json`，Cursor 引擎不再传 `--trust`，由 CLI 强制执行权限规则。
+
+::: warning 仅 Cursor 引擎
+目前仅 **Cursor** 引擎通过 `.cursor/cli.json` 支持细粒度权限。其他引擎会解析此配置但不会生效。
+:::
+
+```yaml
+permissions:
+  allowedPaths:
+    - ./src
+    - ./tests
+  deniedPaths:
+    - ./.env
+    - ./secrets
+  allowedCommands:
+    - npm test
+    - npm run build
+  deniedCommands:
+    - rm -rf *
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `allowedPaths` | `string[]` | Agent 可以读写的路径（相对于工作区） |
+| `deniedPaths` | `string[]` | Agent 不可访问的路径 |
+| `allowedCommands` | `string[]` | Agent 可以执行的 Shell 命令 |
+| `deniedCommands` | `string[]` | Agent 不可执行的 Shell 命令 |
+
+所有字段可选。空数组或未提供不产生影响。修改 permissions 后需重新运行 `golembot init` 以重新生成 `.cursor/cli.json`。
 
 ### `streaming`
 
@@ -269,6 +316,12 @@ interface GolemConfig {
   maxQueuePerSession?: number;  // 默认 3
   sessionTtlDays?: number;      // 默认 30
   systemPrompt?: string;
+  permissions?: {
+    allowedPaths?: string[];
+    deniedPaths?: string[];
+    allowedCommands?: string[];
+    deniedCommands?: string[];
+  };
   streaming?: {
     mode?: 'buffered' | 'streaming';  // 默认：'buffered'
     showToolCalls?: boolean;          // 默认：false

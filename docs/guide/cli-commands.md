@@ -218,7 +218,7 @@ golembot status [-d <dir>] [--json]
 | `-d, --dir <dir>` | Assistant directory | `.` |
 | `--json` | Output JSON (agent-friendly) | `false` |
 
-Shows: name, engine, model, installed skills, configured channels, and gateway settings.
+Shows: name, engine, model, installed skills, active sessions, configured channels, and gateway settings.
 
 **JSON output example:**
 
@@ -228,6 +228,7 @@ Shows: name, engine, model, installed skills, configured channels, and gateway s
   "engine": "claude-code",
   "model": "claude-opus-4-6",
   "skills": [{ "name": "general", "description": "General assistant" }],
+  "sessions": 3,
   "channels": ["telegram"],
   "gateway": { "port": 3000, "authEnabled": false },
   "directory": "/home/user/my-bot"
