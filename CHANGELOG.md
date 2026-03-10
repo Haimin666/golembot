@@ -1,3 +1,12 @@
+# [0.23.0](https://github.com/0xranx/golembot/compare/v0.22.0...v0.23.0) (2026-03-10)
+
+
+### Features
+
+* **cli:** add session count to golembot status ([#7](https://github.com/0xranx/golembot/issues/7)) ([2c149e0](https://github.com/0xranx/golembot/commit/2c149e0f80403f8ad868e4c6e889dadde14bd190))
+* **engine:** expose fullText on done StreamEvent ([#6](https://github.com/0xranx/golembot/issues/6)) ([739323c](https://github.com/0xranx/golembot/commit/739323c250d3969adf77761aba5634aae5f16c17))
+* **workspace:** add permissions config with .cursor/cli.json generation ([#8](https://github.com/0xranx/golembot/issues/8)) ([b5c59a2](https://github.com/0xranx/golembot/commit/b5c59a2c1e68934f7cf522fc7fe8fd0148650ba3))
+
 # [0.22.0](https://github.com/0xranx/golembot/compare/v0.21.0...v0.22.0) (2026-03-09)
 
 
