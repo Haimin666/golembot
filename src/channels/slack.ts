@@ -133,6 +133,15 @@ export class SlackAdapter implements ChannelAdapter {
       console.error('[slack:error]', error);
     });
 
+    // Validate token before starting Socket Mode to fail fast with a clear error
+    // instead of crashing the process with an unhandled rejection.
+    try {
+      await this.app.client.auth.test();
+    } catch (e) {
+      this.app = null;
+      throw new Error(`Slack auth failed: ${(e as Error).message}`);
+    }
+
     await this.app.start();
     console.log(`[slack] Socket Mode connection established`);
   }
