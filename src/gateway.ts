@@ -705,6 +705,10 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
     coordinator ? { taskStore, scheduler, runTask: (id) => coordinator!.runTask(id) } : undefined,
   );
 
+  // Declare scheduler & coordinator early so adapter callbacks can reference them safely.
+  const scheduler = new Scheduler();
+  let coordinator: ProactiveCoordinator | undefined;
+
   const adapters: ChannelAdapter[] = [];
   const adapterMap = new Map<string, ChannelAdapter>();
   const channels: ChannelsConfig | undefined = config.channels;
@@ -764,9 +768,6 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
   }
 
   // ── Scheduled tasks ─────────────────────────────────────────────────────────
-  const scheduler = new Scheduler();
-  let coordinator: ProactiveCoordinator | undefined;
-
   if (config.tasks && config.tasks.length > 0) {
     try {
       const mergedTasks = await taskStore.mergeConfigTasks(config.tasks);

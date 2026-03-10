@@ -100,6 +100,7 @@ export class SlackAdapter implements ChannelAdapter {
         chatId: message.channel,
         chatType: 'dm',
         text: message.text || (images.length > 0 ? '(image)' : ''),
+        messageId: message.ts,
         images: images.length > 0 ? images : undefined,
         raw: message,
       });
@@ -121,6 +122,7 @@ export class SlackAdapter implements ChannelAdapter {
         chatId: event.channel,
         chatType: 'group',
         text,
+        messageId: event.ts,
         mentioned: true,
         raw: event,
       });
@@ -135,11 +137,37 @@ export class SlackAdapter implements ChannelAdapter {
     console.log(`[slack] Socket Mode connection established`);
   }
 
-  async reply(msg: ChannelMessage, text: string, _options?: ReplyOptions): Promise<void> {
+  async getGroupMembers(chatId: string): Promise<Map<string, string>> {
+    if (!this.app) return new Map();
+    try {
+      const res = await this.app.client.conversations.members({ channel: chatId });
+      const members = new Map<string, string>();
+      for (const userId of res.members ?? []) {
+        const name = await this.resolveUserName(userId);
+        if (name) members.set(name, userId);
+      }
+      return members;
+    } catch {
+      return new Map();
+    }
+  }
+
+  async reply(msg: ChannelMessage, text: string, options?: ReplyOptions): Promise<void> {
     if (!this.app) return;
+    // Convert markdown first, then substitute mentions so <@ID> tokens don't get escaped.
+    let mrkdwn = markdownToMrkdwn(text);
+    if (options?.mentions) {
+      for (const m of options.mentions) {
+        mrkdwn = mrkdwn.replace(
+          new RegExp(`@${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'),
+          `<@${m.platformId}>`,
+        );
+      }
+    }
     await this.app.client.chat.postMessage({
       channel: msg.chatId,
-      text: markdownToMrkdwn(text),
+      text: mrkdwn,
+      ...(msg.messageId ? { thread_ts: msg.messageId } : {}),
     });
   }
 

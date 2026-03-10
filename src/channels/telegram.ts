@@ -100,6 +100,7 @@ export class TelegramAdapter implements ChannelAdapter {
         chatId: String(message.chat.id),
         chatType,
         text,
+        messageId: String(message.message_id),
         images: images.length > 0 ? images : undefined,
         mentioned,
         raw: message,
@@ -115,6 +116,7 @@ export class TelegramAdapter implements ChannelAdapter {
     if (!this.bot) return;
     await this.bot.api.sendMessage(Number(msg.chatId), markdownToHtml(text), {
       parse_mode: 'HTML',
+      ...(msg.messageId ? { reply_to_message_id: Number(msg.messageId) } : {}),
     });
   }
 

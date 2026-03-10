@@ -113,6 +113,7 @@ export class DingtalkAdapter implements ChannelAdapter {
         chatId: data.conversationId || '',
         chatType: isGroup ? 'group' : 'dm',
         text,
+        messageId: msgId,
         images: images.length > 0 ? images : undefined,
         mentioned: isGroup ? true : undefined,
         raw: { ...data, _sessionWebhook: data.sessionWebhook },

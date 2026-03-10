@@ -15,6 +15,8 @@ export interface ChannelMessage {
   chatId: string;
   chatType: 'dm' | 'group';
   text: string;
+  /** Platform-native message ID, used for quote/reply. */
+  messageId?: string;
   /** Images attached to the message (downloaded by the adapter). */
   images?: ImageAttachment[];
   raw: unknown;

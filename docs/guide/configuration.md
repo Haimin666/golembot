@@ -227,25 +227,7 @@ tasks:
       chatId: "oc_xxxxx"
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `id` | `string` | Yes | Unique identifier for the task |
-| `name` | `string` | Yes | Human-readable task name |
-| `schedule` | `string` | Yes | When to run — see schedule formats below |
-| `prompt` | `string` | Yes | The prompt sent to the engine on each run |
-| `enabled` | `boolean` | No | Whether the task is active (default: `true`) |
-| `target` | `object` | No | Where to deliver the result. If omitted, the result is logged only |
-| `target.channel` | `string` | — | IM channel type (`feishu`, `dingtalk`, `wecom`, `slack`, `telegram`, `discord`) |
-| `target.chatId` | `string` | — | Chat or group ID to send the result to |
-
-**Supported schedule formats:**
-
-| Format | Example | Description |
-|--------|---------|-------------|
-| Standard 5-field cron | `0 9 * * 1-5` | Minute, hour, day-of-month, month, day-of-week |
-| Interval shorthand | `every 30m` | Run every 30 minutes |
-| Daily shorthand | `daily 09:00` | Run once per day at the given time |
-| Weekly shorthand | `weekly mon 09:00` | Run once per week on the given day and time |
+See [Scheduled Tasks](/guide/scheduled-tasks) for full configuration reference, schedule formats, management commands, and use case examples.
 
 ### Conversation History
 

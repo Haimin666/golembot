@@ -72,6 +72,7 @@ interface ChannelMessage {
   chatId: string;          // 会话/群组 ID
   chatType: 'dm' | 'group';
   text: string;            // 消息文本
+  messageId?: string;      // 平台原生消息 ID（用于引用回复）
   images?: ImageAttachment[];  // 图片附件（如果有）
   raw: unknown;            // 原始 SDK 事件对象
   /**

@@ -95,6 +95,7 @@ export class DiscordAdapter implements ChannelAdapter {
         chatId: isDM ? `dm-${message.author.id}` : message.channelId,
         chatType: isDM ? 'dm' : 'group',
         text,
+        messageId: message.id,
         images: images.length > 0 ? images : undefined,
         mentioned,
         raw: message,
@@ -102,9 +103,36 @@ export class DiscordAdapter implements ChannelAdapter {
     });
   }
 
-  async reply(msg: ChannelMessage, text: string, _options?: ReplyOptions): Promise<void> {
+  async getGroupMembers(chatId: string): Promise<Map<string, string>> {
+    if (!this.client) return new Map();
+    try {
+      const channel = await this.client.channels.fetch(chatId);
+      if (!channel?.guild) return new Map();
+      const guildMembers = await channel.guild.members.fetch();
+      const members = new Map<string, string>();
+      for (const [id, member] of guildMembers) {
+        if (member.user.bot) continue;
+        const name = member.displayName || member.user.username;
+        if (name) members.set(name, id);
+      }
+      return members;
+    } catch {
+      return new Map();
+    }
+  }
+
+  async reply(msg: ChannelMessage, text: string, options?: ReplyOptions): Promise<void> {
     const raw = msg.raw as any;
-    await raw.reply({ content: text });
+    let finalText = text;
+    if (options?.mentions) {
+      for (const m of options.mentions) {
+        finalText = finalText.replace(
+          new RegExp(`@${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'),
+          `<@${m.platformId}>`,
+        );
+      }
+    }
+    await raw.reply({ content: finalText });
   }
 
   async send(chatId: string, text: string): Promise<void> {

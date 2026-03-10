@@ -96,9 +96,25 @@ When the AI reply contains `@name` patterns matching known group members, the ga
 
 Currently supported:
 - **Feishu** — auto-discovers group members via API, converts to native `<at>` tags in card v2 messages. Requires `im:chat:readonly` permission.
-- **Slack / Discord** — `<@USER_ID>` in text is rendered as native mentions by the platform.
+- **Slack** — fetches channel members via `conversations.members`, converts `@Name` to native `<@USER_ID>` mentions.
+- **Discord** — fetches guild members, converts `@Name` to native `<@USER_ID>` mentions. Requires the **Server Members Intent** (privileged) enabled in Discord Developer Portal.
 
-For adapters without `getGroupMembers()`, `@name` is sent as plain text.
+For adapters without `getGroupMembers()` (DingTalk, WeCom, Telegram), `@name` is sent as plain text.
+
+## Quote Reply
+
+When a user sends a message, the bot replies as a **quote reply** (referencing the original message) instead of posting a standalone message. This makes conversation threads clearer, especially in busy group chats.
+
+| Channel | Quote Reply | Mechanism |
+|---------|:-----------:|-----------|
+| **Feishu** | ✅ | `im.v1.message.reply` (native quote) |
+| **Telegram** | ✅ | `reply_to_message_id` parameter |
+| **Slack** | ✅ | Thread reply via `thread_ts` |
+| **Discord** | ✅ | Native `message.reply()` (already supported) |
+| **DingTalk** | ❌ | Webhook mode doesn't support quote reply |
+| **WeCom** | ❌ | API doesn't support quote reply |
+
+No configuration needed — quote reply is enabled automatically for supported channels.
 
 ## Custom Adapters
 
@@ -211,23 +227,9 @@ User sends image → Adapter downloads to Buffer → gateway passes to assistant
 
 ## Proactive Messaging (Scheduled Tasks)
 
-Beyond responding to incoming messages, GolemBot can **proactively send messages** to IM channels on a schedule. Define tasks in `golem.yaml`:
+Beyond responding to incoming messages, GolemBot can **proactively send messages** to IM channels on a schedule. Define tasks in `golem.yaml` and the agent will execute prompts automatically, pushing results to your IM channels.
 
-```yaml
-tasks:
-  - name: daily-standup
-    schedule: "0 9 * * 1-5"
-    prompt: Summarize yesterday's git commits by author.
-    target:
-      channel: feishu
-      chatId: "oc_xxx"
-```
-
-The agent runs on schedule, executes the prompt, and pushes the result to the specified channel via `adapter.send()`. Manage tasks with `/cron` commands from CLI, HTTP API, or directly in IM.
-
-**Adapter support:** Feishu, Slack, Telegram, Discord, and WeCom all support `send()`. DingTalk does not yet support proactive sending (webhook reply only).
-
-See [Configuration > tasks](/guide/configuration#tasks) for full syntax.
+See [Scheduled Tasks](/guide/scheduled-tasks) for full configuration, management commands, and use case examples.
 
 ## Starting the Gateway
 

@@ -268,6 +268,7 @@ export class FeishuAdapter implements ChannelAdapter {
         chatId: message.chat_id,
         chatType,
         text,
+        messageId: msgId,
         images: images.length > 0 ? images : undefined,
         mentioned: chatType === 'group' ? isMentioned : undefined,
         mentionedOthers: otherMentionNames.length > 0 ? otherMentionNames : undefined,
@@ -333,8 +334,10 @@ export class FeishuAdapter implements ChannelAdapter {
     const mentions = options?.mentions;
     const hasMentions = mentions && mentions.length > 0;
 
+    let content: string;
+    let msgType: string;
+
     if (hasMarkdown(text) || hasMentions) {
-      // Card v2 (default) — best markdown rendering with native headings, lists, code blocks
       let mdText = text;
       if (hasMentions) {
         for (const m of mentions) {
@@ -344,24 +347,23 @@ export class FeishuAdapter implements ChannelAdapter {
           );
         }
       }
-      const card = markdownToCard(mdText);
-      await this.client.im.v1.message.create({
-        params: { receive_id_type: 'chat_id' },
-        data: {
-          receive_id: msg.chatId,
-          content: JSON.stringify(card),
-          msg_type: 'interactive',
-        },
+      content = JSON.stringify(markdownToCard(mdText));
+      msgType = 'interactive';
+    } else {
+      content = JSON.stringify({ text });
+      msgType = 'text';
+    }
+
+    // Use quote reply when we have the original message ID.
+    if (msg.messageId) {
+      await this.client.im.v1.message.reply({
+        path: { message_id: msg.messageId },
+        data: { content, msg_type: msgType },
       });
     } else {
-      // Plain text
       await this.client.im.v1.message.create({
         params: { receive_id_type: 'chat_id' },
-        data: {
-          receive_id: msg.chatId,
-          content: JSON.stringify({ text }),
-          msg_type: 'text',
-        },
+        data: { receive_id: msg.chatId, content, msg_type: msgType },
       });
     }
   }

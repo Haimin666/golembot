@@ -581,6 +581,37 @@ describe('handleMessage — full gateway pipeline', () => {
     });
   });
 
+  // ── messageId pass-through (quote reply) ──────────────────────────────
+
+  describe('messageId pass-through for quote reply', () => {
+    it('messageId from incoming msg is available in adapter.reply call', async () => {
+      const assistant = makeMockAssistant('reply text');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg({ messageId: 'msg_12345' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies).toHaveLength(1);
+      expect(adapter.replies[0].msg.messageId).toBe('msg_12345');
+    });
+
+    it('works without messageId (backwards compatible)', async () => {
+      const assistant = makeMockAssistant('reply text');
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg(); // no messageId
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies).toHaveLength(1);
+      expect(adapter.replies[0].msg.messageId).toBeUndefined();
+    });
+
+    it('messageId is preserved in group chat replies', async () => {
+      const assistant = makeMockAssistant('pong');
+      const adapter = makeMockAdapter();
+      const msg = makeGroupMsg({ text: '@golem ping', messageId: 'ts_67890' });
+      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies).toHaveLength(1);
+      expect(adapter.replies[0].msg.messageId).toBe('ts_67890');
+    });
+  });
+
   // ── mention-only policy ─────────────────────────────────────────────────
 
   describe('groupPolicy: mention-only (default)', () => {

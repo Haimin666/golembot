@@ -242,25 +242,7 @@ tasks:
       chatId: "oc_xxxxx"
 ```
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | `string` | 任务唯一标识，用于 `/cron run <id>` 等命令引用 |
-| `name` | `string` | 任务显示名称 |
-| `schedule` | `string` | 执行计划，支持以下格式 |
-| `prompt` | `string` | 每次触发时发送给 Agent 的提示词 |
-| `enabled` | `boolean` | 是否启用（默认 `true`） |
-| `target` | `object` | 可选，指定输出目标通道和会话 |
-| `target.channel` | `string` | 目标 IM 通道（如 `feishu`、`dingtalk`、`wecom`） |
-| `target.chatId` | `string` | 目标群聊 ID |
-
-**支持的 `schedule` 格式：**
-
-| 格式 | 示例 | 说明 |
-|------|------|------|
-| 标准 5 字段 cron | `0 9 * * 1-5` | 工作日每天 9:00 |
-| `every <interval>` | `every 30m` | 每 30 分钟 |
-| `daily HH:MM` | `daily 09:00` | 每天 09:00 |
-| `weekly <day> HH:MM` | `weekly mon 09:00` | 每周一 09:00 |
+详见[定时任务](/zh/guide/scheduled-tasks)，了解完整配置参考、调度格式、管理命令和使用场景。
 
 ## 环境变量占位符
 

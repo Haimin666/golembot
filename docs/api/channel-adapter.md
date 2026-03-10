@@ -85,6 +85,7 @@ interface ChannelMessage {
   chatId: string;          // Chat/conversation ID
   chatType: 'dm' | 'group';
   text: string;            // Message text content
+  messageId?: string;      // Platform-native message ID (used for quote reply)
   images?: ImageAttachment[];  // Image attachments (if any)
   raw: unknown;            // Raw SDK event object
   /**

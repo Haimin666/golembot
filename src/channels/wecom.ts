@@ -181,6 +181,7 @@ export class WecomAdapter implements ChannelAdapter {
             chatId: senderId,
             chatType: 'dm',
             text,
+            messageId: msgId,
             images: images.length > 0 ? images : undefined,
             raw: msgXml,
           };
