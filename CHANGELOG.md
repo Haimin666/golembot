@@ -1,3 +1,10 @@
+# [0.24.0](https://github.com/0xranx/golembot/compare/v0.23.0...v0.24.0) (2026-03-10)
+
+
+### Features
+
+* **channels:** add quote reply and cross-platform [@mention](https://github.com/mention) support ([5d7168a](https://github.com/0xranx/golembot/commit/5d7168a6762038dfeb42467823d5285df7fcec50))
+
 # [0.23.0](https://github.com/0xranx/golembot/compare/v0.22.0...v0.23.0) (2026-03-10)
 
 
