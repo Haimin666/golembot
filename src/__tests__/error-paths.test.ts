@@ -1,10 +1,18 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir, readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { loadConfig, writeConfig, scanSkills, ensureReady, initWorkspace, resolveEnvPlaceholders } from '../workspace.js';
-import { parseStreamLine, parseClaudeStreamLine, parseOpenCodeStreamLine, createEngine, stripAnsi, ensureOpenCodeConfig, isOnPath } from '../engine.js';
-import { buildSessionKey, stripMention, type ChannelMessage } from '../channel.js';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { buildSessionKey, stripMention } from '../channel.js';
+import {
+  createEngine,
+  ensureOpenCodeConfig,
+  isOnPath,
+  parseClaudeStreamLine,
+  parseOpenCodeStreamLine,
+  parseStreamLine,
+  stripAnsi,
+} from '../engine.js';
+import { ensureReady, initWorkspace, loadConfig, resolveEnvPlaceholders, scanSkills } from '../workspace.js';
 
 describe('error paths and edge cases', () => {
   let dir: string;
@@ -124,19 +132,23 @@ describe('error paths and edge cases', () => {
     });
 
     it('parseStreamLine handles assistant event with empty content array', () => {
-      const event = parseStreamLine(JSON.stringify({
-        type: 'assistant',
-        message: { content: [] },
-      }));
+      const event = parseStreamLine(
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [] },
+        }),
+      );
       expect(event).toBeNull();
     });
 
     it('parseStreamLine handles system event (returns null — not a terminal event)', () => {
-      const event = parseStreamLine(JSON.stringify({
-        type: 'system',
-        subtype: 'init',
-        session_id: 'ses_test',
-      }));
+      const event = parseStreamLine(
+        JSON.stringify({
+          type: 'system',
+          subtype: 'init',
+          session_id: 'ses_test',
+        }),
+      );
       expect(event).toBeNull();
     });
   });
@@ -233,10 +245,7 @@ describe('error paths and edge cases', () => {
     it('ensureReady works with a valid setup', async () => {
       await writeFile(join(dir, 'golem.yaml'), 'name: test\nengine: cursor\n');
       await mkdir(join(dir, 'skills', 'demo'), { recursive: true });
-      await writeFile(
-        join(dir, 'skills', 'demo', 'SKILL.md'),
-        '---\nname: demo\ndescription: Demo\n---\n',
-      );
+      await writeFile(join(dir, 'skills', 'demo', 'SKILL.md'), '---\nname: demo\ndescription: Demo\n---\n');
 
       const { config, skills } = await ensureReady(dir);
       expect(config.name).toBe('test');
@@ -248,9 +257,7 @@ describe('error paths and edge cases', () => {
 
     it('initWorkspace prevents double initialization', async () => {
       await writeFile(join(dir, 'golem.yaml'), 'name: existing\nengine: cursor\n');
-      await expect(
-        initWorkspace(dir, { name: 'new', engine: 'cursor' }, '/tmp'),
-      ).rejects.toThrow('already exists');
+      await expect(initWorkspace(dir, { name: 'new', engine: 'cursor' }, '/tmp')).rejects.toThrow('already exists');
     });
   });
 
@@ -265,19 +272,25 @@ describe('error paths and edge cases', () => {
     });
 
     it('preserves existing fields in opencode.json', async () => {
-      await writeFile(join(dir, 'opencode.json'), JSON.stringify({
-        customField: 'keep-me',
-        model: 'existing-model',
-      }));
+      await writeFile(
+        join(dir, 'opencode.json'),
+        JSON.stringify({
+          customField: 'keep-me',
+          model: 'existing-model',
+        }),
+      );
       await ensureOpenCodeConfig(dir, 'new-model');
       const content = JSON.parse(await readFile(join(dir, 'opencode.json'), 'utf-8'));
       expect(content.customField).toBe('keep-me');
     });
 
     it('does not overwrite existing permission config', async () => {
-      await writeFile(join(dir, 'opencode.json'), JSON.stringify({
-        permission: { 'Read': 'deny' },
-      }));
+      await writeFile(
+        join(dir, 'opencode.json'),
+        JSON.stringify({
+          permission: { Read: 'deny' },
+        }),
+      );
       await ensureOpenCodeConfig(dir);
       const content = JSON.parse(await readFile(join(dir, 'opencode.json'), 'utf-8'));
       expect(content.permission.Read).toBe('deny');
@@ -312,7 +325,9 @@ describe('error paths and edge cases', () => {
       try {
         process.env.HOME = fakeHome;
         process.env.PATH = fakeHome;
-        await expect(drainFirst(engine.invoke('test', { workspace: dir, skillPaths: [] }))).rejects.toThrow('curl https://cursor.com/install');
+        await expect(drainFirst(engine.invoke('test', { workspace: dir, skillPaths: [] }))).rejects.toThrow(
+          'curl https://cursor.com/install',
+        );
       } finally {
         process.env.HOME = originalHome;
         process.env.PATH = originalPath;
@@ -329,7 +344,9 @@ describe('error paths and edge cases', () => {
       try {
         process.env.HOME = fakeHome;
         process.env.PATH = fakeHome;
-        await expect(drainFirst(engine.invoke('test', { workspace: dir, skillPaths: [] }))).rejects.toThrow('npm install -g @anthropic-ai/claude-code');
+        await expect(drainFirst(engine.invoke('test', { workspace: dir, skillPaths: [] }))).rejects.toThrow(
+          'npm install -g @anthropic-ai/claude-code',
+        );
       } finally {
         process.env.HOME = originalHome;
         process.env.PATH = originalPath;
@@ -346,7 +363,9 @@ describe('error paths and edge cases', () => {
       try {
         process.env.HOME = fakeHome;
         process.env.PATH = fakeHome;
-        await expect(drainFirst(engine.invoke('test', { workspace: dir, skillPaths: [] }))).rejects.toThrow('npm install -g opencode-ai');
+        await expect(drainFirst(engine.invoke('test', { workspace: dir, skillPaths: [] }))).rejects.toThrow(
+          'npm install -g opencode-ai',
+        );
       } finally {
         process.env.HOME = originalHome;
         process.env.PATH = originalPath;

@@ -1,10 +1,10 @@
-import { symlink, readdir, mkdir, lstat, unlink } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { join, basename, resolve } from 'node:path';
-import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
-import type { AgentEngine, InvokeOpts, StreamEvent, ListModelsOpts } from '../engine.js';
-import { stripAnsi, isOnPath } from './shared.js';
+import { existsSync } from 'node:fs';
+import { lstat, mkdir, readdir, symlink, unlink } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { basename, join, resolve } from 'node:path';
+import type { AgentEngine, InvokeOpts, ListModelsOpts, StreamEvent } from '../engine.js';
+import { isOnPath, stripAnsi } from './shared.js';
 
 // ── stream-json event parsing ───────────────────────────
 
@@ -14,8 +14,8 @@ function extractAssistantText(obj: Record<string, unknown>): string {
   const content = msg.content as Array<Record<string, unknown>> | undefined;
   if (!Array.isArray(content)) return '';
   return content
-    .filter(b => b.type === 'text')
-    .map(b => (b.text as string) || '')
+    .filter((b) => b.type === 'text')
+    .map((b) => (b.text as string) || '')
     .join('\n');
 }
 
@@ -129,8 +129,8 @@ function findAgentBin(): string {
   if (!existsSync(localBin) && !isOnPath('agent')) {
     throw new Error(
       `Cursor CLI ("agent") not found at ${localBin}\n` +
-      `Install it with: curl https://cursor.com/install -fsS | bash\n` +
-      `See: https://cursor.com/docs/cli/installation`
+        `Install it with: curl https://cursor.com/install -fsS | bash\n` +
+        `See: https://cursor.com/docs/cli/installation`,
     );
   }
   return existsSync(localBin) ? localBin : 'agent';
@@ -142,13 +142,17 @@ export class CursorEngine implements AgentEngine {
 
     const agentBin = findAgentBin();
     const args = [
-      '-p', prompt,
+      '-p',
+      prompt,
       '--force',
-      '--sandbox', 'disabled',
-      '--output-format', 'stream-json',
+      '--sandbox',
+      'disabled',
+      '--output-format',
+      'stream-json',
       '--stream-partial-output',
       '--approve-mcps',
-      '--workspace', opts.workspace,
+      '--workspace',
+      opts.workspace,
     ];
     // When granular permissions are configured via .cursor/cli.json, skip --trust
     // so that the CLI enforces the permission rules. Otherwise, auto-approve all.
@@ -160,7 +164,7 @@ export class CursorEngine implements AgentEngine {
     if (opts.apiKey) args.push('--api-key', opts.apiKey);
 
     const env: Record<string, string> = {
-      ...process.env as Record<string, string>,
+      ...(process.env as Record<string, string>),
       PATH: `${join(homedir(), '.local', 'bin')}:${process.env.PATH || ''}`,
     };
     if (opts.apiKey) env.CURSOR_API_KEY = opts.apiKey;
@@ -181,7 +185,10 @@ export class CursorEngine implements AgentEngine {
 
     function enqueue(evt: StreamEvent | null) {
       queue.push(evt);
-      if (resolver) { resolver(); resolver = null; }
+      if (resolver) {
+        resolver();
+        resolver = null;
+      }
     }
 
     function processBuffer() {
@@ -208,7 +215,11 @@ export class CursorEngine implements AgentEngine {
 
     if (opts.signal) {
       const abortHandler = () => {
-        try { child.kill(); } catch { /* already dead */ }
+        try {
+          child.kill();
+        } catch {
+          /* already dead */
+        }
         enqueue({ type: 'error', message: 'Agent invocation timed out' });
         enqueue(null);
       };
@@ -216,12 +227,18 @@ export class CursorEngine implements AgentEngine {
       child.once('close', () => opts.signal!.removeEventListener('abort', abortHandler));
     }
 
-    child.stdout!.on('data', (chunk: Buffer) => { buffer += chunk.toString(); processBuffer(); });
+    child.stdout!.on('data', (chunk: Buffer) => {
+      buffer += chunk.toString();
+      processBuffer();
+    });
 
     child.on('close', (exitCode: number | null) => {
-      if (buffer.trim()) { buffer += '\n'; processBuffer(); }
+      if (buffer.trim()) {
+        buffer += '\n';
+        processBuffer();
+      }
       const code = exitCode ?? 1;
-      if (code !== 0 && !queue.some(e => e && (e.type === 'done' || e.type === 'error'))) {
+      if (code !== 0 && !queue.some((e) => e && (e.type === 'done' || e.type === 'error'))) {
         enqueue({ type: 'error', message: `Agent process exited with code ${code}` });
       }
       enqueue(null);
@@ -233,13 +250,20 @@ export class CursorEngine implements AgentEngine {
     });
 
     while (true) {
-      if (queue.length === 0) await new Promise<void>(r => { resolver = r; });
+      if (queue.length === 0)
+        await new Promise<void>((r) => {
+          resolver = r;
+        });
       while (queue.length > 0) {
         const evt = queue.shift()!;
         if (evt === null) return;
         yield evt;
         if (evt.type === 'done' || evt.type === 'error') {
-          try { child.kill(); } catch { /* already dead */ }
+          try {
+            child.kill();
+          } catch {
+            /* already dead */
+          }
           return;
         }
       }
@@ -254,10 +278,11 @@ export class CursorEngine implements AgentEngine {
       child.stdout.on('data', (c: Buffer) => chunks.push(c));
       child.on('close', () => {
         const raw = stripAnsi(Buffer.concat(chunks).toString('utf-8'));
-        const models = raw.split('\n')
-          .map(l => l.match(/^(\S+)\s+-\s+/))
+        const models = raw
+          .split('\n')
+          .map((l) => l.match(/^(\S+)\s+-\s+/))
           .filter((m): m is RegExpMatchArray => !!m)
-          .map(m => m[1]);
+          .map((m) => m[1]);
         resolve(models);
       });
       child.on('error', () => resolve([]));

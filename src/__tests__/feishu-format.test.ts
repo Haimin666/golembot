@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   hasMarkdown,
-  markdownToPost,
-  markdownToCard,
   injectMentionsIntoPost,
-  type PostElement,
+  markdownToCard,
+  markdownToPost,
   type PostContent,
+  type PostElement,
 } from '../channels/feishu-format.js';
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,6 @@ describe('hasMarkdown', () => {
   });
 });
 
-
 // ---------------------------------------------------------------------------
 // markdownToPost
 // ---------------------------------------------------------------------------
@@ -92,10 +91,7 @@ describe('markdownToPost', () => {
 
   it('skips empty lines', () => {
     const content = getContent('a\n\nb');
-    expect(content).toEqual([
-      [{ tag: 'text', text: 'a' }],
-      [{ tag: 'text', text: 'b' }],
-    ]);
+    expect(content).toEqual([[{ tag: 'text', text: 'a' }], [{ tag: 'text', text: 'b' }]]);
   });
 
   it('converts headings to bold', () => {
@@ -275,7 +271,6 @@ describe('injectMentionsIntoPost', () => {
   it('replaces @name with at element in a simple text line', () => {
     const post: PostContent = {
       zh_cn: {
-
         content: [[{ tag: 'text', text: '好的，@小舟 你来处理' }]],
       },
     };
@@ -291,7 +286,6 @@ describe('injectMentionsIntoPost', () => {
   it('replaces multiple different @mentions in the same line', () => {
     const post: PostContent = {
       zh_cn: {
-
         content: [[{ tag: 'text', text: '@alice and @bob please review' }]],
       },
     };
@@ -301,7 +295,7 @@ describe('injectMentionsIntoPost', () => {
     ]);
 
     const line = post.zh_cn.content[0];
-    const atElements = line.filter(el => el.tag === 'at');
+    const atElements = line.filter((el) => el.tag === 'at');
     expect(atElements).toHaveLength(2);
     expect(atElements[0].user_id).toBe('ou_alice');
     expect(atElements[1].user_id).toBe('ou_bob');
@@ -310,11 +304,12 @@ describe('injectMentionsIntoPost', () => {
   it('does not modify non-text elements', () => {
     const post: PostContent = {
       zh_cn: {
-
-        content: [[
-          { tag: 'a', text: '@alice link', href: 'https://example.com' },
-          { tag: 'text', text: 'hello @alice' },
-        ]],
+        content: [
+          [
+            { tag: 'a', text: '@alice link', href: 'https://example.com' },
+            { tag: 'text', text: 'hello @alice' },
+          ],
+        ],
       },
     };
     injectMentionsIntoPost(post, [{ name: 'alice', platformId: 'ou_alice' }]);
@@ -323,14 +318,13 @@ describe('injectMentionsIntoPost', () => {
     // The <a> element should be untouched
     expect(line[0]).toEqual({ tag: 'a', text: '@alice link', href: 'https://example.com' });
     // The text element should have been split
-    const atElements = line.filter(el => el.tag === 'at');
+    const atElements = line.filter((el) => el.tag === 'at');
     expect(atElements).toHaveLength(1);
   });
 
   it('handles @mention at the very start of text', () => {
     const post: PostContent = {
       zh_cn: {
-
         content: [[{ tag: 'text', text: '@alice 你好' }]],
       },
     };
@@ -344,7 +338,6 @@ describe('injectMentionsIntoPost', () => {
   it('handles @mention at the very end of text', () => {
     const post: PostContent = {
       zh_cn: {
-
         content: [[{ tag: 'text', text: '请 @alice' }]],
       },
     };
@@ -358,7 +351,6 @@ describe('injectMentionsIntoPost', () => {
   it('does nothing when mentions array is empty', () => {
     const post: PostContent = {
       zh_cn: {
-
         content: [[{ tag: 'text', text: 'hello @alice' }]],
       },
     };
@@ -370,29 +362,27 @@ describe('injectMentionsIntoPost', () => {
   it('ignores @names not in the mentions list', () => {
     const post: PostContent = {
       zh_cn: {
-
         content: [[{ tag: 'text', text: 'hello @alice and @charlie' }]],
       },
     };
     injectMentionsIntoPost(post, [{ name: 'alice', platformId: 'ou_alice' }]);
 
     const line = post.zh_cn.content[0];
-    const atElements = line.filter(el => el.tag === 'at');
+    const atElements = line.filter((el) => el.tag === 'at');
     expect(atElements).toHaveLength(1);
     expect(atElements[0].user_id).toBe('ou_alice');
     // @charlie should remain as text
-    const textParts = line.filter(el => el.tag === 'text').map(el => el.text).join('');
+    const textParts = line
+      .filter((el) => el.tag === 'text')
+      .map((el) => el.text)
+      .join('');
     expect(textParts).toContain('@charlie');
   });
 
   it('handles multi-line post content', () => {
     const post: PostContent = {
       zh_cn: {
-
-        content: [
-          [{ tag: 'text', text: '第一行 @alice' }],
-          [{ tag: 'text', text: '第二行 @bob' }],
-        ],
+        content: [[{ tag: 'text', text: '第一行 @alice' }], [{ tag: 'text', text: '第二行 @bob' }]],
       },
     };
     injectMentionsIntoPost(post, [
@@ -400,8 +390,8 @@ describe('injectMentionsIntoPost', () => {
       { name: 'bob', platformId: 'ou_bob' },
     ]);
 
-    const atLine1 = post.zh_cn.content[0].filter(el => el.tag === 'at');
-    const atLine2 = post.zh_cn.content[1].filter(el => el.tag === 'at');
+    const atLine1 = post.zh_cn.content[0].filter((el) => el.tag === 'at');
+    const atLine2 = post.zh_cn.content[1].filter((el) => el.tag === 'at');
     expect(atLine1).toHaveLength(1);
     expect(atLine1[0].user_id).toBe('ou_alice');
     expect(atLine2).toHaveLength(1);

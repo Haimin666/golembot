@@ -1,9 +1,26 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, readlink, readdir, mkdir, writeFile, readFile, lstat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { lstat, mkdir, mkdtemp, readdir, readFile, readlink, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { parseStreamLine, stripAnsi, injectSkills, parseClaudeStreamLine, injectClaudeSkills, parseOpenCodeStreamLine, resolveOpenCodeEnv, injectOpenCodeSkills, ensureOpenCodeConfig, parseCodexStreamLine, injectCodexSkills, createEngine, CursorEngine, ClaudeCodeEngine, OpenCodeEngine, CodexEngine } from '../engine.js';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { StreamEvent } from '../engine.js';
+import {
+  ClaudeCodeEngine,
+  CodexEngine,
+  CursorEngine,
+  createEngine,
+  ensureOpenCodeConfig,
+  injectClaudeSkills,
+  injectCodexSkills,
+  injectOpenCodeSkills,
+  injectSkills,
+  OpenCodeEngine,
+  parseClaudeStreamLine,
+  parseCodexStreamLine,
+  parseOpenCodeStreamLine,
+  parseStreamLine,
+  resolveOpenCodeEnv,
+  stripAnsi,
+} from '../engine.js';
 
 // ═══════════════════════════════════════════════════════
 // Real Cursor stream-json samples (based on actual output)
@@ -15,9 +32,7 @@ const SAMPLES = {
   assistantSimple: JSON.stringify({
     type: 'assistant',
     message: {
-      content: [
-        { type: 'text', text: 'Hello! I am your AI assistant.' },
-      ],
+      content: [{ type: 'text', text: 'Hello! I am your AI assistant.' }],
     },
     session_id: 'sess-abc-123',
     timestamp_ms: 1700000000000,
@@ -39,9 +54,7 @@ const SAMPLES = {
   assistantSummary: JSON.stringify({
     type: 'assistant',
     message: {
-      content: [
-        { type: 'text', text: 'Complete reply text (duplicate summary)' },
-      ],
+      content: [{ type: 'text', text: 'Complete reply text (duplicate summary)' }],
     },
     session_id: 'sess-abc-123',
   }),
@@ -108,7 +121,8 @@ const SAMPLES = {
     is_error: true,
   }),
 
-  modelError: '{"type":"result","subtype":"error","is_error":true,"result":"Cannot use this model with your current plan"}',
+  modelError:
+    '{"type":"result","subtype":"error","is_error":true,"result":"Cannot use this model with your current plan"}',
 };
 
 // ═══════════════════════════════════════════════════════
@@ -129,7 +143,7 @@ describe('stripAnsi', () => {
   });
 
   it('handles mixed ANSI + JSON', () => {
-    const line = '\x1b[32m' + SAMPLES.systemInit + '\x1b[0m';
+    const line = `\x1b[32m${SAMPLES.systemInit}\x1b[0m`;
     const cleaned = stripAnsi(line);
     expect(JSON.parse(cleaned)).toHaveProperty('type', 'system');
   });
@@ -313,7 +327,7 @@ describe('parseStreamLine', () => {
   });
 
   it('handles ANSI-wrapped JSON', () => {
-    const line = '\x1b[32m' + SAMPLES.assistantSimple + '\x1b[0m';
+    const line = `\x1b[32m${SAMPLES.assistantSimple}\x1b[0m`;
     const evt = parseStreamLine(line);
     expect(evt?.type).toBe('text');
   });
@@ -330,9 +344,7 @@ describe('parseStreamLine', () => {
       SAMPLES.resultSuccess,
     ];
 
-    const events = lines
-      .map(l => parseStreamLine(l))
-      .filter((e): e is StreamEvent => e !== null);
+    const events = lines.map((l) => parseStreamLine(l)).filter((e): e is StreamEvent => e !== null);
 
     // system init → null (filtered out), so first event is assistant text
     expect(events[0].type).toBe('text');
@@ -589,26 +601,36 @@ describe('parseClaudeStreamLine', () => {
 
   it('result success → done with all metadata', () => {
     const events = parseClaudeStreamLine(CLAUDE_SAMPLES.resultSuccess);
-    expect(events).toEqual([{
-      type: 'done',
-      sessionId: 'session_01',
-      durationMs: 12345,
-      costUsd: 0.0123,
-      numTurns: 2,
-      fullText: 'Done.',
-    }]);
+    expect(events).toEqual([
+      {
+        type: 'done',
+        sessionId: 'session_01',
+        durationMs: 12345,
+        costUsd: 0.0123,
+        numTurns: 2,
+        fullText: 'Done.',
+      },
+    ]);
   });
 
   it('result success without optional fields → undefined metadata', () => {
     const line = JSON.stringify({
-      type: 'result', subtype: 'success', is_error: false,
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
       session_id: 'sess-minimal',
     });
     const events = parseClaudeStreamLine(line);
-    expect(events).toEqual([{
-      type: 'done', sessionId: 'sess-minimal',
-      durationMs: undefined, costUsd: undefined, numTurns: undefined, fullText: undefined,
-    }]);
+    expect(events).toEqual([
+      {
+        type: 'done',
+        sessionId: 'sess-minimal',
+        durationMs: undefined,
+        costUsd: undefined,
+        numTurns: undefined,
+        fullText: undefined,
+      },
+    ]);
   });
 
   it('result error with error field', () => {
@@ -652,7 +674,7 @@ describe('parseClaudeStreamLine', () => {
       CLAUDE_SAMPLES.resultSuccess,
     ];
 
-    const allEvents = lines.flatMap(l => parseClaudeStreamLine(l));
+    const allEvents = lines.flatMap((l) => parseClaudeStreamLine(l));
 
     // system → [], assistant text → [text], tool_use → [tool_call],
     // user result → [tool_result], mixed → [text, tool_call],
@@ -708,10 +730,14 @@ describe('injectClaudeSkills', () => {
   });
 
   it('creates CLAUDE.md as symlink to AGENTS.md', async () => {
-    await injectClaudeSkills(workspace, [], [
-      { name: 'general', description: 'General assistant' },
-      { name: 'devops', description: 'DevOps operations' },
-    ]);
+    await injectClaudeSkills(
+      workspace,
+      [],
+      [
+        { name: 'general', description: 'General assistant' },
+        { name: 'devops', description: 'DevOps operations' },
+      ],
+    );
 
     const claudeMdPath = join(workspace, 'CLAUDE.md');
     const s = await lstat(claudeMdPath);
@@ -816,7 +842,11 @@ const OPENCODE_SAMPLES = {
     type: 'text',
     timestamp: 1772337656660,
     sessionID: 'ses_abc123',
-    part: { type: 'text', text: 'Let me help you analyze this problem.', time: { start: 1772337656655, end: 1772337656655 } },
+    part: {
+      type: 'text',
+      text: 'Let me help you analyze this problem.',
+      time: { start: 1772337656655, end: 1772337656655 },
+    },
   }),
 
   textEmpty: JSON.stringify({
@@ -920,7 +950,9 @@ describe('resolveOpenCodeEnv', () => {
   });
 
   it('openrouter model → OPENROUTER_API_KEY', () => {
-    expect(resolveOpenCodeEnv('openrouter/anthropic/claude-sonnet-4-5', 'sk-or')).toEqual({ OPENROUTER_API_KEY: 'sk-or' });
+    expect(resolveOpenCodeEnv('openrouter/anthropic/claude-sonnet-4-5', 'sk-or')).toEqual({
+      OPENROUTER_API_KEY: 'sk-or',
+    });
   });
 
   it('google model → GOOGLE_GENERATIVE_AI_API_KEY', () => {
@@ -1058,7 +1090,7 @@ describe('parseOpenCodeStreamLine', () => {
       OPENCODE_SAMPLES.stepFinish,
     ];
 
-    const allEvents = lines.flatMap(l => parseOpenCodeStreamLine(l));
+    const allEvents = lines.flatMap((l) => parseOpenCodeStreamLine(l));
 
     // step_start(ignored) → text → tool_call + tool_result → done → step_start(ignored) → text → done
     expect(allEvents).toHaveLength(6);
@@ -1218,7 +1250,11 @@ describe('ensureOpenCodeConfig', () => {
   it('preserves existing model-level config when model is already registered', async () => {
     await writeFile(
       join(workspace, 'opencode.json'),
-      JSON.stringify({ provider: { openrouter: { models: { 'anthropic/claude-sonnet-4-5': { options: { provider: { order: ['baseten'] } } } } } } }),
+      JSON.stringify({
+        provider: {
+          openrouter: { models: { 'anthropic/claude-sonnet-4-5': { options: { provider: { order: ['baseten'] } } } } },
+        },
+      }),
       'utf-8',
     );
 
@@ -1454,8 +1490,14 @@ describe('parseCodexStreamLine', () => {
 
   it('top-level error — suppresses WebSocket reconnection notices (returns [])', () => {
     const state: { threadId?: string } = {};
-    const reconnect2 = JSON.stringify({ type: 'error', message: 'Reconnecting... 2/5 (stream disconnected before completion: ...)' });
-    const reconnect5 = JSON.stringify({ type: 'error', message: 'Reconnecting... 5/5 (failed to send websocket request: Connection closed normally)' });
+    const reconnect2 = JSON.stringify({
+      type: 'error',
+      message: 'Reconnecting... 2/5 (stream disconnected before completion: ...)',
+    });
+    const reconnect5 = JSON.stringify({
+      type: 'error',
+      message: 'Reconnecting... 5/5 (failed to send websocket request: Connection closed normally)',
+    });
     expect(parseCodexStreamLine(reconnect2, state)).toEqual([]);
     expect(parseCodexStreamLine(reconnect5, state)).toEqual([]);
   });
@@ -1494,7 +1536,7 @@ describe('parseCodexStreamLine', () => {
       CODEX_SAMPLES.turnCompleted,
     ];
     const state: { threadId?: string } = {};
-    const allEvents = lines.flatMap(l => parseCodexStreamLine(l, state));
+    const allEvents = lines.flatMap((l) => parseCodexStreamLine(l, state));
 
     expect(state.threadId).toBe('thread_abc123');
     expect(allEvents).toHaveLength(4); // text + tool_call + tool_result + done

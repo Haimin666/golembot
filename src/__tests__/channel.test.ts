@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { buildSessionKey, stripMention, type ChannelMessage } from '../channel.js';
+import { describe, expect, it } from 'vitest';
+import { buildSessionKey, type ChannelMessage, stripMention } from '../channel.js';
 
 describe('buildSessionKey', () => {
   it('generates key from channelType:chatId:senderId', () => {
@@ -61,8 +61,13 @@ describe('Slack adapter mentioned field', () => {
     const event = { text: '<@UBOT123> what is 2+2?', user: 'U001', channel: 'C001' };
     const text = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
     const msg: ChannelMessage = {
-      channelType: 'slack', senderId: event.user, chatId: event.channel,
-      chatType: 'group', text, mentioned: true, raw: event,
+      channelType: 'slack',
+      senderId: event.user,
+      chatId: event.channel,
+      chatType: 'group',
+      text,
+      mentioned: true,
+      raw: event,
     };
     expect(msg.mentioned).toBe(true);
     expect(msg.text).toBe('what is 2+2?');
@@ -70,8 +75,12 @@ describe('Slack adapter mentioned field', () => {
 
   it('DM messages do not set mentioned', () => {
     const msg: ChannelMessage = {
-      channelType: 'slack', senderId: 'U001', chatId: 'D001',
-      chatType: 'dm', text: 'hello', raw: {},
+      channelType: 'slack',
+      senderId: 'U001',
+      chatId: 'D001',
+      chatType: 'dm',
+      text: 'hello',
+      raw: {},
     };
     expect(msg.mentioned).toBeUndefined();
   });
@@ -81,12 +90,17 @@ describe('Feishu adapter mentioned field', () => {
   it('sets mentioned=true when bot is @mentioned in group', () => {
     const botOpenId = 'ou_bot123';
     const mentions = [{ key: '@_user_1', id: { open_id: 'ou_bot123' } }];
-    const isMentioned = mentions.some(m => m.id?.open_id === botOpenId);
+    const isMentioned = mentions.some((m) => m.id?.open_id === botOpenId);
     const text = '@_user_1 help me'.replace(mentions[0].key, '').trim();
 
     const msg: ChannelMessage = {
-      channelType: 'feishu', senderId: 'ou_user1', chatId: 'oc_group1',
-      chatType: 'group', text, mentioned: isMentioned, raw: {},
+      channelType: 'feishu',
+      senderId: 'ou_user1',
+      chatId: 'oc_group1',
+      chatType: 'group',
+      text,
+      mentioned: isMentioned,
+      raw: {},
     };
     expect(msg.mentioned).toBe(true);
     expect(msg.text).toBe('help me');
@@ -95,19 +109,28 @@ describe('Feishu adapter mentioned field', () => {
   it('sets mentioned=false for non-mention group messages (smart mode)', () => {
     const botOpenId = 'ou_bot123';
     const mentions: any[] = [];
-    const isMentioned = mentions.some(m => m.id?.open_id === botOpenId);
+    const isMentioned = mentions.some((m) => m.id?.open_id === botOpenId);
 
     const msg: ChannelMessage = {
-      channelType: 'feishu', senderId: 'ou_user1', chatId: 'oc_group1',
-      chatType: 'group', text: 'general discussion', mentioned: isMentioned, raw: {},
+      channelType: 'feishu',
+      senderId: 'ou_user1',
+      chatId: 'oc_group1',
+      chatType: 'group',
+      text: 'general discussion',
+      mentioned: isMentioned,
+      raw: {},
     };
     expect(msg.mentioned).toBe(false);
   });
 
   it('DM messages have mentioned=undefined', () => {
     const msg: ChannelMessage = {
-      channelType: 'feishu', senderId: 'ou_user1', chatId: 'oc_dm1',
-      chatType: 'dm', text: 'hello', raw: {},
+      channelType: 'feishu',
+      senderId: 'ou_user1',
+      chatId: 'oc_dm1',
+      chatType: 'dm',
+      text: 'hello',
+      raw: {},
     };
     expect(msg.mentioned).toBeUndefined();
   });
@@ -117,8 +140,13 @@ describe('DingTalk adapter mentioned field', () => {
   it('sets mentioned=true for group messages (platform guarantees @mention)', () => {
     const isGroup = true;
     const msg: ChannelMessage = {
-      channelType: 'dingtalk', senderId: 'user001', chatId: 'cid_group1',
-      chatType: 'group', text: 'hello bot', mentioned: isGroup ? true : undefined, raw: {},
+      channelType: 'dingtalk',
+      senderId: 'user001',
+      chatId: 'cid_group1',
+      chatType: 'group',
+      text: 'hello bot',
+      mentioned: isGroup ? true : undefined,
+      raw: {},
     };
     expect(msg.mentioned).toBe(true);
   });
@@ -126,8 +154,13 @@ describe('DingTalk adapter mentioned field', () => {
   it('DM messages have mentioned=undefined', () => {
     const isGroup = false;
     const msg: ChannelMessage = {
-      channelType: 'dingtalk', senderId: 'user001', chatId: 'cid_dm1',
-      chatType: 'dm', text: 'hello', mentioned: isGroup ? true : undefined, raw: {},
+      channelType: 'dingtalk',
+      senderId: 'user001',
+      chatId: 'cid_dm1',
+      chatType: 'dm',
+      text: 'hello',
+      mentioned: isGroup ? true : undefined,
+      raw: {},
     };
     expect(msg.mentioned).toBeUndefined();
   });
@@ -206,9 +239,7 @@ describe('Telegram message routing logic', () => {
     const botUsername = 'TestBot';
 
     const isMentioned = entities.some(
-      (e: any) =>
-        e.type === 'mention' &&
-        text.slice(e.offset, e.offset + e.length) === `@${botUsername}`,
+      (e: any) => e.type === 'mention' && text.slice(e.offset, e.offset + e.length) === `@${botUsername}`,
     );
     expect(isMentioned).toBe(true);
   });
@@ -219,9 +250,7 @@ describe('Telegram message routing logic', () => {
     const botUsername = 'TestBot';
 
     const isMentioned = entities.some(
-      (e: any) =>
-        e.type === 'mention' &&
-        text.slice(e.offset, e.offset + e.length) === `@${botUsername}`,
+      (e: any) => e.type === 'mention' && text.slice(e.offset, e.offset + e.length) === `@${botUsername}`,
     );
     expect(isMentioned).toBe(false);
   });
@@ -232,9 +261,7 @@ describe('Telegram message routing logic', () => {
     const botUsername = 'TestBot';
 
     const isMentioned = entities.some(
-      (e: any) =>
-        e.type === 'mention' &&
-        text.slice(e.offset, e.offset + e.length) === `@${botUsername}`,
+      (e: any) => e.type === 'mention' && text.slice(e.offset, e.offset + e.length) === `@${botUsername}`,
     );
     expect(isMentioned).toBe(false);
   });

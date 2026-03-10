@@ -1,7 +1,7 @@
-import { symlink, readdir, mkdir, lstat, unlink, readFile, writeFile } from 'node:fs/promises';
-import { join, basename, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
-import type { AgentEngine, InvokeOpts, StreamEvent, ListModelsOpts } from '../engine.js';
+import { lstat, mkdir, readdir, readFile, symlink, unlink, writeFile } from 'node:fs/promises';
+import { basename, join, resolve } from 'node:path';
+import type { AgentEngine, InvokeOpts, ListModelsOpts, StreamEvent } from '../engine.js';
 import { isOnPath } from './shared.js';
 
 // ── Provider env resolution ──────────────────────────────
@@ -172,7 +172,7 @@ export async function ensureOpenCodeConfig(workspace: string, model?: string): P
     }
   }
 
-  await writeFile(configPath, JSON.stringify(existing, null, 2) + '\n', 'utf-8');
+  await writeFile(configPath, `${JSON.stringify(existing, null, 2)}\n`, 'utf-8');
 }
 
 // ── Engine ───────────────────────────────────────────────
@@ -181,8 +181,8 @@ function findOpenCodeBin(): string {
   if (!isOnPath('opencode')) {
     throw new Error(
       `OpenCode CLI ("opencode") not found in PATH\n` +
-      `Install it with: npm install -g opencode-ai\n` +
-      `See: https://opencode.ai/docs`
+        `Install it with: npm install -g opencode-ai\n` +
+        `See: https://opencode.ai/docs`,
     );
   }
   return 'opencode';
@@ -198,7 +198,7 @@ export class OpenCodeEngine implements AgentEngine {
     if (opts.sessionId) args.push('--session', opts.sessionId);
     if (opts.model) args.push('--model', opts.model);
 
-    const env: Record<string, string> = { ...process.env as Record<string, string> };
+    const env: Record<string, string> = { ...(process.env as Record<string, string>) };
     Object.assign(env, resolveOpenCodeEnv(opts.model, opts.apiKey));
 
     const child = spawn(bin, args, {
@@ -217,7 +217,10 @@ export class OpenCodeEngine implements AgentEngine {
 
     function enqueue(evt: StreamEvent | null) {
       queue.push(evt);
-      if (resolver) { resolver(); resolver = null; }
+      if (resolver) {
+        resolver();
+        resolver = null;
+      }
     }
 
     function processBuffer() {
@@ -241,7 +244,11 @@ export class OpenCodeEngine implements AgentEngine {
 
     if (opts.signal) {
       const abortHandler = () => {
-        try { child.kill(); } catch { /* already dead */ }
+        try {
+          child.kill();
+        } catch {
+          /* already dead */
+        }
         enqueue({ type: 'error', message: 'Agent invocation timed out' });
         enqueue(null);
       };
@@ -249,7 +256,10 @@ export class OpenCodeEngine implements AgentEngine {
       child.once('close', () => opts.signal!.removeEventListener('abort', abortHandler));
     }
 
-    child.stdout!.on('data', (chunk: Buffer) => { buffer += chunk.toString(); processBuffer(); });
+    child.stdout!.on('data', (chunk: Buffer) => {
+      buffer += chunk.toString();
+      processBuffer();
+    });
 
     child.stderr!.on('data', (chunk: Buffer) => {
       const text = chunk.toString().trim();
@@ -263,7 +273,10 @@ export class OpenCodeEngine implements AgentEngine {
     });
 
     child.on('close', (exitCode: number | null) => {
-      if (buffer.trim()) { buffer += '\n'; processBuffer(); }
+      if (buffer.trim()) {
+        buffer += '\n';
+        processBuffer();
+      }
       const code = exitCode ?? 1;
       if (code !== 0 && !gotError && !lastSessionId) {
         const stderrText = stderrChunks.join('\n').slice(0, 500);
@@ -281,13 +294,20 @@ export class OpenCodeEngine implements AgentEngine {
     });
 
     while (true) {
-      if (queue.length === 0) await new Promise<void>(r => { resolver = r; });
+      if (queue.length === 0)
+        await new Promise<void>((r) => {
+          resolver = r;
+        });
       while (queue.length > 0) {
         const evt = queue.shift()!;
         if (evt === null) return;
         yield evt;
         if (evt.type === 'done' || evt.type === 'error') {
-          try { child.kill(); } catch { /* already dead */ }
+          try {
+            child.kill();
+          } catch {
+            /* already dead */
+          }
           return;
         }
       }
@@ -303,8 +323,10 @@ export class OpenCodeEngine implements AgentEngine {
           signal: AbortSignal.timeout(10_000),
         });
         const data = (await resp.json()) as { data?: Array<{ id: string }> };
-        if (data.data?.length) return data.data.map(m => m.id).sort();
-      } catch { /* fallback to CLI */ }
+        if (data.data?.length) return data.data.map((m) => m.id).sort();
+      } catch {
+        /* fallback to CLI */
+      }
     }
     // Fallback: opencode CLI
     return new Promise<string[]>((resolve) => {

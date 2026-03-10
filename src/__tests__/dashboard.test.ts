@@ -1,18 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  createMetrics,
-  recordMessage,
   buildDashboardData,
-  renderDashboard,
+  createMetrics,
   type DashboardContext,
-  type ChannelStatus,
   type RecentMessage,
-  type GatewayMetrics,
+  recordMessage,
+  renderDashboard,
 } from '../dashboard.js';
 
 function makeDashboardCtx(overrides?: Partial<DashboardContext>): DashboardContext {
   return {
-    config: { name: 'test-bot', engine: 'claude-code', model: 'claude-opus-4-6', channels: {}, gateway: { port: 3000 } },
+    config: {
+      name: 'test-bot',
+      engine: 'claude-code',
+      model: 'claude-opus-4-6',
+      channels: {},
+      gateway: { port: 3000 },
+    },
     skills: [{ name: 'general', path: '/skills/general', description: 'General assistant' }],
     channelStatuses: [
       { type: 'telegram', status: 'connected' },
@@ -52,7 +56,7 @@ describe('recordMessage', () => {
     expect(m.totalMessages).toBe(1);
     expect(m.totalCostUsd).toBeCloseTo(0.01);
     expect(m.totalDurationMs).toBe(1500);
-    expect(m.messagesBySource['telegram']).toBe(1);
+    expect(m.messagesBySource.telegram).toBe(1);
     expect(m.recentMessages).toHaveLength(1);
   });
 

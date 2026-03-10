@@ -1,7 +1,8 @@
-import { readFile, readdir, writeFile, mkdir, stat } from 'node:fs/promises';
-import { join, basename } from 'node:path';
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import yaml from 'js-yaml';
 import type { ScheduledTaskDef, TaskTarget } from './scheduler.js';
+
 export type { ScheduledTaskDef, TaskTarget } from './scheduler.js';
 
 export interface FeishuChannelConfig {
@@ -219,9 +220,8 @@ export async function patchConfig(dir: string, patch: Partial<Pick<GolemConfig, 
       } else {
         // Key doesn't exist yet — insert after the first line (name: ...)
         const idx = raw.indexOf('\n');
-        raw = idx >= 0
-          ? raw.slice(0, idx + 1) + `${key}: ${value}\n` + raw.slice(idx + 1)
-          : raw + `\n${key}: ${value}\n`;
+        raw =
+          idx >= 0 ? `${raw.slice(0, idx + 1)}${key}: ${value}\n${raw.slice(idx + 1)}` : `${raw}\n${key}: ${value}\n`;
       }
     } else {
       // undefined = remove the key entirely
@@ -291,13 +291,10 @@ export async function scanSkills(dir: string): Promise<SkillInfo[]> {
 }
 
 export async function generateAgentsMd(dir: string, skills: SkillInfo[], systemPrompt?: string): Promise<void> {
-  const skillList = skills.length > 0
-    ? skills.map(s => `- ${s.name}: ${s.description}`).join('\n')
-    : '- (no skills installed)';
+  const skillList =
+    skills.length > 0 ? skills.map((s) => `- ${s.name}: ${s.description}`).join('\n') : '- (no skills installed)';
 
-  const systemPromptSection = systemPrompt
-    ? `## System Instructions\n${systemPrompt}\n\n`
-    : '';
+  const systemPromptSection = systemPrompt ? `## System Instructions\n${systemPrompt}\n\n` : '';
 
   const content = `# Assistant Context
 
@@ -326,11 +323,7 @@ export async function ensureReady(dir: string): Promise<{
   return { config, skills };
 }
 
-export async function initWorkspace(
-  dir: string,
-  config: GolemConfig,
-  builtinSkillsDir: string,
-): Promise<void> {
+export async function initWorkspace(dir: string, config: GolemConfig, builtinSkillsDir: string): Promise<void> {
   const configPath = join(dir, 'golem.yaml');
   try {
     await stat(configPath);
@@ -373,7 +366,7 @@ export async function initWorkspace(
   try {
     await stat(gitignorePath);
   } catch {
-    await writeFile(gitignorePath, gitignoreLines.join('\n') + '\n', 'utf-8');
+    await writeFile(gitignorePath, `${gitignoreLines.join('\n')}\n`, 'utf-8');
   }
 
   if (config.permissions) {
@@ -410,9 +403,5 @@ export async function generateCursorCliJson(dir: string, permissions: Permission
     cliConfig.permissions = perms;
   }
 
-  await writeFile(
-    join(cursorDir, 'cli.json'),
-    JSON.stringify(cliConfig, null, 2) + '\n',
-    'utf-8',
-  );
+  await writeFile(join(cursorDir, 'cli.json'), `${JSON.stringify(cliConfig, null, 2)}\n`, 'utf-8');
 }

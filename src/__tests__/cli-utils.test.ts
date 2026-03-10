@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { formatToolCall, truncate } from '../cli-utils.js';
 
 describe('truncate', () => {
@@ -39,7 +39,7 @@ describe('formatToolCall', () => {
   });
 
   it('truncates long paths', () => {
-    const longPath = '/very/long/' + 'x'.repeat(100) + '/file.ts';
+    const longPath = `/very/long/${'x'.repeat(100)}/file.ts`;
     const result = formatToolCall('Read', JSON.stringify({ file_path: longPath }));
     expect(result.length).toBeLessThan(70);
   });

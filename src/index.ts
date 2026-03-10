@@ -1,28 +1,67 @@
-import { resolve, join, extname } from 'node:path';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
-import { ensureReady, loadConfig, scanSkills, patchConfig, initWorkspace, type GolemConfig, type SkillInfo } from './workspace.js';
 import { existsSync } from 'node:fs';
-import { loadSession, saveSession, clearSession, pruneExpiredSessions, appendHistory, getHistoryPath } from './session.js';
-import { createEngine, type StreamEvent, type AgentEngine } from './engine.js';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import type { ImageAttachment } from './channel.js';
+import { type AgentEngine, createEngine, type StreamEvent } from './engine.js';
+import {
+  appendHistory,
+  clearSession,
+  getHistoryPath,
+  loadSession,
+  pruneExpiredSessions,
+  saveSession,
+} from './session.js';
+import {
+  ensureReady,
+  type GolemConfig,
+  initWorkspace,
+  loadConfig,
+  patchConfig,
+  type SkillInfo,
+  scanSkills,
+} from './workspace.js';
 
-export type { StreamEvent } from './engine.js';
-export type { GolemConfig, SkillInfo, ChannelsConfig, GatewayConfig, StreamingConfig, FeishuChannelConfig, DingtalkChannelConfig, WecomChannelConfig, SlackChannelConfig, TelegramChannelConfig, DiscordChannelConfig } from './workspace.js';
-export { patchConfig } from './workspace.js';
-export { createGolemServer, startServer, type ServerOpts, type GolemServer } from './server.js';
-export type { ChannelAdapter, ChannelMessage, ReadReceipt, ImageAttachment } from './channel.js';
+export type { ChannelAdapter, ChannelMessage, ImageAttachment, ReadReceipt } from './channel.js';
 export { buildSessionKey, stripMention } from './channel.js';
-export { startGateway } from './gateway.js';
-export type { DashboardContext, ChannelStatus, GatewayMetrics, RecentMessage } from './dashboard.js';
-export { parseCommand, executeCommand, type CommandResult, type CommandContext } from './commands.js';
-export { registerInstance, unregisterInstance, listInstances, listStoppedInstances, isProcessAlive, stopInstance, startInstance, findInstance, findStoppedInstance, renderFleetDashboard, startFleetServer } from './fleet.js';
+export { type CommandContext, type CommandResult, executeCommand, parseCommand } from './commands.js';
+export type { ChannelStatus, DashboardContext, GatewayMetrics, RecentMessage } from './dashboard.js';
+export type { StreamEvent } from './engine.js';
 export type { FleetEntry, FleetInstance, FleetServerOpts } from './fleet.js';
-export { Scheduler, parseCron, normalizeSchedule, getNextCronTime, getNextCronDelay } from './scheduler.js';
-export type { ScheduledTaskDef, TaskTarget, CronFields } from './scheduler.js';
-export { TaskStore } from './task-store.js';
-export type { TaskRecord, TaskExecution } from './task-store.js';
-export { ProactiveCoordinator, createProactiveCoordinator } from './proactive.js';
+export {
+  findInstance,
+  findStoppedInstance,
+  isProcessAlive,
+  listInstances,
+  listStoppedInstances,
+  registerInstance,
+  renderFleetDashboard,
+  startFleetServer,
+  startInstance,
+  stopInstance,
+  unregisterInstance,
+} from './fleet.js';
+export { startGateway } from './gateway.js';
 export type { ProactiveCoordinatorOpts } from './proactive.js';
+export { createProactiveCoordinator, ProactiveCoordinator } from './proactive.js';
+export type { CronFields, ScheduledTaskDef, TaskTarget } from './scheduler.js';
+export { getNextCronDelay, getNextCronTime, normalizeSchedule, parseCron, Scheduler } from './scheduler.js';
+export { createGolemServer, type GolemServer, type ServerOpts, startServer } from './server.js';
+export type { TaskExecution, TaskRecord } from './task-store.js';
+export { TaskStore } from './task-store.js';
+export type {
+  ChannelsConfig,
+  DingtalkChannelConfig,
+  DiscordChannelConfig,
+  FeishuChannelConfig,
+  GatewayConfig,
+  GolemConfig,
+  SkillInfo,
+  SlackChannelConfig,
+  StreamingConfig,
+  TelegramChannelConfig,
+  WecomChannelConfig,
+} from './workspace.js';
+export { patchConfig } from './workspace.js';
 
 // ── Helpers ───────────────────────────────────────────
 
@@ -58,7 +97,7 @@ class KeyedMutex {
       e.locked = true;
       return Promise.resolve();
     }
-    return new Promise<void>(r => e.queue.push(r));
+    return new Promise<void>((r) => e.queue.push(r));
   }
 
   /**
@@ -74,7 +113,7 @@ class KeyedMutex {
     if (e.queue.length >= maxPending) {
       return Promise.resolve(false);
     }
-    return new Promise<boolean>(r => e.queue.push(() => r(true)));
+    return new Promise<boolean>((r) => e.queue.push(() => r(true)));
   }
 
   release(key: string): void {
@@ -158,7 +197,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     const engine: AgentEngine = createEngine(engineType);
 
     const sessionId = await loadSession(dir, sessionKey, engineType);
-    const skillPaths = skills.map(s => s.path);
+    const skillPaths = skills.map((s) => s.path);
 
     // Save attached images to workspace temp dir so the agent can read them
     const imagePaths: string[] = [];
@@ -192,7 +231,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
 
     // Append image file paths to the message so the agent can read/view them
     if (imagePaths.length > 0) {
-      const imageRefs = imagePaths.map(p => p).join('\n');
+      const imageRefs = imagePaths.map((p) => p).join('\n');
       finalMessage += `\n\n[User attached ${imagePaths.length} image(s). File paths:\n${imageRefs}\nPlease read/view these files to see the images.]`;
     }
 
@@ -270,8 +309,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
 
     if (gotError && sessionId && !isRetry) {
       const isResumeFail =
-        errorMessage.toLowerCase().includes('resume') ||
-        errorMessage.toLowerCase().includes('session');
+        errorMessage.toLowerCase().includes('resume') || errorMessage.toLowerCase().includes('session');
       if (isResumeFail) {
         await clearSession(dir, sessionKey);
         yield { type: 'warning' as const, message: 'Session could not be resumed. Starting fresh conversation.' };
@@ -280,7 +318,11 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     }
   }
 
-  async function* chatImpl(message: string, sessionKey: string, images?: ImageAttachment[]): AsyncIterable<StreamEvent> {
+  async function* chatImpl(
+    message: string,
+    sessionKey: string,
+    images?: ImageAttachment[],
+  ): AsyncIterable<StreamEvent> {
     // Rate limits use opts values directly — no file I/O before acquiring the mutex,
     // so same-key serialization order is preserved (first caller wins the lock).
     const maxConcurrent = maxConcurrentOpt ?? 10;
@@ -291,7 +333,10 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     activeChatCount++;
     if (activeChatCount > maxConcurrent) {
       activeChatCount--;
-      yield { type: 'error', message: `Server busy: too many concurrent requests (limit: ${maxConcurrent}). Try again later.` };
+      yield {
+        type: 'error',
+        message: `Server busy: too many concurrent requests (limit: ${maxConcurrent}). Try again later.`,
+      };
       return;
     }
 
@@ -299,7 +344,10 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     const acquired = await mutex.tryAcquire(sessionKey, maxQueuePerSession);
     if (!acquired) {
       activeChatCount--;
-      yield { type: 'error', message: `Too many pending requests for this session (limit: ${maxQueuePerSession}). Try again later.` };
+      yield {
+        type: 'error',
+        message: `Too many pending requests for this session (limit: ${maxQueuePerSession}). Try again later.`,
+      };
       return;
     }
 
@@ -318,15 +366,15 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     },
 
     async init(initOpts: { engine: string; name: string }): Promise<void> {
-      const builtinSkillsDir = resolve(
-        new URL('.', import.meta.url).pathname,
-        '..',
-        'skills',
+      const builtinSkillsDir = resolve(new URL('.', import.meta.url).pathname, '..', 'skills');
+      await initWorkspace(
+        dir,
+        {
+          name: initOpts.name,
+          engine: initOpts.engine,
+        },
+        builtinSkillsDir,
       );
-      await initWorkspace(dir, {
-        name: initOpts.name,
-        engine: initOpts.engine,
-      }, builtinSkillsDir);
       engineOverride = initOpts.engine;
     },
 
@@ -353,7 +401,12 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
       }
     },
 
-    async getStatus(): Promise<{ config: GolemConfig; skills: SkillInfo[]; engine: string; model: string | undefined }> {
+    async getStatus(): Promise<{
+      config: GolemConfig;
+      skills: SkillInfo[];
+      engine: string;
+      model: string | undefined;
+    }> {
       const config = await loadConfig(dir);
       const skills = await scanSkills(dir);
       return {

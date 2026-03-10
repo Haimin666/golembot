@@ -1,7 +1,7 @@
-import type { ChannelAdapter, ChannelMessage, ReplyOptions, ImageAttachment } from '../channel.js';
+import type { ChannelAdapter, ChannelMessage, ImageAttachment, ReplyOptions } from '../channel.js';
+import { importPeer } from '../peer-require.js';
 import type { TelegramChannelConfig } from '../workspace.js';
 import { markdownToHtml } from './telegram-format.js';
-import { importPeer } from '../peer-require.js';
 
 export class TelegramAdapter implements ChannelAdapter {
   readonly name = 'telegram';
@@ -21,9 +21,7 @@ export class TelegramAdapter implements ChannelAdapter {
     try {
       grammyModule = await importPeer('grammy');
     } catch {
-      throw new Error(
-        'Telegram adapter requires grammy. Install it: npm install grammy',
-      );
+      throw new Error('Telegram adapter requires grammy. Install it: npm install grammy');
     }
 
     const { Bot } = grammyModule;
@@ -73,8 +71,7 @@ export class TelegramAdapter implements ChannelAdapter {
         const entries = [...this.seenMsgIds];
         this.seenMsgIds = new Set(entries.slice(entries.length >> 1));
       }
-      const chatType: 'dm' | 'group' =
-        message.chat.type === 'private' ? 'dm' : 'group';
+      const chatType: 'dm' | 'group' = message.chat.type === 'private' ? 'dm' : 'group';
       let text: string = rawText;
 
       let mentioned: boolean | undefined;
@@ -82,9 +79,7 @@ export class TelegramAdapter implements ChannelAdapter {
         // Detect whether this bot is @mentioned
         const botUsername = this.botUsername;
         const isMentioned = entities.some(
-          (e: any) =>
-            e.type === 'mention' &&
-            text.slice(e.offset, e.offset + e.length) === `@${botUsername}`,
+          (e: any) => e.type === 'mention' && text.slice(e.offset, e.offset + e.length) === `@${botUsername}`,
         );
         mentioned = isMentioned;
         if (isMentioned) {
@@ -116,7 +111,7 @@ export class TelegramAdapter implements ChannelAdapter {
     console.log(`[telegram] Long-polling started (@${this.botUsername})`);
   }
 
-  async reply(msg: ChannelMessage, text: string, options?: ReplyOptions): Promise<void> {
+  async reply(msg: ChannelMessage, text: string, _options?: ReplyOptions): Promise<void> {
     if (!this.bot) return;
     await this.bot.api.sendMessage(Number(msg.chatId), markdownToHtml(text), {
       parse_mode: 'HTML',

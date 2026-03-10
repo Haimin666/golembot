@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, readFile, mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { ScheduledTaskDef, TaskExecution, TaskRecord } from '../task-store.js';
 import { TaskStore } from '../task-store.js';
-import type { TaskRecord, TaskExecution, ScheduledTaskDef } from '../task-store.js';
 
 describe('TaskStore', () => {
   let dir: string;
@@ -43,7 +43,14 @@ describe('TaskStore', () => {
   describe('save', () => {
     it('creates .golem directory and writes tasks', async () => {
       const tasks: TaskRecord[] = [
-        { id: 'abc', name: 'test', schedule: '0 9 * * *', prompt: 'hello', enabled: true, createdAt: '2026-01-01T00:00:00Z' },
+        {
+          id: 'abc',
+          name: 'test',
+          schedule: '0 9 * * *',
+          prompt: 'hello',
+          enabled: true,
+          createdAt: '2026-01-01T00:00:00Z',
+        },
       ];
       await store.save(tasks);
 
@@ -65,8 +72,22 @@ describe('TaskStore', () => {
 
   describe('addTask', () => {
     it('appends a task and persists', async () => {
-      await store.addTask({ id: 't1', name: 'task1', schedule: '0 * * * *', prompt: 'do stuff', enabled: true, createdAt: '2026-01-01T00:00:00Z' });
-      await store.addTask({ id: 't2', name: 'task2', schedule: '0 * * * *', prompt: 'more stuff', enabled: true, createdAt: '2026-01-01T00:00:00Z' });
+      await store.addTask({
+        id: 't1',
+        name: 'task1',
+        schedule: '0 * * * *',
+        prompt: 'do stuff',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+      });
+      await store.addTask({
+        id: 't2',
+        name: 'task2',
+        schedule: '0 * * * *',
+        prompt: 'more stuff',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+      });
 
       const tasks = await store.load();
       expect(tasks).toHaveLength(2);
@@ -75,7 +96,14 @@ describe('TaskStore', () => {
     });
 
     it('generates id if not provided', async () => {
-      const task: TaskRecord = { id: '', name: 'auto-id', schedule: '0 * * * *', prompt: 'test', enabled: true, createdAt: '2026-01-01T00:00:00Z' };
+      const task: TaskRecord = {
+        id: '',
+        name: 'auto-id',
+        schedule: '0 * * * *',
+        prompt: 'test',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+      };
       await store.addTask(task);
 
       const tasks = await store.load();
@@ -87,8 +115,22 @@ describe('TaskStore', () => {
 
   describe('removeTask', () => {
     it('removes existing task and returns true', async () => {
-      await store.addTask({ id: 'del1', name: 'to-delete', schedule: '0 * * * *', prompt: 'x', enabled: true, createdAt: '2026-01-01T00:00:00Z' });
-      await store.addTask({ id: 'keep1', name: 'to-keep', schedule: '0 * * * *', prompt: 'y', enabled: true, createdAt: '2026-01-01T00:00:00Z' });
+      await store.addTask({
+        id: 'del1',
+        name: 'to-delete',
+        schedule: '0 * * * *',
+        prompt: 'x',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+      });
+      await store.addTask({
+        id: 'keep1',
+        name: 'to-keep',
+        schedule: '0 * * * *',
+        prompt: 'y',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+      });
 
       const result = await store.removeTask('del1');
       expect(result).toBe(true);
@@ -106,7 +148,14 @@ describe('TaskStore', () => {
 
   describe('getTask', () => {
     it('returns the task if found', async () => {
-      await store.addTask({ id: 'g1', name: 'findme', schedule: '0 * * * *', prompt: 'hi', enabled: true, createdAt: '2026-01-01T00:00:00Z' });
+      await store.addTask({
+        id: 'g1',
+        name: 'findme',
+        schedule: '0 * * * *',
+        prompt: 'hi',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+      });
       const task = await store.getTask('g1');
       expect(task).toBeDefined();
       expect(task!.name).toBe('findme');
@@ -119,9 +168,20 @@ describe('TaskStore', () => {
 
   describe('updateTask', () => {
     it('patches an existing task and returns true', async () => {
-      await store.addTask({ id: 'u1', name: 'original', schedule: '0 * * * *', prompt: 'old', enabled: true, createdAt: '2026-01-01T00:00:00Z' });
+      await store.addTask({
+        id: 'u1',
+        name: 'original',
+        schedule: '0 * * * *',
+        prompt: 'old',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+      });
 
-      const result = await store.updateTask('u1', { prompt: 'new', lastStatus: 'success', lastRun: '2026-01-02T00:00:00Z' });
+      const result = await store.updateTask('u1', {
+        prompt: 'new',
+        lastStatus: 'success',
+        lastRun: '2026-01-02T00:00:00Z',
+      });
       expect(result).toBe(true);
 
       const task = await store.getTask('u1');
@@ -136,7 +196,14 @@ describe('TaskStore', () => {
     });
 
     it('id is immutable even if patch includes it', async () => {
-      await store.addTask({ id: 'immutable', name: 'test', schedule: '0 * * * *', prompt: 'x', enabled: true, createdAt: '2026-01-01T00:00:00Z' });
+      await store.addTask({
+        id: 'immutable',
+        name: 'test',
+        schedule: '0 * * * *',
+        prompt: 'x',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+      });
 
       await store.updateTask('immutable', { id: 'hacked' } as Partial<TaskRecord>);
       const task = await store.getTask('immutable');
@@ -147,8 +214,22 @@ describe('TaskStore', () => {
 
   describe('listTasks', () => {
     it('returns all tasks', async () => {
-      await store.addTask({ id: 'l1', name: 'a', schedule: '* * * * *', prompt: 'x', enabled: true, createdAt: '2026-01-01T00:00:00Z' });
-      await store.addTask({ id: 'l2', name: 'b', schedule: '* * * * *', prompt: 'y', enabled: true, createdAt: '2026-01-01T00:00:00Z' });
+      await store.addTask({
+        id: 'l1',
+        name: 'a',
+        schedule: '* * * * *',
+        prompt: 'x',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+      });
+      await store.addTask({
+        id: 'l2',
+        name: 'b',
+        schedule: '* * * * *',
+        prompt: 'y',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+      });
 
       const list = await store.listTasks();
       expect(list).toHaveLength(2);
@@ -175,9 +256,15 @@ describe('TaskStore', () => {
     it('updates existing config task schedule and prompt', async () => {
       // Pre-populate a config task
       await store.addTask({
-        id: 'c1', name: 'daily-report', schedule: '0 9 * * *', prompt: 'old prompt', enabled: true,
-        createdAt: '2026-01-01T00:00:00Z', createdBy: 'config',
-        lastRun: '2026-01-02T00:00:00Z', lastStatus: 'success',
+        id: 'c1',
+        name: 'daily-report',
+        schedule: '0 9 * * *',
+        prompt: 'old prompt',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+        createdBy: 'config',
+        lastRun: '2026-01-02T00:00:00Z',
+        lastStatus: 'success',
       });
 
       const configTasks: ScheduledTaskDef[] = [
@@ -196,8 +283,13 @@ describe('TaskStore', () => {
 
     it('removes stale config tasks no longer in config', async () => {
       await store.addTask({
-        id: 'old', name: 'removed-task', schedule: '0 * * * *', prompt: 'x', enabled: true,
-        createdAt: '2026-01-01T00:00:00Z', createdBy: 'config',
+        id: 'old',
+        name: 'removed-task',
+        schedule: '0 * * * *',
+        prompt: 'x',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+        createdBy: 'config',
       });
 
       const configTasks: ScheduledTaskDef[] = []; // empty — old task removed from config
@@ -207,8 +299,13 @@ describe('TaskStore', () => {
 
     it('preserves IM-created tasks untouched', async () => {
       await store.addTask({
-        id: 'im1', name: 'user-task', schedule: '0 12 * * *', prompt: 'remind me', enabled: true,
-        createdAt: '2026-01-01T00:00:00Z', createdBy: 'im',
+        id: 'im1',
+        name: 'user-task',
+        schedule: '0 12 * * *',
+        prompt: 'remind me',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+        createdBy: 'im',
       });
 
       const configTasks: ScheduledTaskDef[] = [
@@ -218,12 +315,12 @@ describe('TaskStore', () => {
       const result = await store.mergeConfigTasks(configTasks);
       expect(result).toHaveLength(2);
 
-      const imTask = result.find(t => t.id === 'im1');
+      const imTask = result.find((t) => t.id === 'im1');
       expect(imTask).toBeDefined();
       expect(imTask!.createdBy).toBe('im');
       expect(imTask!.prompt).toBe('remind me');
 
-      const configTask = result.find(t => t.name === 'config-task');
+      const configTask = result.find((t) => t.name === 'config-task');
       expect(configTask).toBeDefined();
       expect(configTask!.createdBy).toBe('config');
     });
@@ -247,9 +344,13 @@ describe('TaskStore', () => {
   describe('recordExecution', () => {
     it('appends execution to JSONL file', async () => {
       const exec: TaskExecution = {
-        taskId: 't1', taskName: 'test', startedAt: '2026-01-01T00:00:00Z',
-        completedAt: '2026-01-01T00:01:00Z', status: 'success',
-        reply: 'done', durationMs: 60000,
+        taskId: 't1',
+        taskName: 'test',
+        startedAt: '2026-01-01T00:00:00Z',
+        completedAt: '2026-01-01T00:01:00Z',
+        status: 'success',
+        reply: 'done',
+        durationMs: 60000,
       };
 
       await store.recordExecution(exec);
@@ -264,8 +365,13 @@ describe('TaskStore', () => {
 
     it('creates .golem directory if missing', async () => {
       await store.recordExecution({
-        taskId: 'x', taskName: 'x', startedAt: 'ts', completedAt: 'ts',
-        status: 'success', reply: 'ok', durationMs: 1,
+        taskId: 'x',
+        taskName: 'x',
+        startedAt: 'ts',
+        completedAt: 'ts',
+        status: 'success',
+        reply: 'ok',
+        durationMs: 1,
       });
 
       const raw = await readFile(join(dir, '.golem', 'tasks-history.jsonl'), 'utf-8');
@@ -282,9 +388,34 @@ describe('TaskStore', () => {
 
     it('returns entries for a specific taskId, most recent first', async () => {
       await seedHistory([
-        { taskId: 't1', taskName: 'a', startedAt: '2026-01-01T01:00:00Z', completedAt: '2026-01-01T01:01:00Z', status: 'success', reply: 'first', durationMs: 1000 },
-        { taskId: 't2', taskName: 'b', startedAt: '2026-01-01T02:00:00Z', completedAt: '2026-01-01T02:01:00Z', status: 'success', reply: 'other', durationMs: 1000 },
-        { taskId: 't1', taskName: 'a', startedAt: '2026-01-01T03:00:00Z', completedAt: '2026-01-01T03:01:00Z', status: 'error', reply: '', durationMs: 500, error: 'oops' },
+        {
+          taskId: 't1',
+          taskName: 'a',
+          startedAt: '2026-01-01T01:00:00Z',
+          completedAt: '2026-01-01T01:01:00Z',
+          status: 'success',
+          reply: 'first',
+          durationMs: 1000,
+        },
+        {
+          taskId: 't2',
+          taskName: 'b',
+          startedAt: '2026-01-01T02:00:00Z',
+          completedAt: '2026-01-01T02:01:00Z',
+          status: 'success',
+          reply: 'other',
+          durationMs: 1000,
+        },
+        {
+          taskId: 't1',
+          taskName: 'a',
+          startedAt: '2026-01-01T03:00:00Z',
+          completedAt: '2026-01-01T03:01:00Z',
+          status: 'error',
+          reply: '',
+          durationMs: 500,
+          error: 'oops',
+        },
       ]);
 
       const history = await store.getHistory('t1');
@@ -298,9 +429,13 @@ describe('TaskStore', () => {
     it('respects limit parameter', async () => {
       for (let i = 0; i < 5; i++) {
         await store.recordExecution({
-          taskId: 't1', taskName: 'a', startedAt: `2026-01-0${i + 1}T00:00:00Z`,
-          completedAt: `2026-01-0${i + 1}T00:01:00Z`, status: 'success',
-          reply: `run-${i}`, durationMs: 1000,
+          taskId: 't1',
+          taskName: 'a',
+          startedAt: `2026-01-0${i + 1}T00:00:00Z`,
+          completedAt: `2026-01-0${i + 1}T00:01:00Z`,
+          status: 'success',
+          reply: `run-${i}`,
+          durationMs: 1000,
         });
       }
 
@@ -318,8 +453,13 @@ describe('TaskStore', () => {
 
     it('returns empty array when taskId has no executions', async () => {
       await store.recordExecution({
-        taskId: 'other', taskName: 'x', startedAt: 'ts', completedAt: 'ts',
-        status: 'success', reply: 'ok', durationMs: 1,
+        taskId: 'other',
+        taskName: 'x',
+        startedAt: 'ts',
+        completedAt: 'ts',
+        status: 'success',
+        reply: 'ok',
+        durationMs: 1,
       });
 
       const history = await store.getHistory('nonexistent');
@@ -329,8 +469,13 @@ describe('TaskStore', () => {
     it('defaults limit to 20', async () => {
       for (let i = 0; i < 25; i++) {
         await store.recordExecution({
-          taskId: 't1', taskName: 'a', startedAt: `ts-${i}`, completedAt: `ts-${i}`,
-          status: 'success', reply: `r-${i}`, durationMs: 1,
+          taskId: 't1',
+          taskName: 'a',
+          startedAt: `ts-${i}`,
+          completedAt: `ts-${i}`,
+          status: 'success',
+          reply: `r-${i}`,
+          durationMs: 1,
         });
       }
 

@@ -1,9 +1,9 @@
-import { symlink, readdir, mkdir, lstat, unlink } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { join, basename, resolve } from 'node:path';
-import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
-import type { AgentEngine, InvokeOpts, StreamEvent, ListModelsOpts } from '../engine.js';
+import { existsSync } from 'node:fs';
+import { lstat, mkdir, readdir, symlink, unlink } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { basename, join, resolve } from 'node:path';
+import type { AgentEngine, InvokeOpts, ListModelsOpts, StreamEvent } from '../engine.js';
 import { isOnPath } from './shared.js';
 
 // ── stream-json event parsing ───────────────────────────
@@ -56,8 +56,8 @@ export function parseClaudeStreamLine(line: string): StreamEvent[] {
           resultContent = block.content;
         } else if (Array.isArray(block.content)) {
           resultContent = (block.content as Array<Record<string, unknown>>)
-            .filter(b => b.type === 'text')
-            .map(b => (b.text as string) || '')
+            .filter((b) => b.type === 'text')
+            .map((b) => (b.text as string) || '')
             .join('\n');
         } else {
           resultContent = '';
@@ -89,7 +89,7 @@ export function parseClaudeStreamLine(line: string): StreamEvent[] {
 export async function injectClaudeSkills(
   workspace: string,
   skillPaths: string[],
-  skillDescriptions?: Array<{ name: string; description: string }>,
+  _skillDescriptions?: Array<{ name: string; description: string }>,
 ): Promise<void> {
   const claudeSkillsDir = join(workspace, '.claude', 'skills');
   await mkdir(claudeSkillsDir, { recursive: true });
@@ -122,7 +122,9 @@ export async function injectClaudeSkills(
   try {
     const existing = await lstat(claudeMdPath).catch(() => null);
     if (existing) await unlink(claudeMdPath);
-  } catch { /* doesn't exist yet */ }
+  } catch {
+    /* doesn't exist yet */
+  }
   try {
     await symlink('AGENTS.md', claudeMdPath);
   } catch (e: unknown) {
@@ -139,8 +141,8 @@ function findClaudeBin(): string {
   if (!existsSync(localBin) && !isOnPath('claude')) {
     throw new Error(
       `Claude Code CLI ("claude") not found at ${localBin}\n` +
-      `Install it with: npm install -g @anthropic-ai/claude-code\n` +
-      `See: https://code.claude.com/docs/en/overview`
+        `Install it with: npm install -g @anthropic-ai/claude-code\n` +
+        `See: https://code.claude.com/docs/en/overview`,
     );
   }
   return existsSync(localBin) ? localBin : 'claude';
@@ -151,18 +153,14 @@ export class ClaudeCodeEngine implements AgentEngine {
     await injectClaudeSkills(opts.workspace, opts.skillPaths);
 
     const claudeBin = findClaudeBin();
-    const args = [
-      '-p', prompt,
-      '--output-format', 'stream-json',
-      '--verbose',
-    ];
+    const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose'];
     if (opts.skipPermissions !== false) {
       args.push('--dangerously-skip-permissions');
       if (!_warnedSkipPermissions) {
         _warnedSkipPermissions = true;
         process.stderr.write(
           '\x1b[33mWarning: running Claude Code with --dangerously-skip-permissions. ' +
-          'Set skipPermissions: false in golem.yaml to require manual approval.\x1b[0m\n',
+            'Set skipPermissions: false in golem.yaml to require manual approval.\x1b[0m\n',
         );
       }
     }
@@ -170,7 +168,7 @@ export class ClaudeCodeEngine implements AgentEngine {
     if (opts.model) args.push('--model', opts.model);
 
     const env: Record<string, string> = {
-      ...process.env as Record<string, string>,
+      ...(process.env as Record<string, string>),
       PATH: `${join(homedir(), '.local', 'bin')}:${process.env.PATH || ''}`,
     };
     if (opts.apiKey) env.ANTHROPIC_API_KEY = opts.apiKey;
@@ -190,7 +188,10 @@ export class ClaudeCodeEngine implements AgentEngine {
 
     function enqueue(evt: StreamEvent | null) {
       queue.push(evt);
-      if (resolver) { resolver(); resolver = null; }
+      if (resolver) {
+        resolver();
+        resolver = null;
+      }
     }
 
     function processBuffer() {
@@ -204,7 +205,11 @@ export class ClaudeCodeEngine implements AgentEngine {
 
     if (opts.signal) {
       const abortHandler = () => {
-        try { child.kill(); } catch { /* already dead */ }
+        try {
+          child.kill();
+        } catch {
+          /* already dead */
+        }
         enqueue({ type: 'error', message: 'Agent invocation timed out' });
         enqueue(null);
       };
@@ -212,12 +217,18 @@ export class ClaudeCodeEngine implements AgentEngine {
       child.once('close', () => opts.signal!.removeEventListener('abort', abortHandler));
     }
 
-    child.stdout!.on('data', (chunk: Buffer) => { buffer += chunk.toString(); processBuffer(); });
+    child.stdout!.on('data', (chunk: Buffer) => {
+      buffer += chunk.toString();
+      processBuffer();
+    });
 
     child.on('close', (exitCode: number | null) => {
-      if (buffer.trim()) { buffer += '\n'; processBuffer(); }
+      if (buffer.trim()) {
+        buffer += '\n';
+        processBuffer();
+      }
       const code = exitCode ?? 1;
-      if (code !== 0 && !queue.some(e => e && (e.type === 'done' || e.type === 'error'))) {
+      if (code !== 0 && !queue.some((e) => e && (e.type === 'done' || e.type === 'error'))) {
         enqueue({ type: 'error', message: `Claude Code process exited with code ${code}` });
       }
       enqueue(null);
@@ -229,13 +240,20 @@ export class ClaudeCodeEngine implements AgentEngine {
     });
 
     while (true) {
-      if (queue.length === 0) await new Promise<void>(r => { resolver = r; });
+      if (queue.length === 0)
+        await new Promise<void>((r) => {
+          resolver = r;
+        });
       while (queue.length > 0) {
         const evt = queue.shift()!;
         if (evt === null) return;
         yield evt;
         if (evt.type === 'done' || evt.type === 'error') {
-          try { child.kill(); } catch { /* already dead */ }
+          try {
+            child.kill();
+          } catch {
+            /* already dead */
+          }
           return;
         }
       }
@@ -251,8 +269,10 @@ export class ClaudeCodeEngine implements AgentEngine {
           signal: AbortSignal.timeout(10_000),
         });
         const data = (await resp.json()) as { data?: Array<{ id: string }> };
-        if (data.data?.length) return data.data.map(m => m.id).sort();
-      } catch { /* fallback below */ }
+        if (data.data?.length) return data.data.map((m) => m.id).sort();
+      } catch {
+        /* fallback below */
+      }
     }
     return ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
   }

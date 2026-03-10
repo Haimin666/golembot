@@ -1,6 +1,6 @@
-import type { ChannelAdapter, ChannelMessage, ReplyOptions, ImageAttachment } from '../channel.js';
-import type { DiscordChannelConfig } from '../workspace.js';
+import type { ChannelAdapter, ChannelMessage, ImageAttachment, ReplyOptions } from '../channel.js';
 import { importPeer } from '../peer-require.js';
+import type { DiscordChannelConfig } from '../workspace.js';
 
 export class DiscordAdapter implements ChannelAdapter {
   readonly name = 'discord';
@@ -21,9 +21,7 @@ export class DiscordAdapter implements ChannelAdapter {
     try {
       discordModule = await importPeer('discord.js');
     } catch {
-      throw new Error(
-        'Discord adapter requires discord.js. Install it: npm install discord.js',
-      );
+      throw new Error('Discord adapter requires discord.js. Install it: npm install discord.js');
     }
     const { Client, GatewayIntentBits, Partials } = discordModule;
 
@@ -86,10 +84,7 @@ export class DiscordAdapter implements ChannelAdapter {
       // Normalize Discord mention tokens (<@botId>, <@!botId>):
       // - If botName is set: replace with @botName so gateway's detectMention works.
       // - If no botName: strip the token entirely so the engine receives clean text.
-      let text = (message.content || '').replace(
-        new RegExp(`<@!?${botId}>`, 'g'),
-        botName ? `@${botName}` : '',
-      ).trim();
+      let text = (message.content || '').replace(new RegExp(`<@!?${botId}>`, 'g'), botName ? `@${botName}` : '').trim();
 
       if (!text && images.length > 0) text = '(image)';
 
@@ -107,7 +102,7 @@ export class DiscordAdapter implements ChannelAdapter {
     });
   }
 
-  async reply(msg: ChannelMessage, text: string, options?: ReplyOptions): Promise<void> {
+  async reply(msg: ChannelMessage, text: string, _options?: ReplyOptions): Promise<void> {
     const raw = msg.raw as any;
     await raw.reply({ content: text });
   }

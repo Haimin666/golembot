@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, appendFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const GOLEM_DIR = '.golem';
@@ -59,14 +59,10 @@ async function readStore(dir: string): Promise<SessionStore> {
 async function writeStore(dir: string, store: SessionStore): Promise<void> {
   const golemDir = join(dir, GOLEM_DIR);
   await mkdir(golemDir, { recursive: true });
-  await writeFile(sessionPath(dir), JSON.stringify(store, null, 2) + '\n', 'utf-8');
+  await writeFile(sessionPath(dir), `${JSON.stringify(store, null, 2)}\n`, 'utf-8');
 }
 
-export async function loadSession(
-  dir: string,
-  key?: string,
-  engineType?: string,
-): Promise<string | undefined> {
+export async function loadSession(dir: string, key?: string, engineType?: string): Promise<string | undefined> {
   const store = await readStore(dir);
   const entry = store[key || DEFAULT_KEY];
   if (!entry) return undefined;
@@ -76,12 +72,7 @@ export async function loadSession(
   return entry.engineSessionId || undefined;
 }
 
-export async function saveSession(
-  dir: string,
-  sessionId: string,
-  key?: string,
-  engineType?: string,
-): Promise<void> {
+export async function saveSession(dir: string, sessionId: string, key?: string, engineType?: string): Promise<void> {
   const store = await readStore(dir);
   store[key || DEFAULT_KEY] = { engineSessionId: sessionId, lastUsed: Date.now(), engineType };
   await writeStore(dir, store);
@@ -115,7 +106,7 @@ export async function countSessions(dir: string): Promise<number> {
 
 export async function appendHistory(dir: string, entry: HistoryEntry): Promise<void> {
   const path = historyPath(dir, entry.sessionKey);
-  const line = JSON.stringify(entry) + '\n';
+  const line = `${JSON.stringify(entry)}\n`;
   try {
     await appendFile(path, line, 'utf-8');
   } catch (e: unknown) {

@@ -4,7 +4,7 @@
 
 export function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
-  return s.slice(0, max - 1) + '\u2026';
+  return `${s.slice(0, max - 1)}\u2026`;
 }
 
 export function formatToolCall(name: string, argsJson: string): string {

@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
-import { parseCommand, executeCommand, type CommandContext } from '../commands.js';
-import type { TaskStore } from '../task-store.js';
+import { describe, expect, it, vi } from 'vitest';
+import { type CommandContext, executeCommand, parseCommand } from '../commands.js';
 import type { Scheduler } from '../scheduler.js';
+import type { TaskStore } from '../task-store.js';
 
 // ── parseCommand ─────────────────────────────────────────
 
@@ -234,9 +234,7 @@ const mockHistory = [
 function makeMockTaskStore(): TaskStore {
   return {
     listTasks: vi.fn().mockResolvedValue(mockTasks),
-    getTask: vi.fn().mockImplementation(async (id: string) =>
-      mockTasks.find((t) => t.id === id),
-    ),
+    getTask: vi.fn().mockImplementation(async (id: string) => mockTasks.find((t) => t.id === id)),
     getHistory: vi.fn().mockResolvedValue(mockHistory),
     updateTask: vi.fn().mockResolvedValue(true),
     removeTask: vi.fn().mockResolvedValue(true),
@@ -293,8 +291,8 @@ describe('/cron', () => {
     const result = await executeCommand({ name: '/cron', args: ['enable', 'task-1'] }, ctx);
     expect(result).not.toBeNull();
     expect(result!.text).toContain('enabled');
-    expect((ctx.taskStore!.updateTask as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-1', { enabled: true });
-    expect((ctx.scheduler!.enableTask as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-1');
+    expect(ctx.taskStore!.updateTask as ReturnType<typeof vi.fn>).toHaveBeenCalledWith('task-1', { enabled: true });
+    expect(ctx.scheduler!.enableTask as ReturnType<typeof vi.fn>).toHaveBeenCalledWith('task-1');
   });
 
   it('/cron disable <id> disables the task', async () => {
@@ -302,8 +300,8 @@ describe('/cron', () => {
     const result = await executeCommand({ name: '/cron', args: ['disable', 'task-2'] }, ctx);
     expect(result).not.toBeNull();
     expect(result!.text).toContain('disabled');
-    expect((ctx.taskStore!.updateTask as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-2', { enabled: false });
-    expect((ctx.scheduler!.disableTask as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-2');
+    expect(ctx.taskStore!.updateTask as ReturnType<typeof vi.fn>).toHaveBeenCalledWith('task-2', { enabled: false });
+    expect(ctx.scheduler!.disableTask as ReturnType<typeof vi.fn>).toHaveBeenCalledWith('task-2');
   });
 
   it('/cron del <id> deletes the task', async () => {
@@ -311,8 +309,8 @@ describe('/cron', () => {
     const result = await executeCommand({ name: '/cron', args: ['del', 'task-1'] }, ctx);
     expect(result).not.toBeNull();
     expect(result!.text).toContain('deleted');
-    expect((ctx.taskStore!.removeTask as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-1');
-    expect((ctx.scheduler!.removeTask as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-1');
+    expect(ctx.taskStore!.removeTask as ReturnType<typeof vi.fn>).toHaveBeenCalledWith('task-1');
+    expect(ctx.scheduler!.removeTask as ReturnType<typeof vi.fn>).toHaveBeenCalledWith('task-1');
   });
 
   it('/cron history <id> returns execution history', async () => {
@@ -323,7 +321,7 @@ describe('/cron', () => {
     expect(result!.text).toContain('success');
     expect(result!.text).toContain('error');
     expect(result!.data!.history).toHaveLength(2);
-    expect((ctx.taskStore!.getHistory as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('task-1', 10);
+    expect(ctx.taskStore!.getHistory as ReturnType<typeof vi.fn>).toHaveBeenCalledWith('task-1', 10);
   });
 
   it('/cron when taskStore is not available returns gateway mode message', async () => {

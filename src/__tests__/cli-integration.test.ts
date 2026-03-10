@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir, readFile, readdir, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
-import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const exec = promisify(execFile);
 
@@ -76,7 +76,7 @@ describe('CLI integration', () => {
 
   it('doctor runs and reports checks', async () => {
     await runCli(['init', '-e', 'cursor', '-n', 'doc-bot'], dir);
-    const { stdout, exitCode } = await runCli(['doctor', '-d', dir]);
+    const { stdout } = await runCli(['doctor', '-d', dir]);
     // May exit 0 or 1 depending on env, but should produce output
     expect(stdout).toContain('Node.js');
     expect(stdout).toContain('golem.yaml');

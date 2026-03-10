@@ -1,10 +1,10 @@
-import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { Server as HttpServer } from 'node:http';
+import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { type CommandContext, executeCommand, parseCommand } from './commands.js';
+import { buildDashboardData, type DashboardContext, recordMessage, renderDashboard } from './dashboard.js';
 import type { Assistant } from './index.js';
-import { parseCommand, executeCommand, type CommandContext } from './commands.js';
-import { type DashboardContext, buildDashboardData, renderDashboard, recordMessage } from './dashboard.js';
-import type { TaskStore } from './task-store.js';
 import type { Scheduler } from './scheduler.js';
+import type { TaskStore } from './task-store.js';
 
 export interface CronContext {
   taskStore: TaskStore;
@@ -47,7 +47,13 @@ function checkAuth(req: IncomingMessage, url: URL, token: string | undefined): b
   return url.searchParams.get('token') === token;
 }
 
-export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, dashboard?: DashboardContext, dir?: string, getCronCtx?: () => CronContext | undefined): GolemServer {
+export function createGolemServer(
+  assistant: Assistant,
+  opts: ServerOpts = {},
+  dashboard?: DashboardContext,
+  dir?: string,
+  getCronCtx?: () => CronContext | undefined,
+): GolemServer {
   const token = opts.token || process.env.GOLEM_TOKEN;
   const activeConnections = new Set<ServerResponse>();
 
@@ -56,7 +62,11 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
 
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
     const path = url.pathname;
@@ -88,7 +98,11 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
 
     // POST /chat — SSE streaming
     if (path === '/chat' && req.method === 'POST') {
-      let body: { message?: string; sessionKey?: string; images?: Array<{ mimeType?: string; data?: string; fileName?: string }> };
+      let body: {
+        message?: string;
+        sessionKey?: string;
+        images?: Array<{ mimeType?: string; data?: string; fileName?: string }>;
+      };
       try {
         body = JSON.parse(await readBody(req));
       } catch {
@@ -114,7 +128,9 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
               data: Buffer.from(img.data, 'base64'),
               fileName: img.fileName,
             });
-          } catch { /* skip malformed entries */ }
+          } catch {
+            /* skip malformed entries */
+          }
         }
       }
 
@@ -148,7 +164,7 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        Connection: 'keep-alive',
       });
 
       activeConnections.add(res);
@@ -159,10 +175,16 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
       let costUsd: number | undefined;
       let durationMs: number | undefined;
       try {
-        for await (const event of assistant.chat(chatMessage, { sessionKey: body.sessionKey, images: images.length > 0 ? images : undefined })) {
+        for await (const event of assistant.chat(chatMessage, {
+          sessionKey: body.sessionKey,
+          images: images.length > 0 ? images : undefined,
+        })) {
           res.write(`data: ${JSON.stringify(event)}\n\n`);
           if (event.type === 'text') replyText += event.content;
-          else if (event.type === 'done') { costUsd = event.costUsd; durationMs = event.durationMs; }
+          else if (event.type === 'done') {
+            costUsd = event.costUsd;
+            durationMs = event.durationMs;
+          }
         }
       } catch (e: unknown) {
         const errEvent = { type: 'error', message: (e as Error).message };
@@ -176,7 +198,7 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
           sender: body.sessionKey ?? 'anonymous',
           messagePreview: chatMessage.slice(0, 120),
           responsePreview: replyText.slice(0, 120),
-          durationMs: durationMs ?? (Date.now() - chatStartMs),
+          durationMs: durationMs ?? Date.now() - chatStartMs,
           costUsd,
         });
       }
@@ -221,7 +243,7 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        Connection: 'keep-alive',
       });
       res.write(': connected\n\n');
       dashboard.metrics.eventSubscribers.add(res);
@@ -238,7 +260,9 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
       if (opts.onShutdown) {
         json(res, 200, { ok: true });
         // Delay shutdown slightly so the response is sent first
-        setTimeout(() => { opts.onShutdown!(); }, 200);
+        setTimeout(() => {
+          opts.onShutdown!();
+        }, 200);
       } else {
         json(res, 404, { error: 'Shutdown not available' });
       }
@@ -254,7 +278,9 @@ export function createGolemServer(assistant: Assistant, opts: ServerOpts = {}, d
       try {
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Server shutting down' })}\n\n`);
         res.end();
-      } catch { /* best effort */ }
+      } catch {
+        /* best effort */
+      }
     }
     activeConnections.clear();
     server.close();

@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { loadConfig, writeConfig, resolveEnvPlaceholders, type GolemConfig } from '../workspace.js';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { type GolemConfig, loadConfig, resolveEnvPlaceholders, writeConfig } from '../workspace.js';
 
 describe('resolveEnvPlaceholders', () => {
   const ORIGINAL_ENV = process.env;
@@ -143,11 +143,7 @@ describe('loadConfig groupChat field', () => {
   });
 
   it('leaves groupChat undefined when absent', async () => {
-    await writeFile(
-      join(tmpDir, 'golem.yaml'),
-      'name: bot\nengine: cursor\n',
-      'utf-8',
-    );
+    await writeFile(join(tmpDir, 'golem.yaml'), 'name: bot\nengine: cursor\n', 'utf-8');
     const config = await loadConfig(tmpDir);
     expect(config.groupChat).toBeUndefined();
   });

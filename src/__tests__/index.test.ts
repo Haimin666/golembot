@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtemp, rm, writeFile, readFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import type { StreamEvent, AgentEngine, InvokeOpts } from '../engine.js';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AgentEngine, InvokeOpts, StreamEvent } from '../engine.js';
 
 // ── Mock engines ────────────────────────────────────────
 
@@ -45,10 +45,10 @@ vi.mock('../engine.js', async (importOriginal) => {
   };
 });
 
-import { createAssistant } from '../index.js';
-import { createEngine } from '../engine.js';
-import { loadSession } from '../session.js';
 import { readFile as fsReadFile } from 'node:fs/promises';
+import { createEngine } from '../engine.js';
+import { createAssistant } from '../index.js';
+import { loadSession } from '../session.js';
 
 const mockedCreateEngine = vi.mocked(createEngine);
 
@@ -91,7 +91,7 @@ describe('createAssistant', () => {
       const assistant = createAssistant({ dir });
       const events: StreamEvent[] = [];
       for await (const evt of assistant.chat('Analyze data')) events.push(evt);
-      expect(events.map(e => e.type)).toEqual(['text', 'tool_call', 'text', 'done']);
+      expect(events.map((e) => e.type)).toEqual(['text', 'tool_call', 'text', 'done']);
     });
 
     it('error scenario', async () => {
@@ -112,7 +112,8 @@ describe('createAssistant', () => {
         'name: test-bot\nengine: cursor\nsystemPrompt: "You are a helpful assistant."\n',
       );
       const assistant = createAssistant({ dir });
-      for await (const _ of assistant.chat('Hello')) {}
+      for await (const _ of assistant.chat('Hello')) {
+      }
       const agentsMd = await fsReadFile(join(dir, 'AGENTS.md'), 'utf-8');
       expect(agentsMd).toContain('## System Instructions');
       expect(agentsMd).toContain('You are a helpful assistant.');
@@ -131,13 +132,15 @@ describe('createAssistant', () => {
         },
       });
       const assistant = createAssistant({ dir });
-      for await (const _ of assistant.chat('Hello')) {}
+      for await (const _ of assistant.chat('Hello')) {
+      }
       expect(capturedPrompt).toBe('Hello');
     });
 
     it('without systemPrompt, AGENTS.md has no System Instructions section', async () => {
       const assistant = createAssistant({ dir });
-      for await (const _ of assistant.chat('Hello')) {}
+      for await (const _ of assistant.chat('Hello')) {
+      }
       const agentsMd = await fsReadFile(join(dir, 'AGENTS.md'), 'utf-8');
       expect(agentsMd).not.toContain('## System Instructions');
     });
@@ -146,7 +149,7 @@ describe('createAssistant', () => {
       const assistant = createAssistant({ dir });
       const events: StreamEvent[] = [];
       for await (const evt of assistant.chat('Hello')) events.push(evt);
-      const textEvt = events.find(e => e.type === 'text') as Extract<StreamEvent, { type: 'text' }>;
+      const textEvt = events.find((e) => e.type === 'text') as Extract<StreamEvent, { type: 'text' }>;
       expect(textEvt.content).toBe('Reply: Hello');
     });
   });
@@ -164,7 +167,8 @@ describe('createAssistant', () => {
       });
 
       const assistant = createAssistant({ dir, apiKey: 'my-secret-key' });
-      for await (const _ of assistant.chat('hello')) {}
+      for await (const _ of assistant.chat('hello')) {
+      }
 
       expect(capturedApiKey).toBe('my-secret-key');
     });
@@ -179,7 +183,8 @@ describe('createAssistant', () => {
       });
 
       const assistant = createAssistant({ dir });
-      for await (const _ of assistant.chat('hello')) {}
+      for await (const _ of assistant.chat('hello')) {
+      }
 
       expect(capturedApiKey).toBeUndefined();
     });
@@ -200,7 +205,7 @@ describe('createAssistant', () => {
       const events: StreamEvent[] = [];
       for await (const evt of assistant.chat('test')) events.push(evt);
 
-      const doneEvt = events.find(e => e.type === 'done');
+      const doneEvt = events.find((e) => e.type === 'done');
       expect(doneEvt).toBeDefined();
       expect((doneEvt as { type: 'done'; durationMs?: number }).durationMs).toBe(12345);
     });
@@ -216,7 +221,7 @@ describe('createAssistant', () => {
       const events: StreamEvent[] = [];
       for await (const evt of assistant.chat('test')) events.push(evt);
 
-      const doneEvt = events.find(e => e.type === 'done');
+      const doneEvt = events.find((e) => e.type === 'done');
       expect(doneEvt).toEqual({ type: 'done', sessionId: 'sess-nd' });
     });
   });
@@ -235,8 +240,10 @@ describe('createAssistant', () => {
 
       const assistant = createAssistant({ dir });
 
-      for await (const _ of assistant.chat('hi', { sessionKey: 'user:alice' })) {}
-      for await (const _ of assistant.chat('hi', { sessionKey: 'user:bob' })) {}
+      for await (const _ of assistant.chat('hi', { sessionKey: 'user:alice' })) {
+      }
+      for await (const _ of assistant.chat('hi', { sessionKey: 'user:bob' })) {
+      }
 
       expect(await loadSession(dir, 'user:alice')).toBe('sess-1');
       expect(await loadSession(dir, 'user:bob')).toBe('sess-2');
@@ -258,7 +265,8 @@ describe('createAssistant', () => {
       const { saveSession } = await import('../session.js');
       await saveSession(dir, 'sess-round-1', 'user:alice');
 
-      for await (const _ of assistant.chat('hello', { sessionKey: 'user:alice' })) {}
+      for await (const _ of assistant.chat('hello', { sessionKey: 'user:alice' })) {
+      }
       expect(capturedSessionId).toBe('sess-round-1');
       expect(await loadSession(dir, 'user:alice')).toBe('sess-round-2');
     });
@@ -278,7 +286,8 @@ describe('createAssistant', () => {
 
     it('no sessionKey defaults to "default"', async () => {
       const assistant = createAssistant({ dir });
-      for await (const _ of assistant.chat('hi')) {}
+      for await (const _ of assistant.chat('hi')) {
+      }
       expect(await loadSession(dir, 'default')).toBe('mock-session-001');
       expect(await loadSession(dir)).toBe('mock-session-001');
     });
@@ -292,15 +301,21 @@ describe('createAssistant', () => {
       mockedCreateEngine.mockReturnValue({
         async *invoke(prompt: string) {
           order.push(`start:${prompt}`);
-          await new Promise(r => setTimeout(r, 30));
+          await new Promise((r) => setTimeout(r, 30));
           order.push(`end:${prompt}`);
           yield { type: 'done', sessionId: 's' } as StreamEvent;
         },
       });
 
       const assistant = createAssistant({ dir });
-      const p1 = (async () => { for await (const _ of assistant.chat('A', { sessionKey: 'k' })) {} })();
-      const p2 = (async () => { for await (const _ of assistant.chat('B', { sessionKey: 'k' })) {} })();
+      const p1 = (async () => {
+        for await (const _ of assistant.chat('A', { sessionKey: 'k' })) {
+        }
+      })();
+      const p2 = (async () => {
+        for await (const _ of assistant.chat('B', { sessionKey: 'k' })) {
+        }
+      })();
       await Promise.all([p1, p2]);
 
       expect(order.indexOf('end:A')).toBeLessThan(order.indexOf('start:B'));
@@ -311,15 +326,21 @@ describe('createAssistant', () => {
       mockedCreateEngine.mockReturnValue({
         async *invoke(prompt: string) {
           order.push(`start:${prompt}`);
-          await new Promise(r => setTimeout(r, 30));
+          await new Promise((r) => setTimeout(r, 30));
           order.push(`end:${prompt}`);
           yield { type: 'done', sessionId: 's' } as StreamEvent;
         },
       });
 
       const assistant = createAssistant({ dir });
-      const p1 = (async () => { for await (const _ of assistant.chat('A', { sessionKey: 'k1' })) {} })();
-      const p2 = (async () => { for await (const _ of assistant.chat('B', { sessionKey: 'k2' })) {} })();
+      const p1 = (async () => {
+        for await (const _ of assistant.chat('A', { sessionKey: 'k1' })) {
+        }
+      })();
+      const p2 = (async () => {
+        for await (const _ of assistant.chat('B', { sessionKey: 'k2' })) {
+        }
+      })();
       await Promise.all([p1, p2]);
 
       // Both should start before either ends (parallel)
@@ -341,10 +362,10 @@ describe('createAssistant', () => {
       const events: StreamEvent[] = [];
       for await (const evt of assistant.chat('Resume conversation')) events.push(evt);
 
-      expect(events.some(e => e.type === 'error')).toBe(true);
-      expect(events.some(e => e.type === 'warning' && e.message.includes('could not be resumed'))).toBe(true);
-      expect(events.some(e => e.type === 'text' && e.content === 'New session started')).toBe(true);
-      expect(events.some(e => e.type === 'done' && e.sessionId === 'fresh-session-999')).toBe(true);
+      expect(events.some((e) => e.type === 'error')).toBe(true);
+      expect(events.some((e) => e.type === 'warning' && e.message.includes('could not be resumed'))).toBe(true);
+      expect(events.some((e) => e.type === 'text' && e.content === 'New session started')).toBe(true);
+      expect(events.some((e) => e.type === 'done' && e.sessionId === 'fresh-session-999')).toBe(true);
     });
   });
 
@@ -363,7 +384,8 @@ describe('createAssistant', () => {
       });
 
       const assistant = createAssistant({ dir });
-      for await (const _ of assistant.chat('hello')) {}
+      for await (const _ of assistant.chat('hello')) {
+      }
 
       expect(capturedSkipPermissions).toBe(false);
     });
@@ -378,7 +400,8 @@ describe('createAssistant', () => {
       });
 
       const assistant = createAssistant({ dir });
-      for await (const _ of assistant.chat('hello')) {}
+      for await (const _ of assistant.chat('hello')) {
+      }
 
       expect(capturedSkipPermissions).toBeUndefined();
     });
@@ -398,7 +421,7 @@ describe('createAssistant', () => {
       // Slow engine: holds the session lock for 200ms
       mockedCreateEngine.mockReturnValue({
         async *invoke() {
-          await new Promise(r => setTimeout(r, 200));
+          await new Promise((r) => setTimeout(r, 200));
           yield { type: 'done', sessionId: 'slow' } as StreamEvent;
         },
       });
@@ -412,7 +435,7 @@ describe('createAssistant', () => {
       })();
 
       // Give A a moment to acquire the mutex
-      await new Promise(r => setTimeout(r, 20));
+      await new Promise((r) => setTimeout(r, 20));
 
       // B should be rejected because queue is full (maxQueuePerSession=0)
       const bEvents: StreamEvent[] = [];
@@ -421,7 +444,7 @@ describe('createAssistant', () => {
       expect(bEvents[0]).toMatchObject({ type: 'error', message: /too many pending/i });
 
       await aPromise;
-      expect(aEvents.some(e => e.type === 'done')).toBe(true);
+      expect(aEvents.some((e) => e.type === 'done')).toBe(true);
     });
   });
 
@@ -432,7 +455,7 @@ describe('createAssistant', () => {
       mockedCreateEngine.mockReturnValue({
         async *invoke(_p: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
           // Hang until abort signal fires
-          await new Promise<void>(resolve => {
+          await new Promise<void>((resolve) => {
             if (opts.signal?.aborted) return resolve();
             opts.signal?.addEventListener('abort', () => resolve(), { once: true });
           });
@@ -444,7 +467,7 @@ describe('createAssistant', () => {
       const events: StreamEvent[] = [];
       for await (const evt of assistant.chat('slow task')) events.push(evt);
 
-      expect(events.some(e => e.type === 'error' && e.message.includes('timed out'))).toBe(true);
+      expect(events.some((e) => e.type === 'error' && e.message.includes('timed out'))).toBe(true);
     }, 5000);
   });
 
@@ -460,10 +483,14 @@ describe('createAssistant', () => {
       });
 
       const assistant = createAssistant({ dir, timeoutMs: 5000 });
-      for await (const _ of assistant.chat('hello', { sessionKey: 'hist-key' })) {}
+      for await (const _ of assistant.chat('hello', { sessionKey: 'hist-key' })) {
+      }
 
       const raw = await readFile(join(dir, '.golem', 'history', 'hist-key.jsonl'), 'utf-8');
-      const lines = raw.trim().split('\n').map(l => JSON.parse(l));
+      const lines = raw
+        .trim()
+        .split('\n')
+        .map((l) => JSON.parse(l));
 
       expect(lines[0]).toMatchObject({ role: 'user', content: 'hello', sessionKey: 'hist-key' });
       expect(lines[1]).toMatchObject({ role: 'assistant', content: 'world', durationMs: 100, costUsd: 0.005 });
@@ -489,7 +516,8 @@ describe('createAssistant', () => {
 
       // No saved session → new session, history file exists → should inject
       const assistant = createAssistant({ dir, timeoutMs: 5000 });
-      for await (const _ of assistant.chat('new question', { sessionKey: 'user:alice' })) {}
+      for await (const _ of assistant.chat('new question', { sessionKey: 'user:alice' })) {
+      }
 
       expect(capturedPrompt).toContain('[System: This is a new session');
       expect(capturedPrompt).toContain('user:alice.jsonl');
@@ -511,7 +539,8 @@ describe('createAssistant', () => {
       await appendHistory(dir, { ts: 'ts', sessionKey: 'user:bob', role: 'user', content: 'old msg' });
 
       const assistant = createAssistant({ dir, timeoutMs: 5000 });
-      for await (const _ of assistant.chat('follow up', { sessionKey: 'user:bob' })) {}
+      for await (const _ of assistant.chat('follow up', { sessionKey: 'user:bob' })) {
+      }
 
       expect(capturedPrompt).not.toContain('[System: This is a new session');
       expect(capturedPrompt).toBe('follow up');
@@ -528,7 +557,8 @@ describe('createAssistant', () => {
 
       // No history file, no saved session → truly new user
       const assistant = createAssistant({ dir, timeoutMs: 5000 });
-      for await (const _ of assistant.chat('first message', { sessionKey: 'user:charlie' })) {}
+      for await (const _ of assistant.chat('first message', { sessionKey: 'user:charlie' })) {
+      }
 
       expect(capturedPrompt).not.toContain('[System: This is a new session');
       expect(capturedPrompt).toBe('first message');
@@ -576,7 +606,7 @@ describe('createAssistant', () => {
         events.push(evt);
       }
 
-      expect(events.some(e => e.type === 'text' && e.content === 'I see the image')).toBe(true);
+      expect(events.some((e) => e.type === 'text' && e.content === 'I see the image')).toBe(true);
       expect(capturedPrompt).toContain('User attached 1 image(s)');
       expect(capturedPrompt).toContain('.golem/images/screenshot.png');
       expect(capturedImagePaths).toBeDefined();
@@ -597,7 +627,7 @@ describe('createAssistant', () => {
       const assistant = createAssistant({ dir });
       const events: StreamEvent[] = [];
       for await (const evt of assistant.chat('analyze', {
-        images: [{ mimeType: 'image/jpeg', data: Buffer.from([0xFF, 0xD8, 0xFF]) }],
+        images: [{ mimeType: 'image/jpeg', data: Buffer.from([0xff, 0xd8, 0xff]) }],
       })) {
         events.push(evt);
       }
@@ -610,7 +640,7 @@ describe('createAssistant', () => {
     it('handles multiple images', async () => {
       let capturedImagePaths: string[] | undefined;
       mockedCreateEngine.mockReturnValue({
-        async *invoke(prompt: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
+        async *invoke(_prompt: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
           capturedImagePaths = opts.imagePaths;
           yield { type: 'text', content: 'two images' };
           yield { type: 'done', sessionId: 'x' };
@@ -621,9 +651,11 @@ describe('createAssistant', () => {
       for await (const _evt of assistant.chat('compare these', {
         images: [
           { mimeType: 'image/png', data: Buffer.from([0x89, 0x50]) },
-          { mimeType: 'image/jpeg', data: Buffer.from([0xFF, 0xD8]) },
+          { mimeType: 'image/jpeg', data: Buffer.from([0xff, 0xd8]) },
         ],
-      })) { /* drain */ }
+      })) {
+        /* drain */
+      }
 
       expect(capturedImagePaths?.length).toBe(2);
     });
@@ -631,7 +663,7 @@ describe('createAssistant', () => {
     it('no images field → no imagePaths in invoke opts', async () => {
       let capturedImagePaths: string[] | undefined;
       mockedCreateEngine.mockReturnValue({
-        async *invoke(prompt: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
+        async *invoke(_prompt: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
           capturedImagePaths = opts.imagePaths;
           yield { type: 'text', content: 'text only' };
           yield { type: 'done', sessionId: 'x' };
@@ -639,7 +671,9 @@ describe('createAssistant', () => {
       });
 
       const assistant = createAssistant({ dir });
-      for await (const _evt of assistant.chat('just text')) { /* drain */ }
+      for await (const _evt of assistant.chat('just text')) {
+        /* drain */
+      }
 
       expect(capturedImagePaths).toBeUndefined();
     });

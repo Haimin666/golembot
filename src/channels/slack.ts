@@ -1,7 +1,7 @@
-import type { ChannelAdapter, ChannelMessage, ReplyOptions, ImageAttachment } from '../channel.js';
+import type { ChannelAdapter, ChannelMessage, ImageAttachment, ReplyOptions } from '../channel.js';
+import { importPeer } from '../peer-require.js';
 import type { SlackChannelConfig } from '../workspace.js';
 import { markdownToMrkdwn } from './slack-format.js';
-import { importPeer } from '../peer-require.js';
 
 export class SlackAdapter implements ChannelAdapter {
   readonly name = 'slack';
@@ -71,9 +71,7 @@ export class SlackAdapter implements ChannelAdapter {
     try {
       boltModule = await importPeer('@slack/bolt');
     } catch {
-      throw new Error(
-        'Slack adapter requires @slack/bolt. Install it: npm install @slack/bolt',
-      );
+      throw new Error('Slack adapter requires @slack/bolt. Install it: npm install @slack/bolt');
     }
 
     const { App } = boltModule;
@@ -137,7 +135,7 @@ export class SlackAdapter implements ChannelAdapter {
     console.log(`[slack] Socket Mode connection established`);
   }
 
-  async reply(msg: ChannelMessage, text: string, options?: ReplyOptions): Promise<void> {
+  async reply(msg: ChannelMessage, text: string, _options?: ReplyOptions): Promise<void> {
     if (!this.app) return;
     await this.app.client.chat.postMessage({
       channel: msg.chatId,

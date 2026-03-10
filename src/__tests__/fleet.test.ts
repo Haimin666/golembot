@@ -1,19 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  registerInstance,
-  unregisterInstance,
+  type FleetEntry,
+  type FleetInstance,
+  findInstance,
+  findStoppedInstance,
   isProcessAlive,
   listInstances,
   listStoppedInstances,
-  stopInstance,
-  findInstance,
-  findStoppedInstance,
+  registerInstance,
   renderFleetDashboard,
-  type FleetEntry,
-  type FleetInstance,
+  stopInstance,
+  unregisterInstance,
 } from '../fleet.js';
 
 function makeEntry(overrides?: Partial<FleetEntry>): FleetEntry {
@@ -176,7 +176,12 @@ describe('renderFleetDashboard', () => {
 
   it('shows channel names', () => {
     const inst: FleetInstance = {
-      ...makeEntry({ channels: [{ type: 'telegram', status: 'connected' }, { type: 'slack', status: 'connected' }] }),
+      ...makeEntry({
+        channels: [
+          { type: 'telegram', status: 'connected' },
+          { type: 'slack', status: 'connected' },
+        ],
+      }),
       alive: true,
     };
     const html = renderFleetDashboard([inst], '1.0.0');

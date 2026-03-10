@@ -29,7 +29,11 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "prepublishOnly": "pnpm run build",
-    "release": "semantic-release"
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "format": "biome format --write src/",
+    "release": "semantic-release",
+    "prepare": "husky"
   },
   "files": [
     "dist",
@@ -95,6 +99,7 @@
     }
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.6",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/git": "^10.0.1",
@@ -106,10 +111,17 @@
     "@types/node": "^22.0.0",
     "@types/xml2js": "^0.4.14",
     "grammy": "^1.41.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.2",
     "semantic-release": "^25.0.3",
     "tsx": "^4.0.0",
     "typescript": "^5.7.0",
     "vitepress": "^1.6.4",
     "vitest": "^4.0.18"
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "biome check --write --no-errors-on-unmatched"
+    ]
   }
 }

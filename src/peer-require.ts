@@ -45,7 +45,5 @@ export async function importPeer(pkg: string): Promise<any> {
     }
   }
 
-  throw new Error(
-    `Cannot find package "${pkg}". Install it in your bot directory: npm install ${pkg}`,
-  );
+  throw new Error(`Cannot find package "${pkg}". Install it in your bot directory: npm install ${pkg}`);
 }

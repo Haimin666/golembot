@@ -1,8 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, readFile, mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { loadSession, saveSession, clearSession, pruneExpiredSessions, appendHistory, getHistoryPath, countSessions } from '../session.js';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  appendHistory,
+  clearSession,
+  countSessions,
+  getHistoryPath,
+  loadSession,
+  pruneExpiredSessions,
+  saveSession,
+} from '../session.js';
 
 describe('session', () => {
   let dir: string;
@@ -43,7 +51,7 @@ describe('session', () => {
       await mkdir(join(dir, '.golem'), { recursive: true });
       await writeFile(
         join(dir, '.golem', 'sessions.json'),
-        JSON.stringify({ engineSessionId: 'old-sess' }) + '\n',
+        `${JSON.stringify({ engineSessionId: 'old-sess' })}\n`,
         'utf-8',
       );
       expect(await loadSession(dir)).toBe('old-sess');
@@ -52,11 +60,7 @@ describe('session', () => {
 
     it('treats empty engineSessionId as no session', async () => {
       await mkdir(join(dir, '.golem'), { recursive: true });
-      await writeFile(
-        join(dir, '.golem', 'sessions.json'),
-        JSON.stringify({ engineSessionId: '' }) + '\n',
-        'utf-8',
-      );
+      await writeFile(join(dir, '.golem', 'sessions.json'), `${JSON.stringify({ engineSessionId: '' })}\n`, 'utf-8');
       expect(await loadSession(dir)).toBeUndefined();
     });
   });
@@ -115,7 +119,7 @@ describe('session', () => {
       const after = Date.now();
 
       const raw = JSON.parse(await readFile(join(dir, '.golem', 'sessions.json'), 'utf-8'));
-      const entry = raw['default'];
+      const entry = raw.default;
       expect(entry.lastUsed).toBeGreaterThanOrEqual(before);
       expect(entry.lastUsed).toBeLessThanOrEqual(after);
     });
@@ -129,7 +133,7 @@ describe('session', () => {
         fresh: { engineSessionId: 'fresh-sess', lastUsed: Date.now() },
       };
       await mkdir(join(dir, '.golem'), { recursive: true });
-      await writeFile(join(dir, '.golem', 'sessions.json'), JSON.stringify(store) + '\n');
+      await writeFile(join(dir, '.golem', 'sessions.json'), `${JSON.stringify(store)}\n`);
 
       await pruneExpiredSessions(dir, 30);
 
@@ -140,7 +144,7 @@ describe('session', () => {
     it('keeps sessions without lastUsed (legacy)', async () => {
       const store = { legacy: { engineSessionId: 'leg-sess' } };
       await mkdir(join(dir, '.golem'), { recursive: true });
-      await writeFile(join(dir, '.golem', 'sessions.json'), JSON.stringify(store) + '\n');
+      await writeFile(join(dir, '.golem', 'sessions.json'), `${JSON.stringify(store)}\n`);
 
       await pruneExpiredSessions(dir, 1);
 
@@ -155,10 +159,20 @@ describe('session', () => {
   describe('appendHistory', () => {
     it('writes per-session JSONL files', async () => {
       await appendHistory(dir, { ts: '2026-01-01T00:00:00Z', sessionKey: 'k', role: 'user', content: 'hi' });
-      await appendHistory(dir, { ts: '2026-01-01T00:00:01Z', sessionKey: 'k', role: 'assistant', content: 'hello', durationMs: 500, costUsd: 0.01 });
+      await appendHistory(dir, {
+        ts: '2026-01-01T00:00:01Z',
+        sessionKey: 'k',
+        role: 'assistant',
+        content: 'hello',
+        durationMs: 500,
+        costUsd: 0.01,
+      });
 
       const raw = await readFile(join(dir, '.golem', 'history', 'k.jsonl'), 'utf-8');
-      const lines = raw.trim().split('\n').map(l => JSON.parse(l));
+      const lines = raw
+        .trim()
+        .split('\n')
+        .map((l) => JSON.parse(l));
       expect(lines).toHaveLength(2);
       expect(lines[0]).toEqual({ ts: '2026-01-01T00:00:00Z', sessionKey: 'k', role: 'user', content: 'hi' });
       expect(lines[1]).toMatchObject({ role: 'assistant', content: 'hello', durationMs: 500, costUsd: 0.01 });

@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { ProactiveCoordinator } from '../proactive.js';
-import { TaskStore } from '../task-store.js';
-import type { TaskRecord } from '../task-store.js';
-import { Scheduler } from '../scheduler.js';
-import type { StreamEvent } from '../engine.js';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChannelAdapter } from '../channel.js';
+import type { StreamEvent } from '../engine.js';
+import { ProactiveCoordinator } from '../proactive.js';
+import { Scheduler } from '../scheduler.js';
+import type { TaskRecord } from '../task-store.js';
+import { TaskStore } from '../task-store.js';
 import { loadConfig } from '../workspace.js';
 
 // ---------------------------------------------------------------------------
@@ -134,6 +134,7 @@ describe('ProactiveCoordinator', () => {
     const failAssistant = {
       chat(): AsyncIterable<StreamEvent> {
         return {
+          // biome-ignore lint/correctness/useYield: intentionally throws before yielding
           async *[Symbol.asyncIterator]() {
             throw new Error('boom');
           },
@@ -257,7 +258,9 @@ tasks:
     const sendCalls: Array<{ chatId: string; text: string }> = [];
     const mockAdapter: ChannelAdapter = {
       name: 'slack',
-      send: async (chatId: string, text: string) => { sendCalls.push({ chatId, text }); },
+      send: async (chatId: string, text: string) => {
+        sendCalls.push({ chatId, text });
+      },
       start: async () => {},
       stop: async () => {},
       reply: async () => {},
@@ -334,7 +337,7 @@ tasks:
 
     const config = await loadConfig(tmpDir);
     const taskStore = new TaskStore(tmpDir);
-    const mergedTasks = await taskStore.mergeConfigTasks(config.tasks!);
+    const _mergedTasks = await taskStore.mergeConfigTasks(config.tasks!);
 
     // Assistant that throws mid-stream
     const failAssistant = {
@@ -351,7 +354,9 @@ tasks:
     const sendCalls: string[] = [];
     const mockAdapter: ChannelAdapter = {
       name: 'telegram',
-      send: async (_chatId: string, _text: string) => { sendCalls.push(_text); },
+      send: async (_chatId: string, _text: string) => {
+        sendCalls.push(_text);
+      },
       start: async () => {},
       stop: async () => {},
       reply: async () => {},
@@ -421,16 +426,18 @@ tasks:
     // Now simulate a "gateway restart" — re-merge config tasks
     // The config changes the prompt but runtime state (lastRun, lastStatus) should survive
     const updatedConfig = { ...config };
-    updatedConfig.tasks = [{
-      ...config.tasks![0],
-      prompt: 'Check health v2',
-    }];
+    updatedConfig.tasks = [
+      {
+        ...config.tasks![0],
+        prompt: 'Check health v2',
+      },
+    ];
     const reMerged = await taskStore.mergeConfigTasks(updatedConfig.tasks);
 
     expect(reMerged).toHaveLength(1);
     expect(reMerged[0].prompt).toBe('Check health v2'); // updated from config
-    expect(reMerged[0].lastRun).toBe(savedLastRun);      // preserved from runtime
-    expect(reMerged[0].lastStatus).toBe('success');       // preserved from runtime
+    expect(reMerged[0].lastRun).toBe(savedLastRun); // preserved from runtime
+    expect(reMerged[0].lastStatus).toBe('success'); // preserved from runtime
 
     coordinator.stop();
   });

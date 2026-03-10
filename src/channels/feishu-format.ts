@@ -49,26 +49,25 @@ export interface CardContent {
 // ---------------------------------------------------------------------------
 
 const MD_PATTERNS: RegExp[] = [
-  /^#{1,6}\s/m,                // headings
-  /\*\*[^*]+\*\*/,            // bold
-  /\*[^*]+\*/,                // italic
-  /\[[^\]]+\]\([^)]+\)/,      // links
-  /^[-*]\s/m,                 // unordered list
-  /^\d+\.\s/m,                // ordered list
-  /^[-*]\s+\[[ xX]\]/m,      // checkbox
-  /`[^`]+`/,                  // inline code
-  /^[-*_]{3,}$/m,             // horizontal rule
-  /^```/m,                    // code block
-  /^\|.+\|/m,                 // table
-  /^>/m,                      // blockquote
-  /~~[^~]+~~/,                // strikethrough
+  /^#{1,6}\s/m, // headings
+  /\*\*[^*]+\*\*/, // bold
+  /\*[^*]+\*/, // italic
+  /\[[^\]]+\]\([^)]+\)/, // links
+  /^[-*]\s/m, // unordered list
+  /^\d+\.\s/m, // ordered list
+  /^[-*]\s+\[[ xX]\]/m, // checkbox
+  /`[^`]+`/, // inline code
+  /^[-*_]{3,}$/m, // horizontal rule
+  /^```/m, // code block
+  /^\|.+\|/m, // table
+  /^>/m, // blockquote
+  /~~[^~]+~~/, // strikethrough
 ];
 
 /** Detect whether text contains Markdown formatting. */
 export function hasMarkdown(text: string): boolean {
   return MD_PATTERNS.some((p) => p.test(text));
 }
-
 
 // ---------------------------------------------------------------------------
 // Markdown -> Post (rich text)
@@ -91,7 +90,9 @@ export function markdownToPost(markdown: string): PostContent {
         content.push([{ tag: 'text', text: `\u250C\u2500 ${codeBlockLang} \u2500\u2510` }]);
       } else {
         inCodeBlock = false;
-        content.push([{ tag: 'text', text: '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518' }]);
+        content.push([
+          { tag: 'text', text: '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518' },
+        ]);
         codeBlockLang = '';
       }
       continue;
@@ -110,7 +111,9 @@ export function markdownToPost(markdown: string): PostContent {
 
   // Close unclosed code block
   if (inCodeBlock) {
-    content.push([{ tag: 'text', text: '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518' }]);
+    content.push([
+      { tag: 'text', text: '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518' },
+    ]);
   }
 
   return { zh_cn: { content } };
@@ -194,8 +197,7 @@ function parseInline(text: string): PostElement[] {
     }
 
     // Inline triple-backtick code ```code```
-    const inlineCodeBlockMatch =
-      remaining.match(/^```(\w*)\s+(.+?)```/) || remaining.match(/^```(.+?)```/);
+    const inlineCodeBlockMatch = remaining.match(/^```(\w*)\s+(.+?)```/) || remaining.match(/^```(.+?)```/);
     if (inlineCodeBlockMatch) {
       const code = inlineCodeBlockMatch[2] || inlineCodeBlockMatch[1];
       elements.push({ tag: 'text', text: `\u300C${code}\u300D` });
@@ -261,12 +263,9 @@ export function markdownToCard(markdown: string): CardContent {
  * Replace `@name` patterns in post content with Feishu `{ tag: 'at', user_id }` elements.
  * Mutates the post in-place.
  */
-export function injectMentionsIntoPost(
-  post: PostContent,
-  mentions: Array<{ name: string; platformId: string }>,
-): void {
+export function injectMentionsIntoPost(post: PostContent, mentions: Array<{ name: string; platformId: string }>): void {
   if (!mentions.length) return;
-  const mentionMap = new Map(mentions.map(m => [m.name, m.platformId]));
+  const mentionMap = new Map(mentions.map((m) => [m.name, m.platformId]));
 
   for (let i = 0; i < post.zh_cn.content.length; i++) {
     const line = post.zh_cn.content[i];
@@ -279,7 +278,7 @@ export function injectMentionsIntoPost(
       }
 
       // Split text on @name patterns and replace with at elements
-      let remaining = el.text;
+      const remaining = el.text;
       const mentionPattern = /@([\w\u4e00-\u9fff]{1,20})/g;
       let lastIdx = 0;
       let match;

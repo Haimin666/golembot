@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import http from 'node:http';
-import type { StreamEvent, InvokeOpts } from '../engine.js';
-import type { GolemServer } from '../server.js';
-import { createEngine } from '../engine.js';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMetrics, type DashboardContext } from '../dashboard.js';
+import type { InvokeOpts, StreamEvent } from '../engine.js';
+import { createEngine } from '../engine.js';
+import type { GolemServer } from '../server.js';
 
 vi.mock('../engine.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../engine.js')>();
@@ -34,11 +34,19 @@ function request(
   return new Promise((resolve, reject) => {
     const addr = server.address() as { port: number };
     const req = http.request(
-      { hostname: '127.0.0.1', port: addr.port, path, method, headers: { 'Content-Type': 'application/json', ...headers } },
+      {
+        hostname: '127.0.0.1',
+        port: addr.port,
+        path,
+        method,
+        headers: { 'Content-Type': 'application/json', ...headers },
+      },
       (res) => {
         const chunks: Buffer[] = [];
         res.on('data', (c: Buffer) => chunks.push(c));
-        res.on('end', () => resolve({ status: res.statusCode!, headers: res.headers, body: Buffer.concat(chunks).toString() }));
+        res.on('end', () =>
+          resolve({ status: res.statusCode!, headers: res.headers, body: Buffer.concat(chunks).toString() }),
+        );
       },
     );
     req.on('error', reject);
@@ -59,7 +67,7 @@ describe('Golem HTTP Server', () => {
   });
 
   afterEach(async () => {
-    if (server?.listening) await new Promise<void>(r => server.close(() => r()));
+    if (server?.listening) await new Promise<void>((r) => server.close(() => r()));
     await rm(dir, { recursive: true, force: true });
     vi.clearAllMocks();
   });
@@ -67,7 +75,7 @@ describe('Golem HTTP Server', () => {
   function startServer(token?: string) {
     const assistant = createAssistant({ dir });
     server = createGolemServer(assistant, { token });
-    return new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    return new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
   }
 
   describe('GET /health', () => {
@@ -87,10 +95,13 @@ describe('Golem HTTP Server', () => {
       expect(res.status).toBe(200);
       expect(res.headers['content-type']).toBe('text/event-stream');
 
-      const events = res.body.split('\n\n').filter(Boolean).map(line => {
-        const data = line.replace('data: ', '');
-        return JSON.parse(data);
-      });
+      const events = res.body
+        .split('\n\n')
+        .filter(Boolean)
+        .map((line) => {
+          const data = line.replace('data: ', '');
+          return JSON.parse(data);
+        });
       expect(events).toHaveLength(2);
       expect(events[0]).toEqual({ type: 'text', content: 'hello' });
       expect(events[1]).toEqual({ type: 'done', sessionId: 'srv-sess-1' });
@@ -119,7 +130,13 @@ describe('Golem HTTP Server', () => {
       const addr = server.address() as { port: number };
       const res = await new Promise<{ status: number; body: string }>((resolve, reject) => {
         const req = http.request(
-          { hostname: '127.0.0.1', port: addr.port, path: '/chat', method: 'POST', headers: { 'Content-Type': 'application/json' } },
+          {
+            hostname: '127.0.0.1',
+            port: addr.port,
+            path: '/chat',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          },
           (r) => {
             const chunks: Buffer[] = [];
             r.on('data', (c: Buffer) => chunks.push(c));
@@ -158,17 +175,29 @@ describe('Golem HTTP Server', () => {
 
     it('accepts /chat with correct token', async () => {
       await startServer('my-secret');
-      const res = await request(server, 'POST', '/chat', { message: 'hi' }, {
-        Authorization: 'Bearer my-secret',
-      });
+      const res = await request(
+        server,
+        'POST',
+        '/chat',
+        { message: 'hi' },
+        {
+          Authorization: 'Bearer my-secret',
+        },
+      );
       expect(res.status).toBe(200);
     });
 
     it('rejects /chat with wrong token', async () => {
       await startServer('my-secret');
-      const res = await request(server, 'POST', '/chat', { message: 'hi' }, {
-        Authorization: 'Bearer wrong',
-      });
+      const res = await request(
+        server,
+        'POST',
+        '/chat',
+        { message: 'hi' },
+        {
+          Authorization: 'Bearer wrong',
+        },
+      );
       expect(res.status).toBe(401);
     });
 
@@ -201,7 +230,7 @@ describe('Golem HTTP Server', () => {
       // Use a slow engine so the SSE connection stays open
       vi.mocked(createEngine).mockReturnValue({
         async *invoke(): AsyncIterable<StreamEvent> {
-          await new Promise(r => setTimeout(r, 2000)); // hang
+          await new Promise((r) => setTimeout(r, 2000)); // hang
           yield { type: 'done', sessionId: 's' };
         },
       } as any);
@@ -213,7 +242,13 @@ describe('Golem HTTP Server', () => {
       const received: string[] = [];
       const connectionClosed = new Promise<void>((resolve) => {
         const req = http.request(
-          { hostname: '127.0.0.1', port: addr.port, path: '/chat', method: 'POST', headers: { 'Content-Type': 'application/json' } },
+          {
+            hostname: '127.0.0.1',
+            port: addr.port,
+            path: '/chat',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          },
           (res) => {
             res.on('data', (chunk: Buffer) => received.push(chunk.toString()));
             res.on('end', resolve);
@@ -224,7 +259,7 @@ describe('Golem HTTP Server', () => {
       });
 
       // Give the SSE connection time to be established
-      await new Promise(r => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 50));
 
       // Force close all connections
       server.forceClose();
@@ -241,13 +276,16 @@ describe('Golem HTTP Server', () => {
     it('returns error SSE event when global concurrency limit is exceeded', async () => {
       const assistant = createAssistant({ dir, maxConcurrent: 0 });
       server = createGolemServer(assistant, {});
-      await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+      await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
 
       const res = await request(server, 'POST', '/chat', { message: 'hi' });
       expect(res.status).toBe(200);
       expect(res.headers['content-type']).toBe('text/event-stream');
 
-      const events = res.body.split('\n\n').filter(Boolean).map(line => JSON.parse(line.replace('data: ', '')));
+      const events = res.body
+        .split('\n\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line.replace('data: ', '')));
       const errEvt = events.find((e: { type: string; message?: string }) => e.type === 'error');
       expect(errEvt).toBeDefined();
       expect(errEvt.message).toMatch(/busy/i);
@@ -256,33 +294,45 @@ describe('Golem HTTP Server', () => {
     it('returns error SSE event when per-session queue is full', async () => {
       vi.mocked(createEngine).mockReturnValue({
         async *invoke(): AsyncIterable<StreamEvent> {
-          await new Promise(r => setTimeout(r, 500)); // hold the session mutex
+          await new Promise((r) => setTimeout(r, 500)); // hold the session mutex
           yield { type: 'done', sessionId: 's' };
         },
       } as any);
 
       const assistant = createAssistant({ dir, maxQueuePerSession: 0, maxConcurrent: 10, timeoutMs: 5000 });
       server = createGolemServer(assistant, {});
-      await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+      await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
 
       const addr = server.address() as { port: number };
 
       // First request holds the session mutex for 500ms
-      const firstDone = new Promise<void>(resolve => {
+      const firstDone = new Promise<void>((resolve) => {
         const req = http.request(
-          { hostname: '127.0.0.1', port: addr.port, path: '/chat', method: 'POST', headers: { 'Content-Type': 'application/json' } },
-          res => { res.resume(); res.on('end', resolve); },
+          {
+            hostname: '127.0.0.1',
+            port: addr.port,
+            path: '/chat',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          },
+          (res) => {
+            res.resume();
+            res.on('end', resolve);
+          },
         );
         req.write(JSON.stringify({ message: 'first', sessionKey: 'test-sess' }));
         req.end();
       });
 
       // Wait long enough for first request to acquire the mutex
-      await new Promise(r => setTimeout(r, 30));
+      await new Promise((r) => setTimeout(r, 30));
 
       // Second request for same session key — queue is full (maxQueuePerSession: 0)
       const res = await request(server, 'POST', '/chat', { message: 'second', sessionKey: 'test-sess' });
-      const events = res.body.split('\n\n').filter(Boolean).map(line => JSON.parse(line.replace('data: ', '')));
+      const events = res.body
+        .split('\n\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line.replace('data: ', '')));
       const errEvt = events.find((e: { type: string; message?: string }) => e.type === 'error');
       expect(errEvt).toBeDefined();
       expect(errEvt.message).toMatch(/pending/i);
@@ -296,7 +346,7 @@ describe('Golem HTTP Server', () => {
       vi.mocked(createEngine).mockReturnValue({
         async *invoke(_p: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
           // Hang until the AbortController fires
-          await new Promise<void>(resolve => {
+          await new Promise<void>((resolve) => {
             if (opts.signal?.aborted) return resolve();
             opts.signal?.addEventListener('abort', () => resolve(), { once: true });
           });
@@ -306,13 +356,16 @@ describe('Golem HTTP Server', () => {
 
       const assistant = createAssistant({ dir, timeoutMs: 50 });
       server = createGolemServer(assistant, {});
-      await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+      await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
 
       const res = await request(server, 'POST', '/chat', { message: 'slow task' });
       expect(res.status).toBe(200);
       expect(res.headers['content-type']).toBe('text/event-stream');
 
-      const events = res.body.split('\n\n').filter(Boolean).map(line => JSON.parse(line.replace('data: ', '')));
+      const events = res.body
+        .split('\n\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line.replace('data: ', '')));
       const errEvt = events.find((e: { type: string; message?: string }) => e.type === 'error');
       expect(errEvt).toBeDefined();
       expect(errEvt.message).toMatch(/timed out/i);
@@ -335,13 +388,19 @@ describe('Golem HTTP Server', () => {
       await request(server, 'POST', '/chat', { message: 'hello world', sessionKey: 'http-hist' });
 
       const raw = await readFile(join(dir, '.golem', 'history', 'http-hist.jsonl'), 'utf-8');
-      const lines = raw.trim().split('\n').map(l => JSON.parse(l));
+      const lines = raw
+        .trim()
+        .split('\n')
+        .map((l) => JSON.parse(l));
 
       expect(lines.find((l: { role: string }) => l.role === 'user')).toMatchObject({
-        role: 'user', content: 'hello world', sessionKey: 'http-hist',
+        role: 'user',
+        content: 'hello world',
+        sessionKey: 'http-hist',
       });
       expect(lines.find((l: { role: string }) => l.role === 'assistant')).toMatchObject({
-        role: 'assistant', content: 'hello',
+        role: 'assistant',
+        content: 'hello',
       });
     });
   });
@@ -362,7 +421,7 @@ describe('Golem HTTP Server', () => {
       const assistant = createAssistant({ dir });
       const ctx = makeDashboardCtx();
       server = createGolemServer(assistant, { token }, ctx);
-      return new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+      return new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
     }
 
     describe('GET /', () => {
@@ -446,7 +505,7 @@ describe('Golem HTTP Server', () => {
         });
 
         await connected;
-        await new Promise(r => setTimeout(r, 50));
+        await new Promise((r) => setTimeout(r, 50));
         expect(received.join('')).toContain(': connected');
       });
 
@@ -463,7 +522,7 @@ describe('Golem HTTP Server', () => {
     function startServerWithDir(token?: string) {
       const assistant = createAssistant({ dir });
       server = createGolemServer(assistant, { token }, undefined, dir);
-      return new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+      return new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
     }
 
     it('/help returns JSON command result', async () => {

@@ -1,44 +1,44 @@
-import { resolve, join, dirname } from 'node:path';
 import { mkdir, readFile as readFileAsync } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { setPeerBase } from './peer-require.js';
-import { createAssistant, type Assistant, parseCommand, executeCommand, type CommandContext } from './index.js';
-import { createGolemServer, type ServerOpts, type GolemServer } from './server.js';
-import {
-  loadConfig,
-  scanSkills,
-  type GolemConfig,
-  type ChannelsConfig,
-  type GroupChatConfig,
-  type StreamingConfig,
-  type FeishuChannelConfig,
-  type DingtalkChannelConfig,
-  type WecomChannelConfig,
-  type SlackChannelConfig,
-  type TelegramChannelConfig,
-  type DiscordChannelConfig,
-} from './workspace.js';
 import {
   buildSessionKey,
-  detectMention,
-  stripMention,
   type ChannelAdapter,
   type ChannelMessage,
+  detectMention,
   type MentionTarget,
   type ReadReceipt,
+  stripMention,
 } from './channel.js';
 import {
-  createMetrics,
-  recordMessage,
-  KNOWN_CHANNELS,
-  type DashboardContext,
   type ChannelStatus,
+  createMetrics,
+  type DashboardContext,
   type GatewayMetrics,
+  KNOWN_CHANNELS,
+  recordMessage,
 } from './dashboard.js';
 import { registerInstance, unregisterInstance } from './fleet.js';
-import { Scheduler } from './scheduler.js';
-import { TaskStore } from './task-store.js';
+import { type Assistant, type CommandContext, createAssistant, executeCommand, parseCommand } from './index.js';
+import { setPeerBase } from './peer-require.js';
 import { createProactiveCoordinator, type ProactiveCoordinator } from './proactive.js';
+import { Scheduler } from './scheduler.js';
+import { createGolemServer, type GolemServer, type ServerOpts } from './server.js';
+import { TaskStore } from './task-store.js';
+import {
+  type ChannelsConfig,
+  type DingtalkChannelConfig,
+  type DiscordChannelConfig,
+  type FeishuChannelConfig,
+  type GolemConfig,
+  type GroupChatConfig,
+  loadConfig,
+  type SlackChannelConfig,
+  type StreamingConfig,
+  scanSkills,
+  type TelegramChannelConfig,
+  type WecomChannelConfig,
+} from './workspace.js';
 
 export function splitMessage(text: string, maxLen: number): string[] {
   if (text.length <= maxLen) return [text];
@@ -141,7 +141,7 @@ export function buildGroupPrompt(
   userText: string,
   injectPass: boolean,
   groupKey: string,
-  dir: string,
+  _dir: string,
   /** When set, the message explicitly @mentions someone else — this bot should almost always [PASS]. */
   othersAddressed?: string[],
 ): string {
@@ -184,16 +184,10 @@ export function buildGroupPrompt(
   return parts.join('\n');
 }
 
-export function requireFields(
-  type: string,
-  config: Record<string, unknown>,
-  fields: string[],
-): void {
-  const missing = fields.filter(f => !config[f]);
+export function requireFields(type: string, config: Record<string, unknown>, fields: string[]): void {
+  const missing = fields.filter((f) => !config[f]);
   if (missing.length > 0) {
-    throw new Error(
-      `Channel "${type}" is missing required config: ${missing.join(', ')}`,
-    );
+    throw new Error(`Channel "${type}" is missing required config: ${missing.join(', ')}`);
   }
 }
 
@@ -262,14 +256,10 @@ async function createChannelAdapter(
     default: {
       const adapterPath = channelConfig._adapter;
       if (typeof adapterPath !== 'string') {
-        throw new Error(
-          `Unknown channel type "${type}". Add "_adapter: <path or package>" to use a custom adapter.`,
-        );
+        throw new Error(`Unknown channel type "${type}". Add "_adapter: <path or package>" to use a custom adapter.`);
       }
       const resolvedPath =
-        adapterPath.startsWith('.') || adapterPath.startsWith('/')
-          ? resolve(dir, adapterPath)
-          : adapterPath;
+        adapterPath.startsWith('.') || adapterPath.startsWith('/') ? resolve(dir, adapterPath) : adapterPath;
       let mod: any;
       try {
         mod = await import(resolvedPath);
@@ -306,9 +296,7 @@ export async function handleMessage(
   // ── Slash command interception ──
   const parsed = parseCommand(userText);
   if (parsed) {
-    const sessionKey = msg.chatType === 'group'
-      ? `${msg.channelType}:${msg.chatId}`
-      : buildSessionKey(msg);
+    const sessionKey = msg.chatType === 'group' ? `${msg.channelType}:${msg.chatId}` : buildSessionKey(msg);
     const cmdCtx: CommandContext = {
       dir,
       sessionKey,
@@ -377,16 +365,21 @@ export async function handleMessage(
     // Use adapter-provided mention info for stronger [PASS] hint in multi-bot chats.
     const othersAddressed = injectPass ? msg.mentionedOthers : undefined;
 
-    fullText = buildGroupPrompt(hist, msg.senderName ?? msg.senderId, userText, injectPass, groupKey, dir, othersAddressed);
+    fullText = buildGroupPrompt(
+      hist,
+      msg.senderName ?? msg.senderId,
+      userText,
+      injectPass,
+      groupKey,
+      dir,
+      othersAddressed,
+    );
   } else {
     sessionKey = buildSessionKey(msg);
     fullText = `[System: This is a private 1-on-1 conversation with ${senderLabel}.]\n${msg.text}`;
   }
 
-  log(
-    verbose,
-    `[${channelType}] received from ${senderLabel}: "${userText}" → session ${sessionKey}`,
-  );
+  log(verbose, `[${channelType}] received from ${senderLabel}: "${userText}" → session ${sessionKey}`);
 
   // Send typing indicator immediately, then refresh every 4s while waiting for AI.
   // Telegram's typing action expires after ~5s, so we keep it alive.
@@ -405,7 +398,7 @@ export async function handleMessage(
       source: channelType,
       sender: senderLabel,
       messagePreview: userText.slice(0, 120),
-      durationMs: durationMs ?? (Date.now() - msgStartMs),
+      durationMs: durationMs ?? Date.now() - msgStartMs,
       costUsd,
       ...extra,
     });
@@ -426,7 +419,9 @@ export async function handleMessage(
       try {
         const memberCache = await adapter.getGroupMembers(msg.chatId);
         mentions = parseMentions(text.trim(), memberCache).mentions;
-      } catch { /* best effort */ }
+      } catch {
+        /* best effort */
+      }
     }
     const replyOpts = mentions.length > 0 ? { mentions } : undefined;
     for (const chunk of chunks) {
@@ -449,7 +444,10 @@ export async function handleMessage(
 
       // Flush the buffer to IM. Called at paragraph breaks, tool_call, and done.
       const flush = async (): Promise<void> => {
-        if (!buffer.trim()) { buffer = ''; return; }
+        if (!buffer.trim()) {
+          buffer = '';
+          return;
+        }
         await sendChunk(buffer);
         buffer = '';
       };
@@ -578,13 +576,22 @@ export async function handleMessage(
 // ── CLI banner ───────────────────────────────────────────────────────────────
 
 const ANSI = {
-  dim: '\x1b[2m', bold: '\x1b[1m', reset: '\x1b[0m',
-  cyan: '\x1b[36m', green: '\x1b[32m', red: '\x1b[31m', yellow: '\x1b[33m',
+  dim: '\x1b[2m',
+  bold: '\x1b[1m',
+  reset: '\x1b[0m',
+  cyan: '\x1b[36m',
+  green: '\x1b[32m',
+  red: '\x1b[31m',
+  yellow: '\x1b[33m',
 } as const;
 
 function printBanner(ctx: {
-  host: string; port: number; version: string;
-  config: GolemConfig; token?: string; channelStatuses: ChannelStatus[];
+  host: string;
+  port: number;
+  version: string;
+  config: GolemConfig;
+  token?: string;
+  channelStatuses: ChannelStatus[];
 }): void {
   const { dim, bold, reset, cyan, green, red, yellow } = ANSI;
   const { host, port, version, config, token, channelStatuses } = ctx;
@@ -604,7 +611,7 @@ function printBanner(ctx: {
   console.log(`  ${cyan}➜${reset}  Health      ${dim}GET${reset}  ${url}/health`);
   console.log('');
 
-  const connectedCount = channelStatuses.filter(c => c.status === 'connected').length;
+  const connectedCount = channelStatuses.filter((c) => c.status === 'connected').length;
   console.log(`  ${bold}Channels${reset} ${dim}(${connectedCount} connected)${reset}`);
   for (const ch of channelStatuses) {
     const name = ch.type.charAt(0).toUpperCase() + ch.type.slice(1);
@@ -669,8 +676,9 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
     const selfDir = dirname(fileURLToPath(import.meta.url));
     const pkg = JSON.parse(await readFileAsync(join(selfDir, '..', 'package.json'), 'utf-8'));
     version = pkg.version ?? version;
-  } catch { /* ok — dev mode or missing */ }
-
+  } catch {
+    /* ok — dev mode or missing */
+  }
 
   // TaskStore is created here (before channels) so we can pass it to dashboardCtx.
   // The coordinator is created later, after channels are ready.
@@ -693,8 +701,9 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
   // shutdown is assigned later after httpServer is created — use a wrapper
   let shutdownFn: (() => Promise<void>) | undefined;
   const serverOpts: ServerOpts = { port, token, hostname: host, onShutdown: () => shutdownFn?.() };
-  const httpServer: GolemServer = createGolemServer(assistant, serverOpts, dashboardCtx, dir,
-    () => coordinator ? { taskStore, scheduler, runTask: (id) => coordinator!.runTask(id) } : undefined);
+  const httpServer: GolemServer = createGolemServer(assistant, serverOpts, dashboardCtx, dir, () =>
+    coordinator ? { taskStore, scheduler, runTask: (id) => coordinator!.runTask(id) } : undefined,
+  );
 
   const adapters: ChannelAdapter[] = [];
   const adapterMap = new Map<string, ChannelAdapter>();
@@ -713,8 +722,17 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
         };
 
         await adapter.start((msg: ChannelMessage) =>
-          handleMessage(msg, config, assistant, adapter, type, verbose, dir, metrics,
-            coordinator ? { taskStore, scheduler, runTask: (id) => coordinator!.runTask(id) } : undefined),
+          handleMessage(
+            msg,
+            config,
+            assistant,
+            adapter,
+            type,
+            verbose,
+            dir,
+            metrics,
+            coordinator ? { taskStore, scheduler, runTask: (id) => coordinator!.runTask(id) } : undefined,
+          ),
         );
 
         adapters.push(adapter);
@@ -740,7 +758,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
 
   // Mark unconfigured channels
   for (const type of KNOWN_CHANNELS) {
-    if (!channelStatuses.some(c => c.type === type)) {
+    if (!channelStatuses.some((c) => c.type === type)) {
       channelStatuses.push({ type, status: 'not_configured' });
     }
   }
@@ -760,7 +778,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
         verbose,
       });
       coordinator.start(mergedTasks);
-      log(verbose, `[scheduler] ${mergedTasks.filter(t => t.enabled).length} task(s) scheduled`);
+      log(verbose, `[scheduler] ${mergedTasks.filter((t) => t.enabled).length} task(s) scheduled`);
     } catch (e) {
       console.error('[scheduler] Failed to initialize tasks:', (e as Error).message);
     }
@@ -778,7 +796,9 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
       model: config.model,
       version,
       startedAt: new Date().toISOString(),
-      channels: channelStatuses.filter(c => c.status === 'connected').map(c => ({ type: c.type, status: c.status })),
+      channels: channelStatuses
+        .filter((c) => c.status === 'connected')
+        .map((c) => ({ type: c.type, status: c.status })),
       authEnabled: !!token,
       dir,
     }).catch(() => {}); // best-effort

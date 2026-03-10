@@ -116,8 +116,7 @@ function convertTextSegment(text: string): string {
   s = escapeHtml(s);
 
   // Step 3: Convert Markdown links [text](url) → <a href="url">text</a>
-  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) =>
-    `<a href="${url}">${label}</a>`);
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => `<a href="${url}">${label}</a>`);
 
   // Step 4: Convert bold **text** / __text__ → placeholder (before italic to avoid re-matching)
   const boldSlots: string[] = [];
@@ -191,9 +190,5 @@ function convertTextSegment(text: string): string {
 // ---------------------------------------------------------------------------
 
 function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

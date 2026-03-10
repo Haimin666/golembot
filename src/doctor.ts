@@ -66,7 +66,7 @@ export async function runDoctor(dir: string): Promise<void> {
   let authDetail = '';
   if (engine === 'codex') {
     const apiKeyVars = ['OPENAI_API_KEY', 'CODEX_API_KEY'];
-    const foundVars = apiKeyVars.filter(k => !!process.env[k]);
+    const foundVars = apiKeyVars.filter((k) => !!process.env[k]);
     const oauthFile = join(homedir(), '.codex', 'auth.json');
     const hasOAuth = existsSync(oauthFile);
     if (foundVars.length > 0) {
@@ -80,7 +80,7 @@ export async function runDoctor(dir: string): Promise<void> {
     }
   } else {
     const keyVars = ['ANTHROPIC_API_KEY', 'CURSOR_API_KEY', 'OPENROUTER_API_KEY', 'OPENAI_API_KEY'];
-    const foundVars = keyVars.filter(k => !!process.env[k]);
+    const foundVars = keyVars.filter((k) => !!process.env[k]);
     authOk = foundVars.length > 0;
     authDetail = authOk
       ? foundVars.join(', ')
@@ -94,9 +94,7 @@ export async function runDoctor(dir: string): Promise<void> {
     results.push({
       name: 'Skills',
       ok: skills.length > 0,
-      detail: skills.length > 0
-        ? skills.map(s => s.name).join(', ')
-        : 'none — run golembot init or add skills',
+      detail: skills.length > 0 ? skills.map((s) => s.name).join(', ') : 'none — run golembot init or add skills',
     });
   } catch {
     results.push({

@@ -34,18 +34,24 @@ export interface AgentEngine {
 
 // ── Re-exports from engine implementations ───────────────
 
-export { stripAnsi, isOnPath } from './engines/shared.js';
-export { parseStreamLine, injectSkills, CursorEngine } from './engines/cursor.js';
-export { parseClaudeStreamLine, injectClaudeSkills, ClaudeCodeEngine } from './engines/claude-code.js';
-export { parseOpenCodeStreamLine, injectOpenCodeSkills, ensureOpenCodeConfig, resolveOpenCodeEnv, OpenCodeEngine } from './engines/opencode.js';
-export { parseCodexStreamLine, injectCodexSkills, CodexEngine } from './engines/codex.js';
+export { ClaudeCodeEngine, injectClaudeSkills, parseClaudeStreamLine } from './engines/claude-code.js';
+export { CodexEngine, injectCodexSkills, parseCodexStreamLine } from './engines/codex.js';
+export { CursorEngine, injectSkills, parseStreamLine } from './engines/cursor.js';
+export {
+  ensureOpenCodeConfig,
+  injectOpenCodeSkills,
+  OpenCodeEngine,
+  parseOpenCodeStreamLine,
+  resolveOpenCodeEnv,
+} from './engines/opencode.js';
+export { isOnPath, stripAnsi } from './engines/shared.js';
 
 // ── Engine factory ───────────────────────────────────────
 
-import { CursorEngine } from './engines/cursor.js';
 import { ClaudeCodeEngine } from './engines/claude-code.js';
-import { OpenCodeEngine } from './engines/opencode.js';
 import { CodexEngine } from './engines/codex.js';
+import { CursorEngine } from './engines/cursor.js';
+import { OpenCodeEngine } from './engines/opencode.js';
 
 export function createEngine(type: string): AgentEngine {
   if (type === 'cursor') return new CursorEngine();

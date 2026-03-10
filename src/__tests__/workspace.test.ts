@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, readFile, writeFile, mkdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  loadConfig,
-  writeConfig,
-  scanSkills,
-  generateAgentsMd,
   ensureReady,
-  initWorkspace,
+  generateAgentsMd,
   generateCursorCliJson,
+  initWorkspace,
+  loadConfig,
+  scanSkills,
+  writeConfig,
 } from '../workspace.js';
 
 describe('workspace', () => {
@@ -148,15 +148,12 @@ describe('workspace', () => {
       for (const name of ['alpha', 'beta', 'gamma']) {
         const skillDir = join(dir, 'skills', name);
         await mkdir(skillDir, { recursive: true });
-        await writeFile(
-          join(skillDir, 'SKILL.md'),
-          `---\nname: ${name}\ndescription: ${name} skill\n---\n`,
-        );
+        await writeFile(join(skillDir, 'SKILL.md'), `---\nname: ${name}\ndescription: ${name} skill\n---\n`);
       }
 
       const skills = await scanSkills(dir);
       expect(skills).toHaveLength(3);
-      const names = skills.map(s => s.name).sort();
+      const names = skills.map((s) => s.name).sort();
       expect(names).toEqual(['alpha', 'beta', 'gamma']);
     });
 
@@ -197,10 +194,7 @@ describe('workspace', () => {
       await writeFile(join(dir, 'golem.yaml'), 'name: assistant\nengine: cursor\n');
       const skillDir = join(dir, 'skills', 'demo');
       await mkdir(skillDir, { recursive: true });
-      await writeFile(
-        join(skillDir, 'SKILL.md'),
-        '---\nname: demo\ndescription: demo skill\n---\n',
-      );
+      await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo\ndescription: demo skill\n---\n');
 
       const { config, skills } = await ensureReady(dir);
       expect(config.name).toBe('assistant');
@@ -219,11 +213,7 @@ describe('workspace', () => {
     it('creates a fully initialized assistant directory', async () => {
       // Use project's built-in skills as source
       const builtinDir = join(__dirname, '..', '..', 'skills');
-      await initWorkspace(
-        dir,
-        { name: 'my-bot', engine: 'cursor' },
-        builtinDir,
-      );
+      await initWorkspace(dir, { name: 'my-bot', engine: 'cursor' }, builtinDir);
 
       // golem.yaml created
       const cfg = await loadConfig(dir);
@@ -249,17 +239,11 @@ describe('workspace', () => {
 
     it('throws when golem.yaml already exists (prevent double init)', async () => {
       await writeFile(join(dir, 'golem.yaml'), 'name: old\nengine: cursor\n');
-      await expect(
-        initWorkspace(dir, { name: 'new', engine: 'cursor' }, '/tmp'),
-      ).rejects.toThrow('already exists');
+      await expect(initWorkspace(dir, { name: 'new', engine: 'cursor' }, '/tmp')).rejects.toThrow('already exists');
     });
 
     it('falls back to default SKILL.md when builtin source missing', async () => {
-      await initWorkspace(
-        dir,
-        { name: 'fallback-bot', engine: 'cursor' },
-        '/tmp/nonexistent-builtin-path',
-      );
+      await initWorkspace(dir, { name: 'fallback-bot', engine: 'cursor' }, '/tmp/nonexistent-builtin-path');
 
       const skillMd = await readFile(join(dir, 'skills', 'general', 'SKILL.md'), 'utf-8');
       expect(skillMd).toContain('General');
@@ -267,11 +251,7 @@ describe('workspace', () => {
 
     it('does not overwrite existing .gitignore', async () => {
       await writeFile(join(dir, '.gitignore'), 'node_modules/\ncustom/\n');
-      await initWorkspace(
-        dir,
-        { name: 'bot', engine: 'cursor' },
-        '/tmp/nonexistent',
-      );
+      await initWorkspace(dir, { name: 'bot', engine: 'cursor' }, '/tmp/nonexistent');
 
       const gitignore = await readFile(join(dir, '.gitignore'), 'utf-8');
       expect(gitignore).toContain('custom/');
@@ -302,11 +282,7 @@ describe('workspace', () => {
     });
 
     it('does not generate .cursor/cli.json without permissions', async () => {
-      await initWorkspace(
-        dir,
-        { name: 'plain-bot', engine: 'cursor' },
-        '/tmp/nonexistent',
-      );
+      await initWorkspace(dir, { name: 'plain-bot', engine: 'cursor' }, '/tmp/nonexistent');
 
       await expect(stat(join(dir, '.cursor', 'cli.json'))).rejects.toThrow();
     });
@@ -356,15 +332,19 @@ describe('workspace', () => {
 
   describe('loadConfig permissions', () => {
     it('parses permissions from golem.yaml', async () => {
-      await writeFile(join(dir, 'golem.yaml'), [
-        'name: secure-bot',
-        'engine: cursor',
-        'permissions:',
-        '  allowedPaths:',
-        '    - ./src',
-        '  deniedCommands:',
-        '    - rm -rf /',
-      ].join('\n'), 'utf-8');
+      await writeFile(
+        join(dir, 'golem.yaml'),
+        [
+          'name: secure-bot',
+          'engine: cursor',
+          'permissions:',
+          '  allowedPaths:',
+          '    - ./src',
+          '  deniedCommands:',
+          '    - rm -rf /',
+        ].join('\n'),
+        'utf-8',
+      );
 
       const config = await loadConfig(dir);
       expect(config.permissions).toEqual({

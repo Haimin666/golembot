@@ -1,13 +1,19 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { buildSessionKey, stripMention, type ChannelAdapter, type ChannelMessage, type ReplyOptions } from '../channel.js';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  buildSessionKey,
+  type ChannelAdapter,
+  type ChannelMessage,
+  type ReplyOptions,
+  stripMention,
+} from '../channel.js';
 import type { StreamEvent } from '../engine.js';
 import type { GolemConfig } from '../workspace.js';
 
 vi.mock('../engine.js', async (importOriginal) => {
-  const original = await importOriginal() as Record<string, unknown>;
+  const original = (await importOriginal()) as Record<string, unknown>;
   return {
     ...original,
     createEngine: vi.fn(() => ({
@@ -63,14 +69,14 @@ describe('splitMessage', () => {
     const text = 'Part one.\n\nPart two.\n\nPart three.';
     const chunks = splitMessage(text, 20);
     expect(chunks.length).toBeGreaterThan(1);
-    expect(chunks.every(c => c.length <= 20)).toBe(true);
+    expect(chunks.every((c) => c.length <= 20)).toBe(true);
   });
 
   it('splits at newline when no paragraph boundary', () => {
     const text = 'Line one\nLine two\nLine three\nLine four';
     const chunks = splitMessage(text, 20);
     expect(chunks.length).toBeGreaterThan(1);
-    expect(chunks.every(c => c.length <= 20)).toBe(true);
+    expect(chunks.every((c) => c.length <= 20)).toBe(true);
   });
 
   it('hard-cuts when no natural boundary', () => {
@@ -134,7 +140,9 @@ describe('gateway integration', () => {
       const adapter = createMockAdapter('test');
       const received: ChannelMessage[] = [];
 
-      await adapter.start((msg) => { received.push(msg); });
+      await adapter.start((msg) => {
+        received.push(msg);
+      });
 
       const testMsg: ChannelMessage = {
         channelType: 'test',
@@ -158,7 +166,9 @@ describe('gateway integration', () => {
       const adapter = createMockAdapter('test');
       const received: ChannelMessage[] = [];
 
-      await adapter.start((msg) => { received.push(msg); });
+      await adapter.start((msg) => {
+        received.push(msg);
+      });
       await adapter.stop();
 
       adapter._trigger({
@@ -180,8 +190,12 @@ describe('gateway integration', () => {
       const feishuMsgs: ChannelMessage[] = [];
       const dingtalkMsgs: ChannelMessage[] = [];
 
-      await feishu.start((msg) => { feishuMsgs.push(msg); });
-      await dingtalk.start((msg) => { dingtalkMsgs.push(msg); });
+      await feishu.start((msg) => {
+        feishuMsgs.push(msg);
+      });
+      await dingtalk.start((msg) => {
+        dingtalkMsgs.push(msg);
+      });
 
       feishu._trigger({
         channelType: 'feishu',
@@ -254,7 +268,7 @@ describe('gateway integration', () => {
       });
 
       // Wait for async processing
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 100));
 
       expect(adapter._replies.length).toBeGreaterThanOrEqual(1);
       expect(adapter._replies[0].text).toContain('Echo: Hello');
@@ -295,7 +309,7 @@ describe('gateway integration', () => {
         raw: {},
       });
 
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 100));
 
       expect(adapter._replies.length).toBeGreaterThanOrEqual(1);
       expect(adapter._replies[0].text).toContain('Echo: what is 2+2');
@@ -318,7 +332,7 @@ describe('gateway integration', () => {
         raw: {},
       });
 
-      await new Promise(r => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 50));
       expect(adapter._replies).toHaveLength(0);
     });
   });
@@ -383,7 +397,12 @@ type MockAssistant = {
   chat(message: string, opts?: { sessionKey?: string }): AsyncIterable<StreamEvent>;
   setEngine(engine: string): void;
   setModel(model: string): void;
-  getStatus(): Promise<{ config: { name: string; engine: string }; skills: never[]; engine: string; model: string | undefined }>;
+  getStatus(): Promise<{
+    config: { name: string; engine: string };
+    skills: never[];
+    engine: string;
+    model: string | undefined;
+  }>;
   resetSession(sessionKey?: string): Promise<void>;
   listModels(): Promise<string[]>;
   callCount: number;
@@ -395,9 +414,13 @@ type MockAssistant = {
 const mockAssistantStubs = {
   setEngine(_e: string) {},
   setModel(_m: string) {},
-  async getStatus() { return { config: { name: 'test', engine: 'mock' } as any, skills: [] as never[], engine: 'mock', model: undefined }; },
+  async getStatus() {
+    return { config: { name: 'test', engine: 'mock' } as any, skills: [] as never[], engine: 'mock', model: undefined };
+  },
   async resetSession(_k?: string) {},
-  async listModels() { return ['mock-model-1', 'mock-model-2']; },
+  async listModels() {
+    return ['mock-model-1', 'mock-model-2'];
+  },
 };
 
 function makeMockAssistant(replyText: string): MockAssistant {
@@ -428,7 +451,8 @@ function makeThrowingAssistant(): MockAssistant {
       obj.lastPrompt = message;
       obj.lastSessionKey = opts.sessionKey;
       throw new Error('network failure');
-      yield { type: 'done' as const, sessionId: 'x' }; // unreachable — keeps TS happy
+      // biome-ignore lint/correctness/noUnreachable: unreachable yield keeps TS generator type happy
+      yield { type: 'done' as const, sessionId: 'x' };
     },
   };
   return obj;
@@ -750,7 +774,7 @@ describe('handleMessage — full gateway pipeline', () => {
       const msg = makeGroupMsg({ text: '@golem remember this' });
       await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
       const hist = groupHistories.get('slack:C123')!;
-      expect(hist.some(h => h.senderName === 'alice' && !h.isBot)).toBe(true);
+      expect(hist.some((h) => h.senderName === 'alice' && !h.isBot)).toBe(true);
     });
 
     it('adds bot reply to history with isBot=true', async () => {
@@ -759,7 +783,7 @@ describe('handleMessage — full gateway pipeline', () => {
       const msg = makeGroupMsg({ text: '@golem do it' });
       await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
       const hist = groupHistories.get('slack:C123')!;
-      expect(hist.some(h => h.isBot && h.text === 'done!')).toBe(true);
+      expect(hist.some((h) => h.isBot && h.text === 'done!')).toBe(true);
     });
 
     it('respects historyLimit by discarding oldest entries', async () => {
@@ -770,7 +794,12 @@ describe('handleMessage — full gateway pipeline', () => {
       for (let i = 0; i < 3; i++) {
         await handleMessage(
           makeGroupMsg({ text: `@golem msg${i}`, senderId: `U00${i}` }),
-          config, assistant, adapter, 'slack', false, dir,
+          config,
+          assistant,
+          adapter,
+          'slack',
+          false,
+          dir,
         );
       }
       const hist = groupHistories.get('slack:C123')!;
@@ -781,9 +810,25 @@ describe('handleMessage — full gateway pipeline', () => {
       const assistant = makeMockAssistant('got it');
       const adapter = makeMockAdapter();
       // First message
-      await handleMessage(makeGroupMsg({ text: '@golem first' }), makeConfig(), assistant, adapter, 'slack', false, dir);
+      await handleMessage(
+        makeGroupMsg({ text: '@golem first' }),
+        makeConfig(),
+        assistant,
+        adapter,
+        'slack',
+        false,
+        dir,
+      );
       // Second message — prompt should contain history section
-      await handleMessage(makeGroupMsg({ text: '@golem second' }), makeConfig(), assistant, adapter, 'slack', false, dir);
+      await handleMessage(
+        makeGroupMsg({ text: '@golem second' }),
+        makeConfig(),
+        assistant,
+        adapter,
+        'slack',
+        false,
+        dir,
+      );
       expect(assistant.lastPrompt).toContain('--- Recent group conversation ---');
     });
   });
@@ -985,7 +1030,7 @@ describe('handleMessage — full gateway pipeline', () => {
     it('calls getGroupMembers and passes resolved mentions to adapter.reply', async () => {
       const assistant = makeMockAssistant('好的，@小舟 你来处理这个任务');
       const adapter = makeMockAdapter();
-      adapter.getGroupMembers = async (chatId: string) => {
+      adapter.getGroupMembers = async (_chatId: string) => {
         return new Map([['小舟', 'ou_xiaozhou_001']]);
       };
       const msg = makeGroupMsg({ text: '@golem assign task' });
@@ -1045,7 +1090,9 @@ describe('handleMessage — full gateway pipeline', () => {
     it('gracefully handles getGroupMembers throwing an error', async () => {
       const assistant = makeMockAssistant('hello @alice');
       const adapter = makeMockAdapter();
-      adapter.getGroupMembers = async () => { throw new Error('API error'); };
+      adapter.getGroupMembers = async () => {
+        throw new Error('API error');
+      };
       const msg = makeGroupMsg({ text: '@golem hi' });
       const config = makeConfig({ groupChat: { groupPolicy: 'mention-only' } } as any);
       await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
@@ -1152,7 +1199,7 @@ describe('handleMessage — full gateway pipeline', () => {
       const config = makeConfig({ streaming: { mode: 'streaming', showToolCalls: false } } as any);
       await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
       expect(adapter.replies.length).toBe(2);
-      expect(adapter.replies.every(r => !r.text.includes('🔧'))).toBe(true);
+      expect(adapter.replies.every((r) => !r.text.includes('🔧'))).toBe(true);
     });
 
     it('streaming mode accumulates chunks without paragraph breaks into one message', async () => {
@@ -1189,7 +1236,7 @@ describe('handleMessage — full gateway pipeline', () => {
       // Verify that no group history was recorded for the bot reply.
       const groupKey = `${msg.channelType}:${msg.chatId}`;
       const hist = groupHistories.get(groupKey) ?? [];
-      expect(hist.filter(h => h.isBot)).toHaveLength(0);
+      expect(hist.filter((h) => h.isBot)).toHaveLength(0);
     });
 
     it('streaming mode updates group history with full reply', async () => {
@@ -1204,22 +1251,20 @@ describe('handleMessage — full gateway pipeline', () => {
       await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
       const groupKey = `${msg.channelType}:${msg.chatId}`;
       const hist = groupHistories.get(groupKey) ?? [];
-      const botReply = hist.find(h => h.isBot);
+      const botReply = hist.find((h) => h.isBot);
       expect(botReply).toBeDefined();
       // Group history stores the complete concatenated reply
       expect(botReply!.text).toBe('Part 1.\n\nPart 2.');
     });
 
     it('streaming mode sends error fallback when only error events', async () => {
-      const assistant = makeStreamingAssistant([
-        { type: 'error', message: 'engine crashed' },
-      ]);
+      const assistant = makeStreamingAssistant([{ type: 'error', message: 'engine crashed' }]);
       const adapter = makeMockAdapter();
       const msg = makeDmMsg();
       const config = makeConfig({ streaming: { mode: 'streaming' } } as any);
       await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
       expect(adapter.replies.length).toBeGreaterThanOrEqual(1);
-      expect(adapter.replies.some(r => r.text.includes('error occurred'))).toBe(true);
+      expect(adapter.replies.some((r) => r.text.includes('error occurred'))).toBe(true);
     });
   });
 
@@ -1317,8 +1362,12 @@ describe('handleMessage — full gateway pipeline', () => {
       const taskStore = new TaskStore(dir);
       const scheduler = new Scheduler();
       await taskStore.addTask({
-        id: 'e2e1', name: 'daily-report', schedule: '0 9 * * *', prompt: 'test',
-        enabled: true, createdAt: '2026-01-01T00:00:00Z',
+        id: 'e2e1',
+        name: 'daily-report',
+        schedule: '0 9 * * *',
+        prompt: 'test',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
       });
 
       const assistant = makeMockAssistant('x');
@@ -1366,8 +1415,12 @@ describe('handleMessage — full gateway pipeline', () => {
       const taskStore = new TaskStore(dir);
       const scheduler = new Scheduler();
       await taskStore.addTask({
-        id: 'en1', name: 'test-task', schedule: '0 * * * *', prompt: 'x',
-        enabled: false, createdAt: '2026-01-01T00:00:00Z',
+        id: 'en1',
+        name: 'test-task',
+        schedule: '0 * * * *',
+        prompt: 'x',
+        enabled: false,
+        createdAt: '2026-01-01T00:00:00Z',
       });
 
       const assistant = makeMockAssistant('x');
@@ -1387,8 +1440,12 @@ describe('handleMessage — full gateway pipeline', () => {
       const taskStore = new TaskStore(dir);
       const scheduler = new Scheduler();
       await taskStore.addTask({
-        id: 'dis1', name: 'test-task', schedule: '0 * * * *', prompt: 'x',
-        enabled: true, createdAt: '2026-01-01T00:00:00Z',
+        id: 'dis1',
+        name: 'test-task',
+        schedule: '0 * * * *',
+        prompt: 'x',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
       });
 
       const assistant = makeMockAssistant('x');
@@ -1406,8 +1463,12 @@ describe('handleMessage — full gateway pipeline', () => {
       const taskStore = new TaskStore(dir);
       const scheduler = new Scheduler();
       await taskStore.addTask({
-        id: 'del1', name: 'doomed', schedule: '0 * * * *', prompt: 'x',
-        enabled: true, createdAt: '2026-01-01T00:00:00Z',
+        id: 'del1',
+        name: 'doomed',
+        schedule: '0 * * * *',
+        prompt: 'x',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
       });
 
       const assistant = makeMockAssistant('x');
@@ -1425,9 +1486,13 @@ describe('handleMessage — full gateway pipeline', () => {
       const taskStore = new TaskStore(dir);
       const scheduler = new Scheduler();
       await taskStore.recordExecution({
-        taskId: 'h1', taskName: 'test', startedAt: '2026-01-01T09:00:00Z',
-        completedAt: '2026-01-01T09:01:00Z', status: 'success',
-        reply: 'Report generated successfully', durationMs: 60000,
+        taskId: 'h1',
+        taskName: 'test',
+        startedAt: '2026-01-01T09:00:00Z',
+        completedAt: '2026-01-01T09:01:00Z',
+        status: 'success',
+        reply: 'Report generated successfully',
+        durationMs: 60000,
       });
 
       const assistant = makeMockAssistant('x');
@@ -1454,8 +1519,12 @@ describe('handleMessage — full gateway pipeline', () => {
       const taskStore = new TaskStore(dir);
       const scheduler = new Scheduler();
       await taskStore.addTask({
-        id: 'grp1', name: 'group-task', schedule: '0 12 * * *', prompt: 'remind',
-        enabled: true, createdAt: '2026-01-01T00:00:00Z',
+        id: 'grp1',
+        name: 'group-task',
+        schedule: '0 12 * * *',
+        prompt: 'remind',
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
       });
 
       const assistant = makeMockAssistant('x');

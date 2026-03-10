@@ -1,7 +1,7 @@
 import type { ServerResponse } from 'node:http';
+import type { TaskExecution, TaskRecord, TaskStore } from './task-store.js';
+import { BASE_CSS, DOCS_BASE, ENGINE_COLORS, esc, FAVICON, formatUptime } from './ui-shared.js';
 import type { GolemConfig, SkillInfo } from './workspace.js';
-import type { TaskRecord, TaskExecution, TaskStore } from './task-store.js';
-import { esc, formatUptime, FAVICON, DOCS_BASE, ENGINE_COLORS, BASE_CSS } from './ui-shared.js';
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -69,7 +69,11 @@ export function recordMessage(metrics: GatewayMetrics, msg: RecentMessage): void
   // Broadcast to SSE subscribers
   const payload = `data: ${JSON.stringify(msg)}\n\n`;
   for (const sub of metrics.eventSubscribers) {
-    try { sub.write(payload); } catch { metrics.eventSubscribers.delete(sub); }
+    try {
+      sub.write(payload);
+    } catch {
+      metrics.eventSubscribers.delete(sub);
+    }
   }
 }
 
@@ -86,7 +90,6 @@ const CHANNEL_LABELS: Record<string, string> = {
   discord: 'Discord',
 };
 
-
 // ── Dashboard data ───────────────────────────────────────────────────────────
 
 interface DashboardData {
@@ -97,7 +100,12 @@ interface DashboardData {
   uptime: number;
   channels: ChannelStatus[];
   skills: { name: string; description: string }[];
-  metrics: { totalMessages: number; totalCostUsd: number; avgDurationMs: number; messagesBySource: Record<string, number> };
+  metrics: {
+    totalMessages: number;
+    totalCostUsd: number;
+    avgDurationMs: number;
+    messagesBySource: Record<string, number>;
+  };
   recentMessages: RecentMessage[];
   authEnabled: boolean;
   host: string;
@@ -107,9 +115,7 @@ interface DashboardData {
 }
 
 export async function buildDashboardData(ctx: DashboardContext): Promise<DashboardData> {
-  const avg = ctx.metrics.totalMessages > 0
-    ? Math.round(ctx.metrics.totalDurationMs / ctx.metrics.totalMessages)
-    : 0;
+  const avg = ctx.metrics.totalMessages > 0 ? Math.round(ctx.metrics.totalDurationMs / ctx.metrics.totalMessages) : 0;
 
   // Use live runtime status if available (reflects /engine and /model changes)
   let engine = ctx.config.engine;
@@ -119,7 +125,9 @@ export async function buildDashboardData(ctx: DashboardContext): Promise<Dashboa
       const status = await ctx.getRuntimeStatus();
       engine = status.engine;
       model = status.model;
-    } catch { /* fallback to config */ }
+    } catch {
+      /* fallback to config */
+    }
   }
 
   // Load tasks + recent history for each task
@@ -132,7 +140,9 @@ export async function buildDashboardData(ctx: DashboardContext): Promise<Dashboa
         const hist = await ctx.taskStore.getHistory(t.id, 5);
         if (hist.length > 0) taskHistory.set(t.id, hist);
       }
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
   }
 
   return {
@@ -142,7 +152,7 @@ export async function buildDashboardData(ctx: DashboardContext): Promise<Dashboa
     version: ctx.version,
     uptime: Date.now() - ctx.startTime,
     channels: ctx.channelStatuses,
-    skills: ctx.skills.map(s => ({ name: s.name, description: s.description })),
+    skills: ctx.skills.map((s) => ({ name: s.name, description: s.description })),
     metrics: {
       totalMessages: ctx.metrics.totalMessages,
       totalCostUsd: ctx.metrics.totalCostUsd,
@@ -173,7 +183,7 @@ function renderChannelRow(ch: ChannelStatus | undefined, type: string): string {
 
 function renderHeader(data: DashboardData): string {
   const engineColor = ENGINE_COLORS[data.engine] ?? '#58a6ff';
-  const connectedCount = data.channels.filter(c => c.status === 'connected').length;
+  const connectedCount = data.channels.filter((c) => c.status === 'connected').length;
   const modelBadge = data.model
     ? `<span class="badge" style="background:var(--border);color:var(--text)">${esc(data.model)}</span>`
     : '';
@@ -194,12 +204,15 @@ function renderAccessCards(data: DashboardData): string {
   const baseUrl = `http://${data.host}:${data.port}`;
 
   // Channel rows (known + custom)
-  const knownRows = KNOWN_CHANNELS.map(type =>
-    renderChannelRow(data.channels.find(c => c.type === type), type),
+  const knownRows = KNOWN_CHANNELS.map((type) =>
+    renderChannelRow(
+      data.channels.find((c) => c.type === type),
+      type,
+    ),
   ).join('\n');
   const customRows = data.channels
-    .filter(c => !KNOWN_CHANNELS.includes(c.type))
-    .map(c => renderChannelRow(c, c.type))
+    .filter((c) => !KNOWN_CHANNELS.includes(c.type))
+    .map((c) => renderChannelRow(c, c.type))
     .join('\n');
 
   // Code examples (highlighted + plain for copy)
@@ -269,20 +282,29 @@ function renderQuickTest(data: DashboardData): string {
 
 function renderMonitoring(data: DashboardData): string {
   const { totalMessages, totalCostUsd, avgDurationMs, messagesBySource } = data.metrics;
-  const avgDisplay = avgDurationMs > 0 ? (avgDurationMs / 1000).toFixed(1) + 's' : '-';
+  const avgDisplay = avgDurationMs > 0 ? `${(avgDurationMs / 1000).toFixed(1)}s` : '-';
 
   const totalBySource = Object.entries(messagesBySource);
   const maxCount = Math.max(1, ...totalBySource.map(([, n]) => n));
-  const statBars = totalBySource.length > 0
-    ? totalBySource.map(([src, n]) => {
-        const pct = Math.round((n / maxCount) * 100);
-        return `<div class="bar-row"><span class="bar-label">${esc(src)}</span><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><span class="bar-val">${n}</span></div>`;
-      }).join('\n')
-    : '<div class="empty">No messages yet</div>';
+  const statBars =
+    totalBySource.length > 0
+      ? totalBySource
+          .map(([src, n]) => {
+            const pct = Math.round((n / maxCount) * 100);
+            return `<div class="bar-row"><span class="bar-label">${esc(src)}</span><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><span class="bar-val">${n}</span></div>`;
+          })
+          .join('\n')
+      : '<div class="empty">No messages yet</div>';
 
-  const skillRows = data.skills.length > 0
-    ? data.skills.map(s => `<div class="skill-row"><span class="skill-name">${esc(s.name)}</span><span class="skill-desc">${esc(s.description)}</span></div>`).join('\n')
-    : '<div class="empty">No skills installed</div>';
+  const skillRows =
+    data.skills.length > 0
+      ? data.skills
+          .map(
+            (s) =>
+              `<div class="skill-row"><span class="skill-name">${esc(s.name)}</span><span class="skill-desc">${esc(s.description)}</span></div>`,
+          )
+          .join('\n')
+      : '<div class="empty">No skills installed</div>';
 
   return `
 <div class="section-label">Monitoring</div>
@@ -325,34 +347,38 @@ function renderActivityFeed(data: DashboardData): string {
 function renderScheduledTasks(data: DashboardData): string {
   if (data.tasks.length === 0) return '';
 
-  const rows = data.tasks.map(t => {
-    const statusDot = t.lastStatus === 'success' ? 'dot-green'
-      : t.lastStatus === 'error' ? 'dot-red' : 'dot-gray';
-    const statusText = t.lastStatus ?? 'never run';
-    const lastRun = t.lastRun
-      ? new Date(t.lastRun).toLocaleString()
-      : '-';
-    const target = t.target
-      ? `${esc(t.target.channel)}:${esc(t.target.chatId.slice(0, 12))}…`
-      : '<span class="dim">none</span>';
-    const enabledClass = t.enabled ? 'task-enabled' : 'task-disabled';
-    const enabledLabel = t.enabled ? 'Enabled' : 'Disabled';
-    const toggleAction = t.enabled ? 'disable' : 'enable';
-    const toggleLabel = t.enabled ? 'Disable' : 'Enable';
+  const rows = data.tasks
+    .map((t) => {
+      const statusDot = t.lastStatus === 'success' ? 'dot-green' : t.lastStatus === 'error' ? 'dot-red' : 'dot-gray';
+      const statusText = t.lastStatus ?? 'never run';
+      const lastRun = t.lastRun ? new Date(t.lastRun).toLocaleString() : '-';
+      const target = t.target
+        ? `${esc(t.target.channel)}:${esc(t.target.chatId.slice(0, 12))}…`
+        : '<span class="dim">none</span>';
+      const enabledClass = t.enabled ? 'task-enabled' : 'task-disabled';
+      const enabledLabel = t.enabled ? 'Enabled' : 'Disabled';
+      const toggleAction = t.enabled ? 'disable' : 'enable';
+      const toggleLabel = t.enabled ? 'Disable' : 'Enable';
 
-    // Recent history for this task
-    const hist = data.taskHistory.get(t.id) ?? [];
-    const histHtml = hist.length > 0
-      ? `<div class="task-hist">${hist.map(h => {
-          const hTime = new Date(h.startedAt).toLocaleString();
-          const hDur = (h.durationMs / 1000).toFixed(1) + 's';
-          const hCost = h.costUsd ? '$' + h.costUsd.toFixed(4) : '-';
-          const hStatus = h.status === 'success' ? '<span class="task-ok">OK</span>' : `<span class="task-err">${esc(h.error ?? 'error')}</span>`;
-          return `<div class="task-hist-row"><span>${hTime}</span><span>${hStatus}</span><span>${hDur}</span><span>${hCost}</span></div>`;
-        }).join('')}</div>`
-      : '';
+      // Recent history for this task
+      const hist = data.taskHistory.get(t.id) ?? [];
+      const histHtml =
+        hist.length > 0
+          ? `<div class="task-hist">${hist
+              .map((h) => {
+                const hTime = new Date(h.startedAt).toLocaleString();
+                const hDur = `${(h.durationMs / 1000).toFixed(1)}s`;
+                const hCost = h.costUsd ? `$${h.costUsd.toFixed(4)}` : '-';
+                const hStatus =
+                  h.status === 'success'
+                    ? '<span class="task-ok">OK</span>'
+                    : `<span class="task-err">${esc(h.error ?? 'error')}</span>`;
+                return `<div class="task-hist-row"><span>${hTime}</span><span>${hStatus}</span><span>${hDur}</span><span>${hCost}</span></div>`;
+              })
+              .join('')}</div>`
+          : '';
 
-    return `<div class="task-row">
+      return `<div class="task-row">
       <div class="task-main">
         <span class="ch-dot ${statusDot}"></span>
         <span class="task-name">${esc(t.name)}</span>
@@ -367,7 +393,8 @@ function renderScheduledTasks(data: DashboardData): string {
       </div>
       ${histHtml}
     </div>`;
-  }).join('\n');
+    })
+    .join('\n');
 
   return `
 <div class="section-label">Scheduled Tasks</div>

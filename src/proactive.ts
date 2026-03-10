@@ -1,7 +1,7 @@
-import type { StreamEvent } from './engine.js';
-import type { TaskRecord, TaskExecution, TaskStore } from './task-store.js';
-import type { Scheduler, ScheduledTaskDef } from './scheduler.js';
 import type { ChannelAdapter } from './channel.js';
+import type { StreamEvent } from './engine.js';
+import type { Scheduler } from './scheduler.js';
+import type { TaskExecution, TaskRecord, TaskStore } from './task-store.js';
 
 // ---------------------------------------------------------------------------
 // Minimal assistant interface (subset of what createAssistant returns)
@@ -100,7 +100,7 @@ export class ProactiveCoordinator {
     }
 
     const completedAt = new Date().toISOString();
-    const wallMs = durationMs ?? (Date.now() - t0);
+    const wallMs = durationMs ?? Date.now() - t0;
     const status: 'success' | 'error' = error ? 'error' : 'success';
 
     // Record execution history
@@ -141,8 +141,6 @@ export class ProactiveCoordinator {
 // Factory
 // ---------------------------------------------------------------------------
 
-export function createProactiveCoordinator(
-  opts: ProactiveCoordinatorOpts,
-): ProactiveCoordinator {
+export function createProactiveCoordinator(opts: ProactiveCoordinatorOpts): ProactiveCoordinator {
   return new ProactiveCoordinator(opts);
 }

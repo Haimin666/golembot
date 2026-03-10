@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir, readFile, readdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { scanSkills, generateAgentsMd, initWorkspace } from '../workspace.js';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { generateAgentsMd, scanSkills } from '../workspace.js';
 
 describe('skill management operations', () => {
   let dir: string;
@@ -23,7 +23,10 @@ describe('skill management operations', () => {
     it('copies a skill directory into skills/', async () => {
       const srcDir = join(dir, '_external', 'my-custom-skill');
       await mkdir(srcDir, { recursive: true });
-      await writeFile(join(srcDir, 'SKILL.md'), '---\nname: my-custom-skill\ndescription: A custom skill\n---\n# Custom\n');
+      await writeFile(
+        join(srcDir, 'SKILL.md'),
+        '---\nname: my-custom-skill\ndescription: A custom skill\n---\n# Custom\n',
+      );
       await writeFile(join(srcDir, 'helper.py'), 'print("hello")\n');
 
       const { cp } = await import('node:fs/promises');
@@ -36,7 +39,7 @@ describe('skill management operations', () => {
       const skills = await scanSkills(dir);
       await generateAgentsMd(dir, skills);
 
-      expect(skills.some(s => s.name === 'my-custom-skill')).toBe(true);
+      expect(skills.some((s) => s.name === 'my-custom-skill')).toBe(true);
 
       const copied = await readFile(join(destPath, 'helper.py'), 'utf-8');
       expect(copied).toContain('hello');
@@ -78,14 +81,14 @@ describe('skill management operations', () => {
       await writeFile(join(skillDir, 'SKILL.md'), '---\nname: to-remove\ndescription: Will be removed\n---\n');
 
       let skills = await scanSkills(dir);
-      expect(skills.some(s => s.name === 'to-remove')).toBe(true);
+      expect(skills.some((s) => s.name === 'to-remove')).toBe(true);
 
       await rm(skillDir, { recursive: true, force: true });
 
       skills = await scanSkills(dir);
       await generateAgentsMd(dir, skills);
 
-      expect(skills.some(s => s.name === 'to-remove')).toBe(false);
+      expect(skills.some((s) => s.name === 'to-remove')).toBe(false);
 
       const agentsMd = await readFile(join(dir, 'AGENTS.md'), 'utf-8');
       expect(agentsMd).not.toContain('to-remove');
@@ -116,7 +119,11 @@ describe('skill management operations', () => {
 
   describe('skill list', () => {
     it('lists multiple skills with descriptions', async () => {
-      for (const [name, desc] of [['alpha', 'First skill'], ['beta', 'Second skill'], ['gamma', 'Third skill']]) {
+      for (const [name, desc] of [
+        ['alpha', 'First skill'],
+        ['beta', 'Second skill'],
+        ['gamma', 'Third skill'],
+      ]) {
         const sd = join(dir, 'skills', name);
         await mkdir(sd, { recursive: true });
         await writeFile(join(sd, 'SKILL.md'), `---\nname: ${name}\ndescription: ${desc}\n---\n`);
@@ -125,10 +132,10 @@ describe('skill management operations', () => {
       const skills = await scanSkills(dir);
       expect(skills).toHaveLength(3);
 
-      const names = skills.map(s => s.name).sort();
+      const names = skills.map((s) => s.name).sort();
       expect(names).toEqual(['alpha', 'beta', 'gamma']);
 
-      const alpha = skills.find(s => s.name === 'alpha')!;
+      const alpha = skills.find((s) => s.name === 'alpha')!;
       expect(alpha.description).toBe('First skill');
     });
 

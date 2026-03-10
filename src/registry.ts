@@ -7,8 +7,8 @@
 
 import { spawn } from 'node:child_process';
 import { cp, mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { isOnPath } from './engines/shared.js';
 
 // ---------------------------------------------------------------------------
@@ -103,11 +103,7 @@ export class ClawHubRegistry implements SkillRegistry {
   }
 
   async search(query: string, limit = 10): Promise<SkillSearchResult[]> {
-    const { stdout, code } = await runCli(
-      'clawhub',
-      ['search', query, '--limit', String(limit)],
-      { timeout: 15_000 },
-    );
+    const { stdout, code } = await runCli('clawhub', ['search', query, '--limit', String(limit)], { timeout: 15_000 });
 
     if (code !== 0) return [];
 
@@ -135,11 +131,7 @@ export class ClawHubRegistry implements SkillRegistry {
 
   /** Fetch detailed metadata for a single skill. */
   async inspect(slug: string): Promise<SkillSearchResult> {
-    const { stdout, code } = await runCli(
-      'clawhub',
-      ['inspect', slug, '--json'],
-      { timeout: 15_000 },
-    );
+    const { stdout, code } = await runCli('clawhub', ['inspect', slug, '--json'], { timeout: 15_000 });
 
     if (code !== 0) {
       throw new Error(`clawhub inspect failed for ${slug}`);
@@ -170,20 +162,19 @@ export class ClawHubRegistry implements SkillRegistry {
     await mkdir(tmpBase, { recursive: true });
 
     try {
-      const { stdout, stderr, code } = await runCli(
-        'clawhub',
-        ['install', slug, '--force'],
-        { cwd: tmpBase, timeout: 60_000 },
-      );
+      const { stdout, stderr, code } = await runCli('clawhub', ['install', slug, '--force'], {
+        cwd: tmpBase,
+        timeout: 60_000,
+      });
 
       if (code !== 0) {
         // Extract clean error message from CLI output (strip ANSI, warnings, spinners)
         const raw = (stderr || stdout || 'unknown error').trim();
-        const lines = raw.split('\n').filter(l => {
+        const lines = raw.split('\n').filter((l) => {
           const t = l.replace(/\x1b\[[^a-zA-Z]*[a-zA-Z]/g, '').trim();
           return t && !t.startsWith('(') && !t.startsWith('-') && !t.startsWith('✖');
         });
-        const errorLine = lines.find(l => /error/i.test(l)) ?? lines[lines.length - 1] ?? raw;
+        const errorLine = lines.find((l) => /error/i.test(l)) ?? lines[lines.length - 1] ?? raw;
         throw new Error(errorLine.replace(/\x1b\[[^a-zA-Z]*[a-zA-Z]/g, '').trim());
       }
 
@@ -205,9 +196,7 @@ export class ClawHubRegistry implements SkillRegistry {
             await cp(join(skillsDir, entry), destDir, { recursive: true });
             found = true;
             break;
-          } catch {
-            continue;
-          }
+          } catch {}
         }
         if (!found) throw new Error(`Installed skill has no SKILL.md`);
 

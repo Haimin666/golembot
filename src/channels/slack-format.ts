@@ -33,10 +33,7 @@ export function markdownToMrkdwn(markdown: string): string {
  * Split text into code-block and non-code-block segments.
  * Only non-code-block segments are passed to `transform`.
  */
-function processOutsideCodeBlocks(
-  text: string,
-  transform: (segment: string) => string,
-): string {
+function processOutsideCodeBlocks(text: string, transform: (segment: string) => string): string {
   const lines = text.split('\n');
   const result: string[] = [];
   let buf: string[] = [];

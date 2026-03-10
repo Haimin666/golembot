@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { markdownToHtml } from '../channels/telegram-format.js';
 
 describe('markdownToHtml', () => {
@@ -29,8 +29,7 @@ describe('markdownToHtml', () => {
   });
 
   it('converts links to <a> tags', () => {
-    expect(markdownToHtml('[Google](https://google.com)'))
-      .toBe('<a href="https://google.com">Google</a>');
+    expect(markdownToHtml('[Google](https://google.com)')).toBe('<a href="https://google.com">Google</a>');
   });
 
   it('converts headings to <b>text</b>', () => {

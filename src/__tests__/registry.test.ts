@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
-import { getRegistry, listRegistries, ClawHubRegistry } from '../registry.js';
+import { ClawHubRegistry, getRegistry, listRegistries } from '../registry.js';
 
 // ---------------------------------------------------------------------------
 // Registry factory (pure, no network)
@@ -53,39 +53,53 @@ describe('ClawHubRegistry integration', () => {
   const available = registry.isAvailable();
   const hasToken = !!process.env.GITHUB_TOKEN;
 
-  it.skipIf(!available)('search returns results', async () => {
-    const results = await registry.search('markdown', 3);
-    expect(Array.isArray(results)).toBe(true);
-    expect(results.length).toBeGreaterThan(0);
-    expect(results[0]).toHaveProperty('slug');
-    expect(results[0]).toHaveProperty('name');
-  }, 30_000);
+  it.skipIf(!available)(
+    'search returns results',
+    async () => {
+      const results = await registry.search('markdown', 3);
+      expect(Array.isArray(results)).toBe(true);
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0]).toHaveProperty('slug');
+      expect(results[0]).toHaveProperty('name');
+    },
+    30_000,
+  );
 
-  it.skipIf(!available)('inspect returns structured data', async () => {
-    const result = await registry.inspect('markdown-formatter');
-    expect(result.slug).toBe('markdown-formatter');
-    expect(result.name).toBeTruthy();
-    expect(typeof result.description).toBe('string');
-  }, 30_000);
+  it.skipIf(!available)(
+    'inspect returns structured data',
+    async () => {
+      const result = await registry.inspect('markdown-formatter');
+      expect(result.slug).toBe('markdown-formatter');
+      expect(result.name).toBeTruthy();
+      expect(typeof result.description).toBe('string');
+    },
+    30_000,
+  );
 
-  it.skipIf(!available)('inspect throws for nonexistent slug', async () => {
-    await expect(
-      registry.inspect('this-slug-definitely-does-not-exist-xyz-123'),
-    ).rejects.toThrow();
-  }, 30_000);
+  it.skipIf(!available)(
+    'inspect throws for nonexistent slug',
+    async () => {
+      await expect(registry.inspect('this-slug-definitely-does-not-exist-xyz-123')).rejects.toThrow();
+    },
+    30_000,
+  );
 
-  it.skipIf(!available || !hasToken)('install downloads skill with SKILL.md', async () => {
-    const tmpDir = await mkdtemp(join(tmpdir(), 'golem-reg-test-'));
-    try {
-      const destDir = join(tmpDir, 'my-skill');
-      const result = await registry.install('markdown-formatter', destDir);
-      expect(result.name).toBe('markdown-formatter');
-      expect(result.version).toBeTruthy();
+  it.skipIf(!available || !hasToken)(
+    'install downloads skill with SKILL.md',
+    async () => {
+      const tmpDir = await mkdtemp(join(tmpdir(), 'golem-reg-test-'));
+      try {
+        const destDir = join(tmpDir, 'my-skill');
+        const result = await registry.install('markdown-formatter', destDir);
+        expect(result.name).toBe('markdown-formatter');
+        expect(result.version).toBeTruthy();
 
-      const skillMd = await readFile(join(destDir, 'SKILL.md'), 'utf-8');
-      expect(skillMd).toContain('name:');
-    } finally {
-      await rm(tmpDir, { recursive: true, force: true });
-    }
-  }, 60_000);
+        const skillMd = await readFile(join(destDir, 'SKILL.md'), 'utf-8');
+        expect(skillMd).toContain('name:');
+      } finally {
+        await rm(tmpDir, { recursive: true, force: true });
+      }
+    },
+    60_000,
+  );
 });

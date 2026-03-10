@@ -1,19 +1,17 @@
 #!/usr/bin/env node
 
-import { Command } from 'commander';
 import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
-import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createAssistant } from './index.js';
+import { Command } from 'commander';
 import type { CommandContext } from './commands.js';
+import { createAssistant } from './index.js';
 
 // Read version from package.json at runtime
 const __filename_cli = fileURLToPath(import.meta.url);
 const __dirname_cli = dirname(__filename_cli);
-const pkgVersion: string = JSON.parse(
-  readFileSync(join(__dirname_cli, '..', 'package.json'), 'utf-8'),
-).version;
+const pkgVersion: string = JSON.parse(readFileSync(join(__dirname_cli, '..', 'package.json'), 'utf-8')).version;
 
 // Auto-load .env from cwd (no dependencies, does not overwrite existing vars)
 try {
@@ -30,7 +28,9 @@ try {
     }
     if (val && !process.env[key]) process.env[key] = val;
   }
-} catch { /* .env not found — rely on existing env vars */ }
+} catch {
+  /* .env not found — rely on existing env vars */
+}
 
 const DIM = '\x1b[2m';
 const BOLD = '\x1b[1m';
@@ -55,7 +55,7 @@ function renderBox(lines: string[]): string {
   const top = `  ╭${'─'.repeat(BOX_WIDTH)}╮`;
   const bot = `  ╰${'─'.repeat(BOX_WIDTH)}╯`;
   const empty = boxLine('', 0);
-  const body = lines.map(l => l === '' ? empty : boxLine(l));
+  const body = lines.map((l) => (l === '' ? empty : boxLine(l)));
   return [top, empty, ...body, empty, bot].join('\n');
 }
 
@@ -75,7 +75,11 @@ function centerArt(line: string, rawLen: number): string {
 }
 
 function golemArt(): string[] {
-  const y = YELLOW, c = CYAN, d = DIM, b = BOLD, r = RESET;
+  const y = YELLOW,
+    c = CYAN,
+    d = DIM,
+    b = BOLD,
+    r = RESET;
   // 13 chars wide — blocky stone golem face matching the GolemBot icon
   return [
     centerArt(`${y}▄███████████▄${r}`, 13),
@@ -122,18 +126,18 @@ program
     const tagline = `${DIM}Your Coding Agent, Everywhere${RESET}`;
     const cmds = [
       [`${BOLD}golembot onboard${RESET}`, 'Setup wizard'],
-      [`${BOLD}golembot run${RESET}`,     'Start chatting'],
+      [`${BOLD}golembot run${RESET}`, 'Start chatting'],
       [`${BOLD}golembot gateway${RESET}`, 'IM + HTTP service'],
       [`${BOLD}golembot fleet ls${RESET}`, 'List running bots'],
-      [`${BOLD}golembot doctor${RESET}`,  'Check system setup'],
-      [`${BOLD}golembot --help${RESET}`,  'All commands'],
+      [`${BOLD}golembot doctor${RESET}`, 'Check system setup'],
+      [`${BOLD}golembot --help${RESET}`, 'All commands'],
     ];
     const cmdLines = cmds.map(([cmd, desc]) => {
       const cmdRaw = cmd.replace(/\x1b\[[^a-zA-Z]*[a-zA-Z]/g, '');
       const gap = 20 - cmdRaw.length;
       return `${cmd}${' '.repeat(Math.max(1, gap))}${DIM}${desc}${RESET}`;
     });
-    console.log('\n' + renderBox([...art, '', title, tagline, '', ...cmdLines]) + '\n');
+    console.log(`\n${renderBox([...art, '', title, tagline, '', ...cmdLines])}\n`);
   });
 
 program
@@ -214,15 +218,15 @@ program
         infoLines.push(label('Engine', config.engine + (config.model ? ` ${DIM}(${config.model})${RESET}` : '')));
         if (skills.length > 0) {
           const maxValLen = BOX_WIDTH - 2 - 12 - 2; // box - margin - label - padding
-          let skillStr = skills.map(s => s.name).join(', ');
-          if (skillStr.length > maxValLen) skillStr = skillStr.slice(0, maxValLen - 1) + '\u2026';
+          let skillStr = skills.map((s) => s.name).join(', ');
+          if (skillStr.length > maxValLen) skillStr = `${skillStr.slice(0, maxValLen - 1)}\u2026`;
           infoLines.push(label('Skills', skillStr));
         }
         const shortDir = dir.replace(process.env.HOME ?? '', '~');
         infoLines.push(label('cwd', `${DIM}${shortDir}${RESET}`));
 
         const hint = `${DIM}/help${RESET} for commands`;
-        console.log('\n' + renderBox([...art, '', title, '', ...infoLines, '', hint]) + '\n');
+        console.log(`\n${renderBox([...art, '', title, '', ...infoLines, '', hint])}\n`);
       } catch {
         console.log('GolemBot assistant started (type /help for commands)\n');
       }
@@ -232,7 +236,7 @@ program
 
     const SLASH_CMDS = ['/help', '/status', '/engine', '/model', '/skill', '/reset', '/quit', '/exit'];
     const completer = (line: string): [string[], string] => {
-      const hits = SLASH_CMDS.filter(c => c.startsWith(line));
+      const hits = SLASH_CMDS.filter((c) => c.startsWith(line));
       return [hits.length ? hits : SLASH_CMDS, line];
     };
 
@@ -279,8 +283,7 @@ program
         let userMessage = trimmed;
         if (trimmed === '"""') {
           const lines: string[] = [];
-          const collectLine = (): Promise<string> =>
-            new Promise(r => rl.question('... ', r));
+          const collectLine = (): Promise<string> => new Promise((r) => rl.question('... ', r));
           while (true) {
             const line = await collectLine();
             if (line.trim() === '"""') break;
@@ -355,11 +358,15 @@ program
     const dir = resolve(opts.dir);
     const assistant = createAssistant({ dir, apiKey: opts.apiKey });
     const { startServer } = await import('./server.js');
-    await startServer(assistant, {
-      port: Number(opts.port),
-      token: opts.token,
-      hostname: opts.host,
-    }, dir);
+    await startServer(
+      assistant,
+      {
+        port: Number(opts.port),
+        token: opts.token,
+        hostname: opts.host,
+      },
+      dir,
+    );
   });
 
 program
@@ -387,7 +394,10 @@ program
   .command('onboard')
   .description('Interactive onboarding wizard to configure a new assistant')
   .option('-d, --dir <dir>', 'assistant directory', '.')
-  .option('--template <name>', 'pre-select a template (customer-support, data-analyst, code-reviewer, ops-assistant, meeting-notes, research)')
+  .option(
+    '--template <name>',
+    'pre-select a template (customer-support, data-analyst, code-reviewer, ops-assistant, meeting-notes, research)',
+  )
   .action(async (opts) => {
     const { runOnboard } = await import('./onboard.js');
     await runOnboard({ dir: resolve(opts.dir), template: opts.template });
@@ -406,19 +416,23 @@ program
       const config = await loadConfig(dir);
       const skills = await scanSkills(dir);
       const sessionCount = await countSessions(dir);
-      const channelNames = config.channels ? Object.keys(config.channels).filter(k => !!(config.channels as any)[k]) : [];
+      const channelNames = config.channels
+        ? Object.keys(config.channels).filter((k) => !!(config.channels as any)[k])
+        : [];
 
       if (opts.json) {
-        console.log(JSON.stringify({
-          name: config.name,
-          engine: config.engine,
-          model: config.model ?? null,
-          skills: skills.map(s => ({ name: s.name, description: s.description })),
-          sessions: sessionCount,
-          channels: channelNames,
-          gateway: config.gateway ? { port: config.gateway.port ?? 3000, authEnabled: !!config.gateway.token } : null,
-          directory: dir,
-        }));
+        console.log(
+          JSON.stringify({
+            name: config.name,
+            engine: config.engine,
+            model: config.model ?? null,
+            skills: skills.map((s) => ({ name: s.name, description: s.description })),
+            sessions: sessionCount,
+            channels: channelNames,
+            gateway: config.gateway ? { port: config.gateway.port ?? 3000, authEnabled: !!config.gateway.token } : null,
+            directory: dir,
+          }),
+        );
         return;
       }
 
@@ -426,7 +440,7 @@ program
       console.log(`   Name:       ${config.name}`);
       console.log(`   Engine:     ${config.engine}`);
       if (config.model) console.log(`   Model:      ${config.model}`);
-      console.log(`   Skills:     ${skills.length > 0 ? skills.map(s => s.name).join(', ') : '(none)'}`);
+      console.log(`   Skills:     ${skills.length > 0 ? skills.map((s) => s.name).join(', ') : '(none)'}`);
       console.log(`   Sessions:   ${sessionCount}`);
       console.log(`   Channels:   ${channelNames.length > 0 ? channelNames.join(', ') : '(none)'}`);
       if (config.gateway) {
@@ -441,14 +455,14 @@ program
         process.exit(1);
       }
       console.error(`❌ Failed to read assistant status: ${(e as Error).message}`);
-      console.error(`   Make sure the current directory contains golem.yaml, or use -d to specify the assistant directory.`);
+      console.error(
+        `   Make sure the current directory contains golem.yaml, or use -d to specify the assistant directory.`,
+      );
       process.exit(1);
     }
   });
 
-const skill = program
-  .command('skill')
-  .description('Manage skills in the assistant directory');
+const skill = program.command('skill').description('Manage skills in the assistant directory');
 
 skill
   .command('list')
@@ -460,7 +474,7 @@ skill
     const { scanSkills } = await import('./workspace.js');
     const skills = await scanSkills(dir);
     if (opts.json) {
-      console.log(JSON.stringify(skills.map(s => ({ name: s.name, description: s.description }))));
+      console.log(JSON.stringify(skills.map((s) => ({ name: s.name, description: s.description }))));
       return;
     }
     if (skills.length === 0) {
@@ -482,7 +496,10 @@ skill
   .action(async (queryWords: string[], opts: { limit: string; json?: boolean }) => {
     const { getRegistry } = await import('./registry.js');
     const registry = getRegistry('clawhub');
-    if (!registry) { console.error('No registry available'); process.exit(1); }
+    if (!registry) {
+      console.error('No registry available');
+      process.exit(1);
+    }
 
     if (!registry.isAvailable()) {
       console.error('clawhub CLI not found. Install it: npm i -g clawhub');
@@ -504,7 +521,13 @@ skill
 
     console.log(`\nClawHub results for "${query}" (${results.length}):\n`);
     for (const s of results) {
-      const meta = [s.version ? `v${s.version}` : '', s.author ?? '', s.downloads != null ? `${s.downloads} installs` : ''].filter(Boolean).join(' | ');
+      const meta = [
+        s.version ? `v${s.version}` : '',
+        s.author ?? '',
+        s.downloads != null ? `${s.downloads} installs` : '',
+      ]
+        .filter(Boolean)
+        .join(' | ');
       console.log(`  ${s.slug.padEnd(30)} ${s.description ? s.description.slice(0, 60) : ''}`);
       if (meta) console.log(`  ${' '.repeat(30)} ${DIM}${meta}${RESET}`);
     }
@@ -517,7 +540,7 @@ skill
   .option('-d, --dir <dir>', 'assistant directory', '.')
   .option('--json', 'output JSON (agent-friendly)')
   .action(async (source: string, opts: { dir: string; json?: boolean }) => {
-    const { stat: fsStat, cp, readFile: fsReadFile } = await import('node:fs/promises');
+    const { stat: fsStat, cp } = await import('node:fs/promises');
     const { join, basename } = await import('node:path');
     const dir = resolve(opts.dir);
 
@@ -530,13 +553,21 @@ skill
 
       if (!registry) {
         const msg = `Unknown registry: ${registryName}. Available: ${listRegistries().join(', ')}`;
-        if (opts.json) { console.log(JSON.stringify({ ok: false, error: msg })); } else { console.error(`❌ ${msg}`); }
+        if (opts.json) {
+          console.log(JSON.stringify({ ok: false, error: msg }));
+        } else {
+          console.error(`❌ ${msg}`);
+        }
         process.exit(1);
       }
 
       if (!registry.isAvailable()) {
         const msg = `${registryName} CLI not found. Install it: npm i -g ${registryName}`;
-        if (opts.json) { console.log(JSON.stringify({ ok: false, error: msg })); } else { console.error(`❌ ${msg}`); }
+        if (opts.json) {
+          console.log(JSON.stringify({ ok: false, error: msg }));
+        } else {
+          console.error(`❌ ${msg}`);
+        }
         process.exit(1);
       }
 
@@ -546,7 +577,11 @@ skill
       try {
         await fsStat(destPath);
         const msg = `Skill ${skillName} already exists. Run: golembot skill remove ${skillName}`;
-        if (opts.json) { console.log(JSON.stringify({ ok: false, error: msg })); } else { console.error(`❌ ${msg}`); }
+        if (opts.json) {
+          console.log(JSON.stringify({ ok: false, error: msg }));
+        } else {
+          console.error(`❌ ${msg}`);
+        }
         process.exit(1);
       } catch {
         // doesn't exist — good
@@ -561,7 +596,11 @@ skill
         }
       } catch (e: unknown) {
         const msg = (e as Error).message;
-        if (opts.json) { console.log(JSON.stringify({ ok: false, error: msg })); } else { console.error(`❌ ${msg}`); }
+        if (opts.json) {
+          console.log(JSON.stringify({ ok: false, error: msg }));
+        } else {
+          console.error(`❌ ${msg}`);
+        }
         process.exit(1);
       }
 
@@ -635,9 +674,7 @@ skill
     await generateAgentsMd(dir, skills);
   });
 
-const fleet = program
-  .command('fleet')
-  .description('Manage and view all running GolemBot instances');
+const fleet = program.command('fleet').description('Manage and view all running GolemBot instances');
 
 fleet
   .command('serve')
@@ -674,7 +711,11 @@ fleet
       for (const inst of enriched) {
         const engine = `${DIM}(${inst.engine})${RESET}`;
         const model = inst.model ? ` ${DIM}${inst.model}${RESET}` : '';
-        const msgs = inst.metrics ? `${inst.metrics.totalMessages} msgs` : (inst.authEnabled ? 'auth required' : 'unreachable');
+        const msgs = inst.metrics
+          ? `${inst.metrics.totalMessages} msgs`
+          : inst.authEnabled
+            ? 'auth required'
+            : 'unreachable';
         const port = new URL(inst.url).port || '3000';
         console.log(`  ${CYAN}●${RESET}  ${BOLD}${inst.name}${RESET} ${engine}${model}`);
         console.log(`     ${DIM}Port ${port} · PID ${inst.pid} · ${msgs}${RESET}`);
@@ -703,7 +744,11 @@ fleet
       const inst = await findInstance(name);
       if (!inst) {
         const msg = `Bot "${name}" not found. Run "golembot fleet ls" to see running bots.`;
-        if (opts.json) { console.log(JSON.stringify({ ok: false, error: msg })); } else { console.error(`\u274c ${msg}`); }
+        if (opts.json) {
+          console.log(JSON.stringify({ ok: false, error: msg }));
+        } else {
+          console.error(`\u274c ${msg}`);
+        }
         process.exit(1);
       }
       await stopInstance(inst);
@@ -714,7 +759,11 @@ fleet
       }
     } catch (e: unknown) {
       const msg = (e as Error).message;
-      if (opts.json) { console.log(JSON.stringify({ ok: false, error: msg })); } else { console.error(`\u274c ${msg}`); }
+      if (opts.json) {
+        console.log(JSON.stringify({ ok: false, error: msg }));
+      } else {
+        console.error(`\u274c ${msg}`);
+      }
       process.exit(1);
     }
   });
@@ -729,7 +778,11 @@ fleet
       const entry = await findStoppedInstance(name);
       if (!entry) {
         const msg = `Stopped bot "${name}" not found. Run "golembot fleet ls" to see stopped bots.`;
-        if (opts.json) { console.log(JSON.stringify({ ok: false, error: msg })); } else { console.error(`\u274c ${msg}`); }
+        if (opts.json) {
+          console.log(JSON.stringify({ ok: false, error: msg }));
+        } else {
+          console.error(`\u274c ${msg}`);
+        }
         process.exit(1);
       }
       const result = await startInstance(entry);
@@ -740,7 +793,11 @@ fleet
       }
     } catch (e: unknown) {
       const msg = (e as Error).message;
-      if (opts.json) { console.log(JSON.stringify({ ok: false, error: msg })); } else { console.error(`\u274c ${msg}`); }
+      if (opts.json) {
+        console.log(JSON.stringify({ ok: false, error: msg }));
+      } else {
+        console.error(`\u274c ${msg}`);
+      }
       process.exit(1);
     }
   });

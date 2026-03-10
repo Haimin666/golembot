@@ -1,8 +1,8 @@
 import { spawn } from 'node:child_process';
-import { mkdir, readdir, lstat, unlink, symlink } from 'node:fs/promises';
-import { join, basename, resolve } from 'node:path';
-import type { AgentEngine, InvokeOpts, StreamEvent, ListModelsOpts } from '../engine.js';
-import { stripAnsi, isOnPath } from './shared.js';
+import { lstat, mkdir, readdir, symlink, unlink } from 'node:fs/promises';
+import { basename, join, resolve } from 'node:path';
+import type { AgentEngine, InvokeOpts, ListModelsOpts, StreamEvent } from '../engine.js';
+import { isOnPath, stripAnsi } from './shared.js';
 
 // ── NDJSON event parsing ─────────────────────────────────
 
@@ -19,10 +19,7 @@ import { stripAnsi, isOnPath } from './shared.js';
  *
  * @param state Mutable state object; thread_id is written into state.threadId on thread.started events.
  */
-export function parseCodexStreamLine(
-  line: string,
-  state: { threadId?: string },
-): StreamEvent[] {
+export function parseCodexStreamLine(line: string, state: { threadId?: string }): StreamEvent[] {
   const trimmed = stripAnsi(line).trim();
   if (!trimmed || !trimmed.startsWith('{')) return [];
 
@@ -54,8 +51,8 @@ export function parseCodexStreamLine(
       const content = item.content as Array<Record<string, unknown>> | undefined;
       if (Array.isArray(content)) {
         const text = content
-          .filter(b => b.type === 'output_text')
-          .map(b => (b.text as string) || '')
+          .filter((b) => b.type === 'output_text')
+          .map((b) => (b.text as string) || '')
           .join('');
         if (text) return [{ type: 'text', content: text }];
       }
@@ -117,7 +114,9 @@ export async function injectCodexSkills(workspace: string, skillPaths: string[])
         await unlink(full);
       }
     }
-  } catch { /* directory might not exist yet */ }
+  } catch {
+    /* directory might not exist yet */
+  }
 
   for (const sp of skillPaths) {
     const name = basename(sp);
@@ -136,8 +135,8 @@ function findCodexBin(): string {
   if (!isOnPath('codex')) {
     throw new Error(
       `Codex CLI ("codex") not found in PATH\n` +
-      `Install it with: npm install -g @openai/codex\n` +
-      `See: https://developers.openai.com/codex`,
+        `Install it with: npm install -g @openai/codex\n` +
+        `See: https://developers.openai.com/codex`,
     );
   }
   return 'codex';
@@ -158,7 +157,7 @@ export class CodexEngine implements AgentEngine {
       ? ['exec', 'resume', ...sharedFlags, ...modelFlag, opts.sessionId, prompt]
       : ['exec', ...sharedFlags, ...modelFlag, prompt];
 
-    const env: Record<string, string> = { ...process.env as Record<string, string> };
+    const env: Record<string, string> = { ...(process.env as Record<string, string>) };
     if (opts.apiKey) {
       // CODEX_API_KEY is the primary env var per official CI docs;
       // also set OPENAI_API_KEY for backward compatibility with older CLI versions.
@@ -182,7 +181,10 @@ export class CodexEngine implements AgentEngine {
 
     function enqueue(evt: StreamEvent | null) {
       queue.push(evt);
-      if (resolver) { resolver(); resolver = null; }
+      if (resolver) {
+        resolver();
+        resolver = null;
+      }
     }
 
     function processBuffer() {
@@ -191,16 +193,24 @@ export class CodexEngine implements AgentEngine {
       for (const line of lines) {
         if (!line.trim()) continue;
         for (const evt of parseCodexStreamLine(line, state)) {
-          if (evt.type === 'done') { gotDone = true; enqueue(evt); }
-          else if (evt.type === 'error') { gotError = true; enqueue(evt); }
-          else enqueue(evt);
+          if (evt.type === 'done') {
+            gotDone = true;
+            enqueue(evt);
+          } else if (evt.type === 'error') {
+            gotError = true;
+            enqueue(evt);
+          } else enqueue(evt);
         }
       }
     }
 
     if (opts.signal) {
       const abortHandler = () => {
-        try { child.kill(); } catch { /* already dead */ }
+        try {
+          child.kill();
+        } catch {
+          /* already dead */
+        }
         enqueue({ type: 'error', message: 'Agent invocation timed out' });
         enqueue(null);
       };
@@ -208,7 +218,10 @@ export class CodexEngine implements AgentEngine {
       child.once('close', () => opts.signal!.removeEventListener('abort', abortHandler));
     }
 
-    child.stdout!.on('data', (chunk: Buffer) => { buffer += chunk.toString(); processBuffer(); });
+    child.stdout!.on('data', (chunk: Buffer) => {
+      buffer += chunk.toString();
+      processBuffer();
+    });
 
     child.stderr!.on('data', (chunk: Buffer) => {
       const text = chunk.toString().trim();
@@ -216,7 +229,10 @@ export class CodexEngine implements AgentEngine {
     });
 
     child.on('close', (exitCode: number | null) => {
-      if (buffer.trim()) { buffer += '\n'; processBuffer(); }
+      if (buffer.trim()) {
+        buffer += '\n';
+        processBuffer();
+      }
       const code = exitCode ?? 1;
       if (code !== 0 && !gotDone && !gotError) {
         const stderrText = stderrChunks.join('\n').slice(0, 500);
@@ -234,13 +250,20 @@ export class CodexEngine implements AgentEngine {
     });
 
     while (true) {
-      if (queue.length === 0) await new Promise<void>(r => { resolver = r; });
+      if (queue.length === 0)
+        await new Promise<void>((r) => {
+          resolver = r;
+        });
       while (queue.length > 0) {
         const evt = queue.shift()!;
         if (evt === null) return;
         yield evt;
         if (evt.type === 'done' || evt.type === 'error') {
-          try { child.kill(); } catch { /* already dead */ }
+          try {
+            child.kill();
+          } catch {
+            /* already dead */
+          }
           return;
         }
       }
@@ -256,8 +279,10 @@ export class CodexEngine implements AgentEngine {
           signal: AbortSignal.timeout(10_000),
         });
         const data = (await resp.json()) as { data?: Array<{ id: string }> };
-        if (data.data?.length) return data.data.map(m => m.id).sort();
-      } catch { /* fallback below */ }
+        if (data.data?.length) return data.data.map((m) => m.id).sort();
+      } catch {
+        /* fallback below */
+      }
     }
     return ['gpt-5.4', 'gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.1-codex-max', 'codex-mini-latest'];
   }

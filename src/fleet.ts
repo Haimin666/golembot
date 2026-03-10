@@ -3,14 +3,13 @@
 // Each gateway auto-registers itself at ~/.golembot/fleet/<name>-<port>.json.
 // The fleet server reads that directory to discover all running bots.
 
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { homedir } from 'node:os';
-import { mkdir, writeFile, unlink, readdir, readFile, stat } from 'node:fs/promises';
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { request as httpRequest } from 'node:http';
 import { spawn } from 'node:child_process';
-import { esc, formatUptime, FAVICON, DOCS_BASE, ENGINE_COLORS, BASE_CSS } from './ui-shared.js';
+import { mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
+import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from 'node:http';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { BASE_CSS, DOCS_BASE, ENGINE_COLORS, esc, FAVICON, formatUptime } from './ui-shared.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -135,7 +134,10 @@ export async function fetchInstanceMetrics(instance: FleetInstance): Promise<Fle
       });
     });
     req.on('error', () => resolve(instance));
-    req.on('timeout', () => { req.destroy(); resolve(instance); });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(instance);
+    });
     req.end();
   });
 }
@@ -172,7 +174,7 @@ export async function stopInstance(instance: FleetInstance, fleetDir = DEFAULT_F
   process.kill(instance.pid, 'SIGTERM');
 
   // Wait briefly for the process to exit, then ensure the stopped marker persists
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
   if (!isProcessAlive(instance.pid)) {
     await writeFile(filePath, JSON.stringify(stoppedEntry, null, 2));
   }
@@ -243,7 +245,9 @@ export async function listStoppedInstances(fleetDir = DEFAULT_FLEET_DIR): Promis
       if (entry.stopped === true && !isProcessAlive(entry.pid)) {
         stopped.push(entry);
       }
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
   }
   return stopped;
 }
@@ -253,9 +257,7 @@ export async function findInstance(
   fleetDir = DEFAULT_FLEET_DIR,
 ): Promise<FleetInstance | undefined> {
   const instances = await listInstances(fleetDir);
-  return instances.find(
-    i => i.name === nameOrPort || new URL(i.url).port === nameOrPort,
-  );
+  return instances.find((i) => i.name === nameOrPort || new URL(i.url).port === nameOrPort);
 }
 
 export async function findStoppedInstance(
@@ -263,9 +265,7 @@ export async function findStoppedInstance(
   fleetDir = DEFAULT_FLEET_DIR,
 ): Promise<(FleetEntry & { stopped: true }) | undefined> {
   const stopped = await listStoppedInstances(fleetDir);
-  return stopped.find(
-    i => i.name === nameOrPort || new URL(i.url).port === nameOrPort,
-  );
+  return stopped.find((i) => i.name === nameOrPort || new URL(i.url).port === nameOrPort);
 }
 
 // ── Fleet Dashboard HTML ─────────────────────────────────────────────────────
@@ -309,10 +309,7 @@ export function renderFleetDashboard(
   version: string,
   stoppedInstances: (FleetEntry & { stopped: true })[] = [],
 ): string {
-  const allCards = [
-    ...instances.map(renderBotCard),
-    ...stoppedInstances.map(renderStoppedCard),
-  ];
+  const allCards = [...instances.map(renderBotCard), ...stoppedInstances.map(renderStoppedCard)];
   const botCards = allCards.length > 0 ? allCards.join('\n') : renderEmptyState();
 
   return `<!DOCTYPE html>
@@ -357,18 +354,16 @@ function renderBotCard(inst: FleetInstance): string {
       <div class="stat-row">
         <span class="stat-item"><strong>${m.totalMessages}</strong> messages</span>
         <span class="stat-item"><strong>$${m.totalCostUsd.toFixed(4)}</strong> cost</span>
-        <span class="stat-item"><strong>${m.avgDurationMs > 0 ? (m.avgDurationMs / 1000).toFixed(1) + 's' : '—'}</strong> avg</span>
+        <span class="stat-item"><strong>${m.avgDurationMs > 0 ? `${(m.avgDurationMs / 1000).toFixed(1)}s` : '—'}</strong> avg</span>
       </div>`;
   } else {
     statsHtml = '<span class="auth-badge">Unreachable</span>';
   }
 
   const channelNames = inst.channels
-    .filter(c => c.status === 'connected')
-    .map(c => c.type.charAt(0).toUpperCase() + c.type.slice(1));
-  const channelsHtml = channelNames.length > 0
-    ? `<div class="channels-list">${channelNames.join(', ')}</div>`
-    : '';
+    .filter((c) => c.status === 'connected')
+    .map((c) => c.type.charAt(0).toUpperCase() + c.type.slice(1));
+  const channelsHtml = channelNames.length > 0 ? `<div class="channels-list">${channelNames.join(', ')}</div>` : '';
 
   const uptime = formatUptime(Date.now() - new Date(inst.startedAt).getTime());
 
@@ -503,7 +498,9 @@ export async function startFleetServer(opts: FleetServerOpts = {}, fleetDir?: st
     const selfDir = dirname(fileURLToPath(import.meta.url));
     const pkg = JSON.parse(await readFile(join(selfDir, '..', 'package.json'), 'utf-8'));
     version = pkg.version ?? version;
-  } catch { /* dev mode */ }
+  } catch {
+    /* dev mode */
+  }
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
@@ -518,8 +515,8 @@ export async function startFleetServer(opts: FleetServerOpts = {}, fleetDir?: st
       const instances = await getFleetData(fleetDir);
       const stopped = await listStoppedInstances(fleetDir);
       const hash = [
-        ...instances.map(i => `${i.name}:${i.pid}:${i.metrics?.totalMessages ?? 0}`),
-        ...stopped.map(s => `${s.name}:stopped`),
+        ...instances.map((i) => `${i.name}:${i.pid}:${i.metrics?.totalMessages ?? 0}`),
+        ...stopped.map((s) => `${s.name}:stopped`),
       ].join('|');
       json(res, 200, { instances, stopped, _hash: hash });
       return;
@@ -531,7 +528,10 @@ export async function startFleetServer(opts: FleetServerOpts = {}, fleetDir?: st
       const name = decodeURIComponent(stopMatch[1]);
       try {
         const inst = await findInstance(name, fleetDir);
-        if (!inst) { json(res, 404, { ok: false, error: `Bot "${name}" not found` }); return; }
+        if (!inst) {
+          json(res, 404, { ok: false, error: `Bot "${name}" not found` });
+          return;
+        }
         await stopInstance(inst, fleetDir);
         json(res, 200, { ok: true, name: inst.name, pid: inst.pid });
       } catch (e: unknown) {
@@ -546,7 +546,10 @@ export async function startFleetServer(opts: FleetServerOpts = {}, fleetDir?: st
       const name = decodeURIComponent(startMatch[1]);
       try {
         const entry = await findStoppedInstance(name, fleetDir);
-        if (!entry) { json(res, 404, { ok: false, error: `Stopped bot "${name}" not found` }); return; }
+        if (!entry) {
+          json(res, 404, { ok: false, error: `Stopped bot "${name}" not found` });
+          return;
+        }
         const result = await startInstance(entry, fleetDir);
         json(res, 200, { ok: true, name: entry.name, pid: result.pid });
       } catch (e: unknown) {

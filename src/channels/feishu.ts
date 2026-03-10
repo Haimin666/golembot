@@ -1,12 +1,12 @@
-import type { ChannelAdapter, ChannelMessage, ReplyOptions, MentionTarget, ReadReceipt, ImageAttachment } from '../channel.js';
-import type { FeishuChannelConfig } from '../workspace.js';
-import { hasMarkdown, markdownToPost, markdownToCard, injectMentionsIntoPost } from './feishu-format.js';
+import type { ChannelAdapter, ChannelMessage, ImageAttachment, ReadReceipt, ReplyOptions } from '../channel.js';
 import { importPeer } from '../peer-require.js';
+import type { FeishuChannelConfig } from '../workspace.js';
+import { hasMarkdown, markdownToCard } from './feishu-format.js';
 
 /** Detect image MIME type from magic bytes. */
 function detectImageMime(data: Buffer): string {
   if (data[0] === 0x89 && data[1] === 0x50) return 'image/png';
-  if (data[0] === 0xFF && data[1] === 0xD8) return 'image/jpeg';
+  if (data[0] === 0xff && data[1] === 0xd8) return 'image/jpeg';
   if (data[0] === 0x47 && data[1] === 0x49) return 'image/gif';
   if (data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46) return 'image/webp';
   return 'image/png'; // fallback
@@ -139,145 +139,143 @@ export class FeishuAdapter implements ChannelAdapter {
     }
 
     events['im.message.receive_v1'] = async (data: any) => {
-        const { message, sender } = data;
+      const { message, sender } = data;
 
-        // Deduplicate re-delivered events.
-        // Primary: message_id (always present in im.message.receive_v1 events).
-        // Fallback: content-based dedup (chat_id + sender + text hash + 10s window)
-        // to guard against SDK re-dispatches with different envelope IDs.
-        const msgId: string | undefined = message.message_id;
-        if (msgId) {
-          if (this.seenMsgIds.has(msgId)) return;
-          this.seenMsgIds.add(msgId);
-          if (this.seenMsgIds.size > FeishuAdapter.MAX_SEEN) {
-            const entries = [...this.seenMsgIds];
-            this.seenMsgIds = new Set(entries.slice(entries.length >> 1));
+      // Deduplicate re-delivered events.
+      // Primary: message_id (always present in im.message.receive_v1 events).
+      // Fallback: content-based dedup (chat_id + sender + text hash + 10s window)
+      // to guard against SDK re-dispatches with different envelope IDs.
+      const msgId: string | undefined = message.message_id;
+      if (msgId) {
+        if (this.seenMsgIds.has(msgId)) return;
+        this.seenMsgIds.add(msgId);
+        if (this.seenMsgIds.size > FeishuAdapter.MAX_SEEN) {
+          const entries = [...this.seenMsgIds];
+          this.seenMsgIds = new Set(entries.slice(entries.length >> 1));
+        }
+      }
+
+      // Secondary dedup: same chat + sender + content within 10s window.
+      // Lark WSClient may fire the handler twice for the same event.
+      const contentKey = `${message.chat_id}:${sender?.sender_id?.open_id}:${message.content}`;
+      if (this.seenMsgIds.has(contentKey)) return;
+      this.seenMsgIds.add(contentKey);
+      // Auto-expire content keys after 10s.
+      setTimeout(() => this.seenMsgIds.delete(contentKey), 10_000);
+
+      // Parse message content based on type
+      const msgType = message.message_type;
+      if (msgType !== 'text' && msgType !== 'image' && msgType !== 'post') return;
+
+      let parsedContent: Record<string, any>;
+      try {
+        parsedContent = JSON.parse(message.content);
+      } catch {
+        return;
+      }
+
+      // Mentions are on message.mentions (not inside content JSON).
+      type Mention = { key: string; id: { open_id: string }; name?: string };
+      const mentions: Mention[] = message.mentions ?? [];
+
+      const chatType: 'dm' | 'group' = message.chat_type === 'p2p' ? 'dm' : 'group';
+
+      // Detect if the bot is @mentioned in group chats.
+      let isMentioned = false;
+      if (chatType === 'group') {
+        const resolvedId = await fetchBotOpenId();
+        isMentioned = resolvedId ? mentions.some((m) => m.id?.open_id === resolvedId) : mentions.length > 0;
+      }
+
+      let text = '';
+      const images: ImageAttachment[] = [];
+
+      if (msgType === 'text') {
+        text = parsedContent.text || '';
+      } else if (msgType === 'image') {
+        // Image-only message: download the image
+        const imageKey = parsedContent.image_key;
+        if (imageKey) {
+          try {
+            const img = await this.downloadImage(message.message_id, imageKey);
+            images.push(img);
+          } catch (e) {
+            console.error('[feishu] Failed to download image:', (e as Error).message);
+            return;
           }
         }
-
-        // Secondary dedup: same chat + sender + content within 10s window.
-        // Lark WSClient may fire the handler twice for the same event.
-        const contentKey = `${message.chat_id}:${sender?.sender_id?.open_id}:${message.content}`;
-        if (this.seenMsgIds.has(contentKey)) return;
-        this.seenMsgIds.add(contentKey);
-        // Auto-expire content keys after 10s.
-        setTimeout(() => this.seenMsgIds.delete(contentKey), 10_000);
-
-        // Parse message content based on type
-        const msgType = message.message_type;
-        if (msgType !== 'text' && msgType !== 'image' && msgType !== 'post') return;
-
-        let parsedContent: Record<string, any>;
-        try {
-          parsedContent = JSON.parse(message.content);
-        } catch {
-          return;
-        }
-
-        // Mentions are on message.mentions (not inside content JSON).
-        type Mention = { key: string; id: { open_id: string }; name?: string };
-        const mentions: Mention[] = message.mentions ?? [];
-
-        const chatType: 'dm' | 'group' = message.chat_type === 'p2p' ? 'dm' : 'group';
-
-        // Detect if the bot is @mentioned in group chats.
-        let isMentioned = false;
-        if (chatType === 'group') {
-          const resolvedId = await fetchBotOpenId();
-          isMentioned = resolvedId
-            ? mentions.some(m => m.id?.open_id === resolvedId)
-            : mentions.length > 0;
-        }
-
-        let text = '';
-        const images: ImageAttachment[] = [];
-
-        if (msgType === 'text') {
-          text = parsedContent.text || '';
-        } else if (msgType === 'image') {
-          // Image-only message: download the image
-          const imageKey = parsedContent.image_key;
-          if (imageKey) {
-            try {
-              const img = await this.downloadImage(message.message_id, imageKey);
-              images.push(img);
-            } catch (e) {
-              console.error('[feishu] Failed to download image:', (e as Error).message);
-              return;
-            }
-          }
-          text = '(image)';
-        } else if (msgType === 'post') {
-          // Rich text (post) message: extract text + inline images
-          const content = parsedContent.content;
-          // post content is structured as: { title, content: [[{tag, ...}, ...], ...] }
-          // content is an array of lines, each line is an array of inline elements
-          const lines: any[][] = Array.isArray(content) ? content : [];
-          const textParts: string[] = [];
-          if (parsedContent.title) textParts.push(parsedContent.title);
-          for (const line of lines) {
-            if (!Array.isArray(line)) continue;
-            for (const el of line as any[]) {
-              if (el.tag === 'text') textParts.push(el.text || '');
-              else if (el.tag === 'a') textParts.push(el.text || el.href || '');
-              else if (el.tag === 'at') textParts.push(el.user_name ? `@${el.user_name}` : '');
-              else if (el.tag === 'img' && el.image_key) {
-                try {
-                  const img = await this.downloadImage(message.message_id, el.image_key);
-                  images.push(img);
-                } catch (e) {
-                  console.error('[feishu] Failed to download inline image:', (e as Error).message);
-                }
+        text = '(image)';
+      } else if (msgType === 'post') {
+        // Rich text (post) message: extract text + inline images
+        const content = parsedContent.content;
+        // post content is structured as: { title, content: [[{tag, ...}, ...], ...] }
+        // content is an array of lines, each line is an array of inline elements
+        const lines: any[][] = Array.isArray(content) ? content : [];
+        const textParts: string[] = [];
+        if (parsedContent.title) textParts.push(parsedContent.title);
+        for (const line of lines) {
+          if (!Array.isArray(line)) continue;
+          for (const el of line as any[]) {
+            if (el.tag === 'text') textParts.push(el.text || '');
+            else if (el.tag === 'a') textParts.push(el.text || el.href || '');
+            else if (el.tag === 'at') textParts.push(el.user_name ? `@${el.user_name}` : '');
+            else if (el.tag === 'img' && el.image_key) {
+              try {
+                const img = await this.downloadImage(message.message_id, el.image_key);
+                images.push(img);
+              } catch (e) {
+                console.error('[feishu] Failed to download inline image:', (e as Error).message);
               }
             }
           }
-          text = textParts.join(' ').trim();
-          if (!text && images.length > 0) text = '(image)';
         }
+        text = textParts.join(' ').trim();
+        if (!text && images.length > 0) text = '(image)';
+      }
 
-        // Process @mentions in text:
-        // - Strip the bot's own @mention key entirely
-        // - Replace other users' @mention keys with readable @Name format
-        if (chatType === 'group' && mentions.length) {
-          for (const m of mentions) {
-            const isBot = botOpenId ? m.id?.open_id === botOpenId : true;
-            if (isBot) {
-              text = text.replace(m.key, '').trim();
-            } else if (m.name) {
-              text = text.replace(m.key, `@${m.name}`);
-            }
+      // Process @mentions in text:
+      // - Strip the bot's own @mention key entirely
+      // - Replace other users' @mention keys with readable @Name format
+      if (chatType === 'group' && mentions.length) {
+        for (const m of mentions) {
+          const isBot = botOpenId ? m.id?.open_id === botOpenId : true;
+          if (isBot) {
+            text = text.replace(m.key, '').trim();
+          } else if (m.name) {
+            text = text.replace(m.key, `@${m.name}`);
           }
         }
+      }
 
-        if (!text && images.length === 0) return;
+      if (!text && images.length === 0) return;
 
-        const senderId = sender.sender_id?.open_id || sender.sender_id?.user_id || '';
-        const senderName = await this.resolveUserName(senderId);
+      const senderId = sender.sender_id?.open_id || sender.sender_id?.user_id || '';
+      const senderName = await this.resolveUserName(senderId);
 
-        // Collect names of other @mentioned users/bots (not this bot).
-        const otherMentionNames: string[] = [];
-        if (chatType === 'group') {
-          for (const m of mentions) {
-            const isBot = botOpenId ? m.id?.open_id === botOpenId : false;
-            if (!isBot && m.name) otherMentionNames.push(m.name);
-          }
+      // Collect names of other @mentioned users/bots (not this bot).
+      const otherMentionNames: string[] = [];
+      if (chatType === 'group') {
+        for (const m of mentions) {
+          const isBot = botOpenId ? m.id?.open_id === botOpenId : false;
+          if (!isBot && m.name) otherMentionNames.push(m.name);
         }
+      }
 
-        const channelMsg: ChannelMessage = {
-          channelType: 'feishu',
-          senderId,
-          senderName: senderName || senderId,
-          chatId: message.chat_id,
-          chatType,
-          text,
-          images: images.length > 0 ? images : undefined,
-          mentioned: chatType === 'group' ? isMentioned : undefined,
-          mentionedOthers: otherMentionNames.length > 0 ? otherMentionNames : undefined,
-          raw: data,
-        };
-
-        onMessage(channelMsg);
+      const channelMsg: ChannelMessage = {
+        channelType: 'feishu',
+        senderId,
+        senderName: senderName || senderId,
+        chatId: message.chat_id,
+        chatType,
+        text,
+        images: images.length > 0 ? images : undefined,
+        mentioned: chatType === 'group' ? isMentioned : undefined,
+        mentionedOthers: otherMentionNames.length > 0 ? otherMentionNames : undefined,
+        raw: data,
       };
+
+      onMessage(channelMsg);
+    };
 
     const eventDispatcher = new lark.EventDispatcher({}).register(events);
 

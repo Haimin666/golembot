@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { markdownToMrkdwn } from '../channels/slack-format.js';
 
 describe('markdownToMrkdwn', () => {

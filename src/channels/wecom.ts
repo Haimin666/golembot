@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import type { ChannelAdapter, ChannelMessage, ReplyOptions, ImageAttachment } from '../channel.js';
-import type { WecomChannelConfig } from '../workspace.js';
+import type { ChannelAdapter, ChannelMessage, ImageAttachment, ReplyOptions } from '../channel.js';
 import { importPeer } from '../peer-require.js';
+import type { WecomChannelConfig } from '../workspace.js';
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -34,7 +34,7 @@ export class WecomAdapter implements ChannelAdapter {
     try {
       const token = await this.getAccessToken();
       const res = await fetch(`https://qyapi.weixin.qq.com/cgi-bin/user/get?access_token=${token}&userid=${userId}`);
-      const data = await res.json() as { name?: string; errcode?: number };
+      const data = (await res.json()) as { name?: string; errcode?: number };
       if (data.name) this.userNameCache.set(userId, data.name);
       return data.name;
     } catch {
@@ -48,7 +48,7 @@ export class WecomAdapter implements ChannelAdapter {
     }
     const url = `https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=${this.config.corpId}&corpsecret=${this.config.secret}`;
     const res = await fetch(url);
-    const data = await res.json() as { access_token: string; expires_in: number; errcode?: number; errmsg?: string };
+    const data = (await res.json()) as { access_token: string; expires_in: number; errcode?: number; errmsg?: string };
     if (data.errcode && data.errcode !== 0) {
       throw new Error(`WeCom getAccessToken failed: ${data.errmsg}`);
     }
@@ -63,16 +63,12 @@ export class WecomAdapter implements ChannelAdapter {
     try {
       wecomCrypto = await importPeer('@wecom/crypto');
     } catch {
-      throw new Error(
-        'WeCom adapter requires @wecom/crypto. Install it: npm install @wecom/crypto',
-      );
+      throw new Error('WeCom adapter requires @wecom/crypto. Install it: npm install @wecom/crypto');
     }
     try {
       xml2js = await importPeer('xml2js');
     } catch {
-      throw new Error(
-        'WeCom adapter requires xml2js. Install it: npm install xml2js',
-      );
+      throw new Error('WeCom adapter requires xml2js. Install it: npm install xml2js');
     }
 
     const { getSignature, decrypt } = wecomCrypto;
@@ -211,7 +207,7 @@ export class WecomAdapter implements ChannelAdapter {
     });
   }
 
-  async reply(msg: ChannelMessage, text: string, options?: ReplyOptions): Promise<void> {
+  async reply(msg: ChannelMessage, text: string, _options?: ReplyOptions): Promise<void> {
     const token = await this.getAccessToken();
     const url = `https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=${token}`;
     const body = {

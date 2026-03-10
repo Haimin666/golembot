@@ -5,9 +5,9 @@
  * the CommandResult in the appropriate format (terminal, SSE, IM reply, etc.).
  */
 
-import { ensureReady, type GolemConfig, type SkillInfo } from './workspace.js';
-import type { TaskStore, TaskRecord } from './task-store.js';
 import type { Scheduler } from './scheduler.js';
+import type { TaskStore } from './task-store.js';
+import { type GolemConfig, type SkillInfo } from './workspace.js';
 
 // ── Types ────────────────────────────────────────────────
 
@@ -76,13 +76,13 @@ export function parseCommand(text: string): ParsedCommand | null {
 // ── Execute ──────────────────────────────────────────────
 
 const COMMANDS: Record<string, string> = {
-  '/help':    'Show available commands',
-  '/status':  'Show current engine, model, and skills',
-  '/engine':  'Show or switch engine — /engine [name]',
-  '/model':   'Show, switch, or list models — /model [list|name]',
-  '/skill':   'List installed skills',
-  '/reset':   'Clear the current session',
-  '/cron':    'Manage scheduled tasks — /cron [list|run|enable|disable|del|history] [id]',
+  '/help': 'Show available commands',
+  '/status': 'Show current engine, model, and skills',
+  '/engine': 'Show or switch engine — /engine [name]',
+  '/model': 'Show, switch, or list models — /model [list|name]',
+  '/skill': 'List installed skills',
+  '/reset': 'Clear the current session',
+  '/cron': 'Manage scheduled tasks — /cron [list|run|enable|disable|del|history] [id]',
 };
 
 /**
@@ -91,10 +91,7 @@ const COMMANDS: Record<string, string> = {
  *
  * Returns null if the command is not recognized (caller should forward to agent).
  */
-export async function executeCommand(
-  cmd: ParsedCommand,
-  ctx: CommandContext,
-): Promise<CommandResult | null> {
+export async function executeCommand(cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult | null> {
   switch (cmd.name) {
     case '/help':
       return cmdHelp();
@@ -118,9 +115,7 @@ export async function executeCommand(
 // ── Command implementations ──────────────────────────────
 
 function cmdHelp(): CommandResult {
-  const lines = Object.entries(COMMANDS).map(
-    ([cmd, desc]) => `  ${cmd.padEnd(12)} ${desc}`,
-  );
+  const lines = Object.entries(COMMANDS).map(([cmd, desc]) => `  ${cmd.padEnd(12)} ${desc}`);
   return {
     text: `Available commands:\n${lines.join('\n')}`,
     data: { commands: COMMANDS },
@@ -130,14 +125,14 @@ function cmdHelp(): CommandResult {
 async function cmdStatus(ctx: CommandContext): Promise<CommandResult> {
   const { config, skills, engine, model } = await ctx.getStatus();
   const channelNames = config.channels
-    ? Object.keys(config.channels).filter(k => !!(config.channels as Record<string, unknown>)[k])
+    ? Object.keys(config.channels).filter((k) => !!(config.channels as Record<string, unknown>)[k])
     : [];
 
   const lines = [
     `Name:      ${config.name}`,
     `Engine:    ${engine}`,
     model ? `Model:     ${model}` : null,
-    `Skills:    ${skills.length > 0 ? skills.map(s => s.name).join(', ') : '(none)'}`,
+    `Skills:    ${skills.length > 0 ? skills.map((s) => s.name).join(', ') : '(none)'}`,
     channelNames.length > 0 ? `Channels:  ${channelNames.join(', ')}` : null,
   ].filter(Boolean);
 
@@ -147,7 +142,7 @@ async function cmdStatus(ctx: CommandContext): Promise<CommandResult> {
       name: config.name,
       engine,
       model: model ?? null,
-      skills: skills.map(s => ({ name: s.name, description: s.description })),
+      skills: skills.map((s) => ({ name: s.name, description: s.description })),
       channels: channelNames,
     },
   };
@@ -212,7 +207,7 @@ async function cmdModelList(ctx: CommandContext): Promise<CommandResult> {
       data: { engine, models: [] },
     };
   }
-  const lines = models.map(m => `  ${m}`);
+  const lines = models.map((m) => `  ${m}`);
   return {
     text: `Available models for ${engine} (${models.length}):\n${lines.join('\n')}`,
     data: { engine, models },
@@ -225,10 +220,10 @@ async function cmdSkill(ctx: CommandContext): Promise<CommandResult> {
     return { text: 'No skills installed.', data: { skills: [] } };
   }
 
-  const lines = skills.map(s => `  ${s.name.padEnd(20)} ${s.description}`);
+  const lines = skills.map((s) => `  ${s.name.padEnd(20)} ${s.description}`);
   return {
     text: `Installed skills (${skills.length}):\n${lines.join('\n')}`,
-    data: { skills: skills.map(s => ({ name: s.name, description: s.description })) },
+    data: { skills: skills.map((s) => ({ name: s.name, description: s.description })) },
   };
 }
 
@@ -254,9 +249,9 @@ async function cmdCron(args: string[], ctx: CommandContext): Promise<CommandResu
   let id = rawId;
   if (rawId) {
     const tasks = await ctx.taskStore.listTasks();
-    const byId = tasks.find(t => t.id === rawId);
+    const byId = tasks.find((t) => t.id === rawId);
     if (!byId) {
-      const byName = tasks.find(t => t.name === rawId);
+      const byName = tasks.find((t) => t.name === rawId);
       if (byName) id = byName.id;
     }
   }
@@ -291,9 +286,7 @@ async function cronList(ctx: CommandContext): Promise<CommandResult> {
 
   const lines = tasks.map((t) => {
     const status = t.enabled ? 'ON ' : 'OFF';
-    const last = t.lastRun
-      ? `${t.lastStatus ?? '?'} @ ${t.lastRun.replace('T', ' ').slice(0, 19)}`
-      : 'never';
+    const last = t.lastRun ? `${t.lastStatus ?? '?'} @ ${t.lastRun.replace('T', ' ').slice(0, 19)}` : 'never';
     return `  ${t.id}  ${status}  ${t.schedule.padEnd(18)}  ${t.name.padEnd(20)}  last: ${last}`;
   });
 
@@ -321,11 +314,7 @@ async function cronRun(id: string | undefined, ctx: CommandContext): Promise<Com
   return { text: reply, data: { taskId: id, reply } };
 }
 
-async function cronSetEnabled(
-  id: string | undefined,
-  enabled: boolean,
-  ctx: CommandContext,
-): Promise<CommandResult> {
+async function cronSetEnabled(id: string | undefined, enabled: boolean, ctx: CommandContext): Promise<CommandResult> {
   if (!id) return { text: `Usage: /cron ${enabled ? 'enable' : 'disable'} <id>` };
 
   const ok = await ctx.taskStore!.updateTask(id, { enabled });
@@ -367,7 +356,7 @@ async function cronHistory(id: string | undefined, ctx: CommandContext): Promise
   const lines = entries.map((e) => {
     const time = e.startedAt.replace('T', ' ').slice(0, 19);
     const dur = e.durationMs < 1000 ? `${e.durationMs}ms` : `${(e.durationMs / 1000).toFixed(1)}s`;
-    const preview = e.reply.length > 80 ? e.reply.slice(0, 80) + '…' : e.reply;
+    const preview = e.reply.length > 80 ? `${e.reply.slice(0, 80)}…` : e.reply;
     return `  ${time}  ${e.status.padEnd(7)}  ${dur.padEnd(8)}  ${preview}`;
   });
 

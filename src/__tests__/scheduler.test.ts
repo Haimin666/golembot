@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  parseCron,
-  normalizeSchedule,
-  getNextCronTime,
   getNextCronDelay,
-  Scheduler,
+  getNextCronTime,
+  normalizeSchedule,
+  parseCron,
   type ScheduledTaskDef,
+  Scheduler,
 } from '../scheduler.js';
 
 // ── parseCron ───────────────────────────────────────────────
@@ -217,9 +217,7 @@ describe('Scheduler', () => {
 
   it('still schedules next after handler throws', async () => {
     const scheduler = new Scheduler();
-    const handler = vi.fn()
-      .mockRejectedValueOnce(new Error('boom'))
-      .mockResolvedValue(undefined);
+    const handler = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValue(undefined);
 
     scheduler.addTask(makeTask(), handler);
 

@@ -1,17 +1,17 @@
-import { resolve, join } from 'node:path';
 import { existsSync } from 'node:fs';
+import { cp, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { writeFile, mkdir, stat, readFile, readdir, cp } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { createAssistant } from './index.js';
-import type { GolemConfig, ChannelsConfig } from './workspace.js';
+import type { ChannelsConfig, GolemConfig } from './workspace.js';
 
 // ── Engine auth detection ────────────────────────────────
 
 interface EngineAuthInfo {
-  envVar: string;            // primary env var name
-  envVarHint: string;        // placeholder hint (e.g. 'sk-ant-...')
-  loginCmd?: string;         // CLI login command, if supported
-  loginDetail?: string;      // description of login auth
+  envVar: string; // primary env var name
+  envVarHint: string; // placeholder hint (e.g. 'sk-ant-...')
+  loginCmd?: string; // CLI login command, if supported
+  loginDetail?: string; // description of login auth
 }
 
 const ENGINE_AUTH: Record<string, EngineAuthInfo> = {
@@ -59,7 +59,7 @@ function detectEngineAuth(engine: string): { ok: boolean; detail: string } {
   }
   if (engine === 'opencode') {
     const keys = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY'];
-    const found = keys.find(k => !!process.env[k]);
+    const found = keys.find((k) => !!process.env[k]);
     if (found) return { ok: true, detail: found };
     const authFile = join(homedir(), '.local', 'share', 'opencode', 'auth.json');
     if (existsSync(authFile)) return { ok: true, detail: 'OpenCode auth (~/.local/share/opencode/auth.json)' };
@@ -145,12 +145,7 @@ export function generateEnvExample(engine: string, channels: string[]): string {
 export async function installTemplate(dir: string, templateName: string, templatesBase?: string): Promise<void> {
   const templatesRoot = templatesBase
     ? join(templatesBase, templateName)
-    : resolve(
-        new URL('.', import.meta.url).pathname,
-        '..',
-        'templates',
-        templateName,
-      );
+    : resolve(new URL('.', import.meta.url).pathname, '..', 'templates', templateName);
 
   try {
     await stat(templatesRoot);
@@ -201,17 +196,19 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
   console.log('\n🧙 GolemBot Setup Wizard\n');
 
   // Step 1: Choose engine
-  const { engine } = await inquirer.default.prompt([{
-    type: 'list',
-    name: 'engine',
-    message: '1/8 Select AI engine:',
-    choices: [
-      { name: 'Cursor', value: 'cursor' },
-      { name: 'Claude Code', value: 'claude-code' },
-      { name: 'OpenCode', value: 'opencode' },
-      { name: 'Codex', value: 'codex' },
-    ],
-  }]);
+  const { engine } = await inquirer.default.prompt([
+    {
+      type: 'list',
+      name: 'engine',
+      message: '1/8 Select AI engine:',
+      choices: [
+        { name: 'Cursor', value: 'cursor' },
+        { name: 'Claude Code', value: 'claude-code' },
+        { name: 'OpenCode', value: 'opencode' },
+        { name: 'Codex', value: 'codex' },
+      ],
+    },
+  ]);
 
   // Step 2: Engine authentication
   const envLines: string[] = [];
@@ -232,20 +229,24 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
     authChoices.push({ name: `Enter ${authMeta.envVar}`, value: 'apikey' });
     authChoices.push({ name: 'Skip (configure later)', value: 'skip' });
 
-    const { authChoice } = await inquirer.default.prompt([{
-      type: 'list',
-      name: 'authChoice',
-      message: `2/8 Engine authentication:`,
-      choices: authChoices,
-    }]);
+    const { authChoice } = await inquirer.default.prompt([
+      {
+        type: 'list',
+        name: 'authChoice',
+        message: `2/8 Engine authentication:`,
+        choices: authChoices,
+      },
+    ]);
 
     if (authChoice === 'apikey') {
-      const { apiKey } = await inquirer.default.prompt([{
-        type: 'password',
-        name: 'apiKey',
-        message: `${authMeta.envVar}:`,
-        mask: '*',
-      }]);
+      const { apiKey } = await inquirer.default.prompt([
+        {
+          type: 'password',
+          name: 'apiKey',
+          message: `${authMeta.envVar}:`,
+          mask: '*',
+        },
+      ]);
       if (apiKey) {
         envLines.push(`${authMeta.envVar}=${apiKey}`);
         console.log(`   ✓ ${authMeta.envVar} saved to .env\n`);
@@ -262,27 +263,31 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
   }
 
   // Step 3: Name
-  const { name } = await inquirer.default.prompt([{
-    type: 'input',
-    name: 'name',
-    message: '3/8 Name your assistant:',
-    default: 'my-assistant',
-  }]);
+  const { name } = await inquirer.default.prompt([
+    {
+      type: 'input',
+      name: 'name',
+      message: '3/8 Name your assistant:',
+      default: 'my-assistant',
+    },
+  ]);
 
   // Step 4: IM channels
-  const { channels } = await inquirer.default.prompt([{
-    type: 'checkbox',
-    name: 'channels',
-    message: '4/8 Select IM channels (SPACE to select, ENTER to confirm):',
-    choices: [
-      { name: 'Feishu / Lark (WebSocket, no public IP needed)', value: 'feishu' },
-      { name: 'DingTalk (Stream, no public IP needed)', value: 'dingtalk' },
-      { name: 'WeCom (Webhook, public URL required)', value: 'wecom' },
-      { name: 'Slack (Socket Mode, no public IP needed)', value: 'slack' },
-      { name: 'Telegram (Polling, no public IP needed)', value: 'telegram' },
-      { name: 'Discord (Gateway, no public IP needed)', value: 'discord' },
-    ],
-  }]);
+  const { channels } = await inquirer.default.prompt([
+    {
+      type: 'checkbox',
+      name: 'channels',
+      message: '4/8 Select IM channels (SPACE to select, ENTER to confirm):',
+      choices: [
+        { name: 'Feishu / Lark (WebSocket, no public IP needed)', value: 'feishu' },
+        { name: 'DingTalk (Stream, no public IP needed)', value: 'dingtalk' },
+        { name: 'WeCom (Webhook, public URL required)', value: 'wecom' },
+        { name: 'Slack (Socket Mode, no public IP needed)', value: 'slack' },
+        { name: 'Telegram (Polling, no public IP needed)', value: 'telegram' },
+        { name: 'Discord (Gateway, no public IP needed)', value: 'discord' },
+      ],
+    },
+  ]);
 
   // Step 5-6: Channel config
   const channelsConfig: ChannelsConfig = {};
@@ -308,7 +313,13 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
     console.log('\n📱 DingTalk config (get credentials at: https://open-dev.dingtalk.com)');
     const dtAnswer = await inquirer.default.prompt([
       { type: 'input', name: 'clientId', message: 'DingTalk Client ID (AppKey):', default: '' },
-      { type: 'password', name: 'clientSecret', message: 'DingTalk Client Secret (AppSecret):', mask: '*', default: '' },
+      {
+        type: 'password',
+        name: 'clientSecret',
+        message: 'DingTalk Client Secret (AppSecret):',
+        mask: '*',
+        default: '',
+      },
     ]);
 
     if (dtAnswer.clientId) {
@@ -396,15 +407,17 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
   // Step 7: Template
   let templateName: string | undefined = opts.template;
   if (!templateName) {
-    const { template } = await inquirer.default.prompt([{
-      type: 'list',
-      name: 'template',
-      message: '7/8 Choose a scenario template:',
-      choices: [
-        ...TEMPLATES.map(t => ({ name: `${t.label} — ${t.description}`, value: t.name })),
-        { name: 'None (built-in skills only)', value: '' },
-      ],
-    }]);
+    const { template } = await inquirer.default.prompt([
+      {
+        type: 'list',
+        name: 'template',
+        message: '7/8 Choose a scenario template:',
+        choices: [
+          ...TEMPLATES.map((t) => ({ name: `${t.label} — ${t.description}`, value: t.name })),
+          { name: 'None (built-in skills only)', value: '' },
+        ],
+      },
+    ]);
     templateName = template || undefined;
   }
 
@@ -436,19 +449,15 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
     try {
       await stat(envPath);
       const existing = await readFile(envPath, 'utf-8');
-      await writeFile(envPath, existing.trimEnd() + '\n\n# GolemBot onboard\n' + envLines.join('\n') + '\n', 'utf-8');
+      await writeFile(envPath, `${existing.trimEnd()}\n\n# GolemBot onboard\n${envLines.join('\n')}\n`, 'utf-8');
     } catch {
-      await writeFile(envPath, envLines.join('\n') + '\n', 'utf-8');
+      await writeFile(envPath, `${envLines.join('\n')}\n`, 'utf-8');
     }
     console.log('   ✅ .env');
   }
 
   // .env.example
-  await writeFile(
-    join(dir, '.env.example'),
-    generateEnvExample(engine, channels),
-    'utf-8',
-  );
+  await writeFile(join(dir, '.env.example'), generateEnvExample(engine, channels), 'utf-8');
   console.log('   ✅ .env.example');
 
   // .gitignore
@@ -458,7 +467,7 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
   try {
     await stat(gitignorePath);
   } catch {
-    await writeFile(gitignorePath, gitignoreDefaults.join('\n') + '\n', 'utf-8');
+    await writeFile(gitignorePath, `${gitignoreDefaults.join('\n')}\n`, 'utf-8');
     console.log('   ✅ .gitignore');
   }
 
@@ -494,7 +503,7 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
   }
 
   // Summary
-  console.log('\n' + '─'.repeat(40));
+  console.log(`\n${'─'.repeat(40)}`);
   console.log(`\n✅ GolemBot assistant '${name}' configured!\n`);
   console.log(`   Engine:    ${engine}`);
   if (channels.length > 0) {
@@ -506,12 +515,14 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
   console.log(`   Directory: ${dir}`);
 
   // Start?
-  const { start } = await inquirer.default.prompt([{
-    type: 'confirm',
-    name: 'start',
-    message: '8/8 Start the Gateway now?',
-    default: true,
-  }]);
+  const { start } = await inquirer.default.prompt([
+    {
+      type: 'confirm',
+      name: 'start',
+      message: '8/8 Start the Gateway now?',
+      default: true,
+    },
+  ]);
 
   if (start) {
     // Re-load .env that was just created during onboard (the CLI-level loader
@@ -531,7 +542,9 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
         }
         if (val && !process.env[key]) process.env[key] = val;
       }
-    } catch { /* no .env — env vars already set externally */ }
+    } catch {
+      /* no .env — env vars already set externally */
+    }
 
     console.log('');
     const { startGateway } = await import('./gateway.js');

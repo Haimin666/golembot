@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir, readFile, lstat, readlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { lstat, mkdir, mkdtemp, readFile, readlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { generateAgentsMd, initWorkspace, writeConfig, loadConfig, type GolemConfig } from '../workspace.js';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { injectClaudeSkills } from '../engine.js';
+import { type GolemConfig, generateAgentsMd, initWorkspace, loadConfig, writeConfig } from '../workspace.js';
 
 describe('generated file consistency', () => {
   let dir: string;
@@ -113,10 +113,14 @@ describe('generated file consistency', () => {
     it('creates symlink to AGENTS.md', async () => {
       const workspace = dir;
       await mkdir(join(workspace, '.claude', 'skills'), { recursive: true });
-      await injectClaudeSkills(workspace, [], [
-        { name: 'general', description: 'General assistant' },
-        { name: 'faq', description: 'FAQ support' },
-      ]);
+      await injectClaudeSkills(
+        workspace,
+        [],
+        [
+          { name: 'general', description: 'General assistant' },
+          { name: 'faq', description: 'FAQ support' },
+        ],
+      );
 
       const claudeMdPath = join(workspace, 'CLAUDE.md');
       const s = await lstat(claudeMdPath);

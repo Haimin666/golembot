@@ -13,11 +13,11 @@ export interface CronFields {
 export interface ScheduledTaskDef {
   id: string;
   name: string;
-  schedule: string;       // cron expression or human-readable shortcut
+  schedule: string; // cron expression or human-readable shortcut
   prompt: string;
   target?: TaskTarget;
   enabled: boolean;
-  timeout?: number;       // seconds, default 300
+  timeout?: number; // seconds, default 300
 }
 
 export interface TaskTarget {
@@ -30,7 +30,13 @@ export type TaskHandler = (task: ScheduledTaskDef) => Promise<void>;
 // ── Cron Parser ─────────────────────────────────────────────
 
 const DAY_NAMES: Record<string, number> = {
-  sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6,
+  sun: 0,
+  mon: 1,
+  tue: 2,
+  wed: 3,
+  thu: 4,
+  fri: 5,
+  sat: 6,
 };
 
 function parseField(field: string, min: number, max: number): Set<number> {
@@ -65,7 +71,7 @@ function parseSingleValue(s: string, min: number, max: number): number {
   const lower = s.toLowerCase();
   if (DAY_NAMES[lower] !== undefined) return DAY_NAMES[lower];
   const n = parseInt(s, 10);
-  if (isNaN(n) || n < min || n > max) throw new Error(`Invalid cron value: ${s}`);
+  if (Number.isNaN(n) || n < min || n > max) throw new Error(`Invalid cron value: ${s}`);
   return n;
 }
 

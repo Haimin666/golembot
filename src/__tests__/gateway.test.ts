@@ -1,21 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import type { ChannelAdapter, ChannelMessage, ReadReceipt } from '../channel.js';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { ChannelAdapter, ChannelMessage } from '../channel.js';
 import { detectMention } from '../channel.js';
 import {
   buildGroupPrompt,
-  resolveGroupChatConfig,
-  resolveStreamingConfig,
-  GROUP_TURN_RESET_MS,
   clearGroupChatState,
+  GROUP_TURN_RESET_MS,
+  type GroupMessage,
+  groupHistories,
+  groupLastActivity,
+  groupTurnCounters,
   purgeIdleGroups,
   requireFields,
-  groupHistories,
-  groupTurnCounters,
-  groupLastActivity,
-  type GroupMessage,
+  resolveGroupChatConfig,
+  resolveStreamingConfig,
 } from '../gateway.js';
 
 function createMockAdapter(name: string): ChannelAdapter & {
@@ -107,11 +107,7 @@ describe('Gateway config loading', () => {
 
   it('starts without channels (HTTP only)', async () => {
     const { loadConfig } = await import('../workspace.js');
-    await writeFile(
-      join(tmpDir, 'golem.yaml'),
-      'name: gw-test\nengine: cursor\n',
-      'utf-8',
-    );
+    await writeFile(join(tmpDir, 'golem.yaml'), 'name: gw-test\nengine: cursor\n', 'utf-8');
     const config = await loadConfig(tmpDir);
     expect(config.channels).toBeUndefined();
   });
@@ -134,7 +130,7 @@ describe('initWorkspace installs im-adapter skill', () => {
     await initWorkspace(tmpDir, { name: 'test', engine: 'cursor' }, builtinDir);
 
     const skills = await scanSkills(tmpDir);
-    const names = skills.map(s => s.name).sort();
+    const names = skills.map((s) => s.name).sort();
     expect(names).toContain('general');
     expect(names).toContain('im-adapter');
   });
@@ -174,7 +170,9 @@ describe('custom channel adapter loading', () => {
     expect(instance.name).toBe('my-channel');
 
     const received: unknown[] = [];
-    await instance.start((msg: unknown) => { received.push(msg); });
+    await instance.start((msg: unknown) => {
+      received.push(msg);
+    });
     await instance._onMessage?.({ text: 'hello' });
     expect(received).toHaveLength(1);
   });
@@ -372,8 +370,8 @@ describe('GROUP_TURN_RESET_MS', () => {
     const justNow = now - 1000; // 1 second ago
 
     // Simulate the reset condition: Date.now() - lastActivity > GROUP_TURN_RESET_MS
-    expect(now - oneHourAgo > GROUP_TURN_RESET_MS).toBe(true);   // → reset
-    expect(now - justNow > GROUP_TURN_RESET_MS).toBe(false);     // → no reset
+    expect(now - oneHourAgo > GROUP_TURN_RESET_MS).toBe(true); // → reset
+    expect(now - justNow > GROUP_TURN_RESET_MS).toBe(false); // → no reset
   });
 });
 
