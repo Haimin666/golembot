@@ -231,7 +231,8 @@ export async function loadConfig(dir: string): Promise<GolemConfig> {
     config.inbox = {
       enabled: typeof inbox.enabled === 'boolean' ? inbox.enabled : undefined,
       retentionDays: typeof inbox.retentionDays === 'number' ? inbox.retentionDays : undefined,
-  };
+    };
+  }
   if (Array.isArray(doc.tasks)) {
     config.tasks = (doc.tasks as Record<string, unknown>[]).map((t, i) => ({
       id: typeof t.id === 'string' ? t.id : '',
