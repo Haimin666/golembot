@@ -74,6 +74,14 @@ historyFetch:
   pollIntervalMinutes: 15      # 定时轮询间隔（默认：15）
   initialLookbackMinutes: 60   # 首次启动回看时长（默认：60）
 
+# 可选：将引擎路由到第三方 LLM 供应商
+provider:
+  baseUrl: "https://openrouter.ai/api"
+  apiKey: "${OPENROUTER_API_KEY}"
+  model: "anthropic/claude-sonnet-4"
+  models:                            # 按引擎覆盖模型
+    codex: "openai/gpt-4.1-mini"
+
 # 可选：IM 通道配置
 channels:
   feishu:
@@ -123,6 +131,7 @@ gateway:
 | `channels` | `object` | — | IM 通道配置 |
 | `inbox` | `object` | — | 持久化消息队列，详见 [`inbox`](#inbox) |
 | `historyFetch` | `object` | — | 历史消息抓取，详见 [`historyFetch`](#historyfetch) |
+| `provider` | `object` | — | 第三方 LLM 供应商路由，详见 [Provider 路由](/zh/guide/provider-routing) |
 | `gateway` | `object` | — | Gateway 服务设置 |
 
 ### `permissions`
@@ -208,6 +217,17 @@ groupChat:
 ### 会话历史
 
 GolemBot 自动记录对话并在 session 丢失时恢复上下文。无需配置。详见[记忆系统](/zh/guide/memory)。
+
+### `provider`
+
+将任意引擎路由到第三方 LLM API。详见 [Provider 路由](/zh/guide/provider-routing)。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `baseUrl` | `string` | 供应商 API 端点 |
+| `apiKey` | `string` | API 密钥（支持 `${ENV_VAR}` 占位符） |
+| `model` | `string` | 所有引擎的默认模型 |
+| `models` | `object` | 按引擎覆盖模型（key = 引擎名称） |
 
 ### `gateway`
 
@@ -361,6 +381,12 @@ interface GolemConfig {
     enabled?: boolean;           // 默认：false
     pollIntervalMinutes?: number;    // 默认：15
     initialLookbackMinutes?: number; // 默认：60
+  };
+  provider?: {
+    baseUrl?: string;
+    apiKey?: string;
+    model?: string;
+    models?: Record<string, string>;
   };
   gateway?: {
     port?: number;

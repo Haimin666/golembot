@@ -4,7 +4,7 @@ layout: home
 hero:
   name: GolemBot
   text: Run Your Coding Agent Everywhere
-  tagline: Connect Cursor, Claude Code, OpenCode, or Codex to IM platforms, HTTP APIs, or your own product. Compatible with 13,000+ OpenClaw community skills.
+  tagline: Connect Cursor, Claude Code, OpenCode, or Codex to IM platforms, HTTP APIs, or your own product — with any LLM provider. Compatible with 13,000+ OpenClaw community skills.
   image:
     light: /logo-icon-light.svg
     dark: /logo-icon-dark.svg
@@ -25,17 +25,20 @@ hero:
 
 features:
   - icon:
-      src: /icons/clawhub.png
-    title: 13,000+ OpenClaw Skills
-    details: Fully compatible with the OpenClaw ecosystem. Search and install skills from ClawHub — the largest AI agent skill marketplace — with one command. Your agent can even discover and install skills autonomously during conversations.
-  - icon:
       src: /icons/cpu.svg
     title: Your Agent Is the Brain
     details: GolemBot doesn't reinvent AI. It uses the Coding Agent you already have — Cursor, Claude Code, OpenCode, or Codex — as the engine. When the agent gets smarter, your assistant gets smarter automatically.
+  - icon: "&#x1F310;"
+    title: Provider Routing
+    details: 4 engines × unlimited providers. Route Claude Code, Codex, OpenCode, or Cursor to OpenRouter, MiniMax, DeepSeek, SiliconFlow, or any compatible API. One config block — zero code changes, zero CLI modifications.
   - icon:
       src: /icons/plug.svg
     title: Connect Anywhere
     details: Connect to Slack, Telegram, Discord, Feishu, DingTalk, WeCom, or HTTP out of the box — no public URL required. Write a custom adapter to plug in email, GitHub Issues, or any other source. Or embed as a library in Express, Next.js, or any Node.js app in 5 lines.
+  - icon:
+      src: /icons/clawhub.png
+    title: 13,000+ OpenClaw Skills
+    details: Fully compatible with the OpenClaw ecosystem. Search and install skills from ClawHub — the largest AI agent skill marketplace — with one command. Your agent can even discover and install skills autonomously during conversations.
   - icon:
       src: /icons/folder.svg
     title: Directory Is the Assistant

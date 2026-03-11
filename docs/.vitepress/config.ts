@@ -18,6 +18,7 @@ const sidebarEn = [
       { text: 'Scheduled Tasks', link: '/guide/scheduled-tasks' },
       { text: 'Memory', link: '/guide/memory' },
       { text: 'Embed in Your Product', link: '/guide/embed' },
+      { text: 'Provider Routing', link: '/guide/provider-routing' },
     ],
   },
   {
@@ -98,6 +99,7 @@ const sidebarZh = [
       { text: '定时任务', link: '/zh/guide/scheduled-tasks' },
       { text: '记忆系统', link: '/zh/guide/memory' },
       { text: '嵌入到你的产品', link: '/zh/guide/embed' },
+      { text: 'Provider 路由', link: '/zh/guide/provider-routing' },
     ],
   },
   {
@@ -162,7 +164,7 @@ const sidebarZh = [
 
 export default defineConfig({
   title: 'GolemBot',
-  description: 'Run your Coding Agent everywhere — IM, HTTP, or embedded in your product.',
+  description: 'Run your Coding Agent everywhere — IM, HTTP, or embedded in your product — with any LLM provider.',
   base: '/golembot/',
   sitemap: { hostname: 'https://0xranx.github.io/golembot/' },
 
@@ -170,7 +172,7 @@ export default defineConfig({
     ['link', { rel: 'icon', href: '/golembot/logo-icon-dark.svg' }],
     // Open Graph
     ['meta', { property: 'og:title', content: 'GolemBot' }],
-    ['meta', { property: 'og:description', content: 'Run your Coding Agent everywhere — IM, HTTP, or embedded in your product.' }],
+    ['meta', { property: 'og:description', content: 'Run your Coding Agent everywhere — IM, HTTP, or embedded in your product — with any LLM provider.' }],
     ['meta', { property: 'og:image', content: 'https://0xranx.github.io/golembot/og-image.png' }],
     ['meta', { property: 'og:url', content: 'https://0xranx.github.io/golembot/' }],
     ['meta', { property: 'og:type', content: 'website' }],
@@ -179,7 +181,7 @@ export default defineConfig({
     // Twitter Card
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
     ['meta', { name: 'twitter:title', content: 'GolemBot' }],
-    ['meta', { name: 'twitter:description', content: 'Run your Coding Agent everywhere — IM, HTTP, or embedded in your product.' }],
+    ['meta', { name: 'twitter:description', content: 'Run your Coding Agent everywhere — IM, HTTP, or embedded in your product — with any LLM provider.' }],
     ['meta', { name: 'twitter:image', content: 'https://0xranx.github.io/golembot/og-image.png' }],
     // SEO
     ['meta', { name: 'theme-color', content: '#4FC3F7' }],
@@ -195,7 +197,7 @@ export default defineConfig({
     zh: {
       label: '简体中文',
       lang: 'zh-CN',
-      description: '让你的 Coding Agent 随处运行 — IM、HTTP 或嵌入到你的产品中。',
+      description: '让你的 Coding Agent 随处运行 — IM、HTTP 或嵌入到你的产品中 — 搭配任意 LLM 供应商。',
       themeConfig: {
         nav: [
           { text: '文档', link: '/zh/guide/getting-started' },

@@ -73,6 +73,14 @@ historyFetch:
   pollIntervalMinutes: 15      # periodic poll interval (default: 15)
   initialLookbackMinutes: 60   # first-run lookback window (default: 60)
 
+# Optional: route engine to a third-party LLM provider
+provider:
+  baseUrl: "https://openrouter.ai/api"
+  apiKey: "${OPENROUTER_API_KEY}"
+  model: "anthropic/claude-sonnet-4"
+  models:                            # per-engine overrides
+    codex: "openai/gpt-4.1-mini"
+
 # Optional: IM channel configuration
 channels:
   feishu:
@@ -122,6 +130,7 @@ gateway:
 | `channels` | `object` | — | IM channel configurations |
 | `inbox` | `object` | — | Persistent message queue — see [`inbox`](#inbox) section |
 | `historyFetch` | `object` | — | History fetch for missed messages — see [`historyFetch`](#historyfetch) section |
+| `provider` | `object` | — | Third-party LLM provider routing — see [Provider Routing](/guide/provider-routing) |
 | `gateway` | `object` | — | Gateway service settings |
 
 ### `permissions`
@@ -227,6 +236,17 @@ See [Scheduled Tasks](/guide/scheduled-tasks) for full configuration reference, 
 ### Conversation History
 
 GolemBot automatically records conversations and restores context when sessions are lost. No configuration needed. See [Memory](/guide/memory) for details.
+
+### `provider`
+
+Route any engine to a third-party LLM API. See [Provider Routing](/guide/provider-routing) for full documentation.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `baseUrl` | `string` | Provider API endpoint |
+| `apiKey` | `string` | API key (supports `${ENV_VAR}` placeholders) |
+| `model` | `string` | Default model for all engines |
+| `models` | `object` | Per-engine model overrides (key = engine name) |
 
 ### `gateway`
 
@@ -390,6 +410,12 @@ interface GolemConfig {
     enabled?: boolean;           // default: false
     pollIntervalMinutes?: number;    // default: 15
     initialLookbackMinutes?: number; // default: 60
+  };
+  provider?: {
+    baseUrl?: string;
+    apiKey?: string;
+    model?: string;
+    models?: Record<string, string>;
   };
   gateway?: {
     port?: number;

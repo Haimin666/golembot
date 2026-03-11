@@ -38,7 +38,7 @@
 
 Cursor, Claude Code, OpenCode, Codex — these Coding Agents can already write code, run scripts, analyze data, and reason through complex tasks. But they're stuck in an IDE or a terminal window.
 
-**GolemBot gives them a body.** One command connects your Coding Agent to Slack, Telegram, Discord, Feishu, DingTalk, WeCom, or any HTTP client. Write a custom adapter to plug in email, GitHub Issues, or any other message source. Or embed into your own product with 5 lines of code. No AI framework, no prompt engineering — the agent you already have *is* the brain.
+**GolemBot gives them a body.** One command connects your Coding Agent to Slack, Telegram, Discord, Feishu, DingTalk, WeCom, or any HTTP client — with any LLM provider. Route Claude Code through OpenRouter, run Codex on MiniMax, or point OpenCode at DeepSeek — one config block, zero code changes. Write a custom adapter to plug in email, GitHub Issues, or any other message source. Or embed into your own product with 5 lines of code. No AI framework, no prompt engineering — the agent you already have *is* the brain.
 
 ## Run Your Coding Agent Everywhere
 
@@ -73,6 +73,7 @@ Embed into Slack bots, internal tools, SaaS products, customer support — anyth
 | **Auto-upgrade** | Agent gets smarter? Your assistant gets smarter. Zero code changes. | You maintain everything yourself |
 | **Transparency** | `ls` the directory = see what the assistant knows and does | Black box pipelines |
 | **Engine lock-in** | Change one line in config to swap engines | Rewrite everything |
+| **Provider freedom** | 4 engines × any provider — OpenRouter, MiniMax, DeepSeek, SiliconFlow. One config block. | Locked to one LLM provider per framework |
 | **Skills** | 13,000+ community skills from ClawHub, one command to install | Write your own tools and prompts from scratch |
 | **Scheduled tasks** | Built-in cron scheduler — daily standups, dependency audits, test reports pushed to IM | Build your own job system |
 | **Multimodal** | Image messages from IM → saved to disk → agent reads and analyzes. All 6 channels supported. | Parse platform APIs yourself |
@@ -126,6 +127,7 @@ Slack / Telegram / Discord / Feishu / DingTalk / WeCom / HTTP API
           ▼       ▼       ▼       ▼
        Cursor  Claude  OpenCode  Codex
                Code
+          ↕ Provider Routing (OpenRouter, MiniMax, ...)
 ```
 
 ## Engine Comparison
@@ -145,6 +147,12 @@ The `StreamEvent` interface is identical across all engines — switching requir
 ```yaml
 name: my-assistant
 engine: claude-code
+
+# Optional: route engine to a third-party LLM provider
+provider:
+  baseUrl: "https://openrouter.ai/api"
+  apiKey: "${OPENROUTER_API_KEY}"
+  model: "anthropic/claude-sonnet-4"
 
 channels:
   slack:

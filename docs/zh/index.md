@@ -4,7 +4,7 @@ layout: home
 hero:
   name: GolemBot
   text: 让你的 Coding Agent 随处运行
-  tagline: 将 Cursor、Claude Code、OpenCode 或 Codex 接入 IM 平台、HTTP API，或嵌入产品。兼容 13,000+ OpenClaw 社区技能。
+  tagline: 将 Cursor、Claude Code、OpenCode 或 Codex 接入 IM 平台、HTTP API，或嵌入产品 — 搭配任意 LLM 供应商。兼容 13,000+ OpenClaw 社区技能。
   image:
     light: /logo-icon-light.svg
     dark: /logo-icon-dark.svg
@@ -25,17 +25,20 @@ hero:
 
 features:
   - icon:
-      src: /icons/clawhub.png
-    title: 13,000+ OpenClaw 技能
-    details: SKILL.md 格式与 OpenClaw 生态 100% 兼容。一条命令从 ClawHub 搜索和安装 13,000+ 社区技能。Agent 甚至可以在对话中自主发现和安装技能。
-  - icon:
       src: /icons/cpu.svg
     title: Agent 就是大脑
     details: GolemBot 不重新发明 AI。它直接使用你已有的 Coding Agent — Cursor、Claude Code、OpenCode 或 Codex — 作为引擎。Agent 变强，助手自动变强。
+  - icon: "&#x1F310;"
+    title: Provider 路由
+    details: 4 大引擎 × 无限供应商。将 Claude Code、Codex、OpenCode 或 Cursor 路由到 OpenRouter、MiniMax、DeepSeek、硅基流动或任何兼容 API。一个配置块 — 零代码改动，零 CLI 修改。
   - icon:
       src: /icons/plug.svg
     title: 随处接入
     details: 内置 Slack、Telegram、Discord、飞书、钉钉、企业微信、HTTP，无需公网地址。写一个自定义 Adapter 即可接入邮件、GitHub Issue 或任何消息来源。也可 5 行代码嵌入 Express、Next.js 或任何 Node.js 应用。
+  - icon:
+      src: /icons/clawhub.png
+    title: 13,000+ OpenClaw 技能
+    details: SKILL.md 格式与 OpenClaw 生态 100% 兼容。一条命令从 ClawHub 搜索和安装 13,000+ 社区技能。Agent 甚至可以在对话中自主发现和安装技能。
   - icon:
       src: /icons/folder.svg
     title: 目录即助手

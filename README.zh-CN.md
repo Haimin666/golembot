@@ -38,7 +38,7 @@
 
 Cursor、Claude Code、OpenCode、Codex —— 这些 Coding Agent 已经能写代码、跑脚本、分析数据、进行复杂推理。但它们被困在 IDE 或终端窗口里。
 
-**GolemBot 给它们一个身体。** 一条命令就能把你的 Coding Agent 接入 Slack、Telegram、Discord、飞书、钉钉、企业微信，或任何 HTTP 客户端。写一个自定义 Adapter 即可接入邮件、GitHub Issue 等任意消息来源。也可以 5 行代码嵌入你自己的产品。不需要 AI 框架，不需要 prompt 工程 —— 你已有的 Agent 就是大脑。
+**GolemBot 给它们一个身体。** 一条命令就能把你的 Coding Agent 接入 Slack、Telegram、Discord、飞书、钉钉、企业微信，或任何 HTTP 客户端 — 搭配任意 LLM 供应商。把 Claude Code 路由到 OpenRouter、在 MiniMax 上跑 Codex、让 OpenCode 对接 DeepSeek — 一个配置块搞定，零代码改动。写一个自定义 Adapter 即可接入邮件、GitHub Issue 等任意消息来源。也可以 5 行代码嵌入你自己的产品。不需要 AI 框架，不需要 prompt 工程 —— 你已有的 Agent 就是大脑。
 
 ## 让你的 Coding Agent 跑在任何地方
 
@@ -73,6 +73,7 @@ for await (const event of bot.chat('分析上个月的销售数据')) {
 | **自动升级** | Agent 变强了？你的助手自动变强，零代码改动 | 你自己维护所有东西 |
 | **透明度** | `ls` 目录 = 看到助手知道什么、做了什么 | 黑盒流水线 |
 | **引擎锁定** | 改一行配置换引擎 | 全部重写 |
+| **Provider 自由** | 4 大引擎 × 任意供应商 — OpenRouter、MiniMax、DeepSeek、硅基流动。一个配置块搞定。 | 每个框架锁定一个 LLM 供应商 |
 | **技能生态** | ClawHub 13,000+ 社区技能，一条命令安装 | 自己从零编写工具和 prompt |
 | **定时任务** | 内置 cron 调度器 —— 每日站会、依赖审计、测试报告自动推送到 IM | 自己搭建任务系统 |
 | **多模态** | IM 图片消息 → 保存到磁盘 → Agent 读取分析。全部 6 个通道支持。 | 自己解析各平台 API |
@@ -126,6 +127,7 @@ Slack / Telegram / Discord / 飞书 / 钉钉 / 企业微信 / HTTP API
           ▼       ▼       ▼       ▼
        Cursor  Claude  OpenCode  Codex
                Code
+          ↕ Provider 路由 (OpenRouter, MiniMax, ...)
 ```
 
 ## 引擎对比
@@ -145,6 +147,12 @@ Slack / Telegram / Discord / 飞书 / 钉钉 / 企业微信 / HTTP API
 ```yaml
 name: my-assistant
 engine: claude-code
+
+# 可选：将引擎路由到第三方 LLM 供应商
+provider:
+  baseUrl: "https://openrouter.ai/api"
+  apiKey: "${OPENROUTER_API_KEY}"
+  model: "anthropic/claude-sonnet-4"
 
 channels:
   slack:
