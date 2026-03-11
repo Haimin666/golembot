@@ -194,6 +194,7 @@ export class SlackAdapter implements ChannelAdapter {
 
     try {
       const res = await this.app.client.conversations.history({
+        token: this.config.botToken,
         channel: chatId,
         oldest: String(since.getTime() / 1000),
         limit,
@@ -230,28 +231,37 @@ export class SlackAdapter implements ChannelAdapter {
     if (!this.app) return [];
     const chats: Array<{ chatId: string; chatType: 'dm' | 'group' }> = [];
 
-    try {
-      let cursor: string | undefined;
-      do {
-        const res = await this.app.client.conversations.list({
-          types: 'public_channel,private_channel,im',
-          exclude_archived: true,
-          limit: 200,
-          cursor,
-        });
-
-        for (const ch of res.channels ?? []) {
-          if (!ch.is_member) continue;
-          chats.push({
-            chatId: ch.id,
-            chatType: ch.is_im ? 'dm' : 'group',
+    // Try with private_channel first; fall back without if groups:read scope is missing
+    const typesList = ['public_channel,private_channel,im', 'public_channel,im'];
+    for (const types of typesList) {
+      try {
+        let cursor: string | undefined;
+        do {
+          const res = await this.app.client.conversations.list({
+            token: this.config.botToken,
+            types,
+            exclude_archived: true,
+            limit: 200,
+            cursor,
           });
-        }
 
-        cursor = res.response_metadata?.next_cursor || undefined;
-      } while (cursor);
-    } catch (e) {
-      console.error(`[slack] listChats error:`, (e as Error).message);
+          for (const ch of res.channels ?? []) {
+            if (!ch.is_member) continue;
+            chats.push({
+              chatId: ch.id!,
+              chatType: ch.is_im ? 'dm' : 'group',
+            });
+          }
+
+          cursor = res.response_metadata?.next_cursor || undefined;
+        } while (cursor);
+        break; // success — no need to retry with fewer types
+      } catch (e) {
+        if (chats.length === 0 && types.includes('private_channel')) {
+          continue; // retry without private_channel
+        }
+        console.error(`[slack] listChats error:`, (e as Error).message);
+      }
     }
 
     return chats;
