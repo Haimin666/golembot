@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: GolemBot
-  text: 让你的 Coding Agent 随处运行 — 搭配任意供应商
+  text: 任意 Agent × 任意供应商 × 随处运行
   tagline: 将 Cursor、Claude Code、OpenCode 或 Codex 接入 IM 平台、HTTP API，或嵌入产品 — 搭配任意 LLM 供应商。兼容 13,000+ OpenClaw 社区技能。
   image:
     light: /logo-icon-light.svg

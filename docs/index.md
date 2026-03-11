@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: GolemBot
-  text: Run Your Coding Agent Everywhere — with Any Provider
+  text: Any Agent × Any Provider × Anywhere
   tagline: Connect Cursor, Claude Code, OpenCode, or Codex to IM platforms, HTTP APIs, or your own product — with any LLM provider. Compatible with 13,000+ OpenClaw community skills.
   image:
     light: /logo-icon-light.svg
