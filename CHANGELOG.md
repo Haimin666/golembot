@@ -1,3 +1,10 @@
+## [0.24.2](https://github.com/0xranx/golembot/compare/v0.24.1...v0.24.2) (2026-03-11)
+
+
+### Bug Fixes
+
+* add missing listHistoryFiles and readHistory exports ([6ce0fee](https://github.com/0xranx/golembot/commit/6ce0fee08bca715a86ef61c764b2f9127675d55a))
+
 ## [0.24.1](https://github.com/0xranx/golembot/compare/v0.24.0...v0.24.1) (2026-03-10)
 
 
