@@ -188,6 +188,75 @@ export class SlackAdapter implements ChannelAdapter {
     });
   }
 
+  async fetchHistory(chatId: string, since: Date, limit = 50): Promise<ChannelMessage[]> {
+    if (!this.app) return [];
+    const messages: ChannelMessage[] = [];
+
+    try {
+      const res = await this.app.client.conversations.history({
+        channel: chatId,
+        oldest: String(since.getTime() / 1000),
+        limit,
+        inclusive: false,
+      });
+
+      for (const msg of res.messages ?? []) {
+        // Skip bot messages and subtypes (joins, edits, etc.)
+        if (msg.bot_id || msg.subtype) continue;
+        if (!msg.text) continue;
+
+        const senderName = await this.resolveUserName(msg.user);
+
+        messages.push({
+          channelType: 'slack',
+          senderId: msg.user || 'unknown',
+          senderName,
+          chatId,
+          chatType: 'group', // determined by caller; conversations.history works for both
+          text: msg.text,
+          messageId: msg.ts,
+          raw: msg,
+        });
+      }
+    } catch (e) {
+      console.error(`[slack] fetchHistory error:`, (e as Error).message);
+    }
+
+    // Slack returns newest first; reverse to chronological order
+    return messages.reverse();
+  }
+
+  async listChats(): Promise<Array<{ chatId: string; chatType: 'dm' | 'group' }>> {
+    if (!this.app) return [];
+    const chats: Array<{ chatId: string; chatType: 'dm' | 'group' }> = [];
+
+    try {
+      let cursor: string | undefined;
+      do {
+        const res = await this.app.client.conversations.list({
+          types: 'public_channel,private_channel,im',
+          exclude_archived: true,
+          limit: 200,
+          cursor,
+        });
+
+        for (const ch of res.channels ?? []) {
+          if (!ch.is_member) continue;
+          chats.push({
+            chatId: ch.id,
+            chatType: ch.is_im ? 'dm' : 'group',
+          });
+        }
+
+        cursor = res.response_metadata?.next_cursor || undefined;
+      } while (cursor);
+    } catch (e) {
+      console.error(`[slack] listChats error:`, (e as Error).message);
+    }
+
+    return chats;
+  }
+
   async stop(): Promise<void> {
     if (this.app) {
       await this.app.stop();
