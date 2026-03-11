@@ -1,3 +1,15 @@
+# [0.26.0](https://github.com/0xranx/golembot/compare/v0.25.0...v0.26.0) (2026-03-11)
+
+
+### Bug Fixes
+
+* **workspace:** restore missing closing brace in inbox config parsing ([f0fc611](https://github.com/0xranx/golembot/commit/f0fc611f2ffe4f78c117d5864ce39f14d4d0f636)), closes [#14](https://github.com/0xranx/golembot/issues/14)
+
+
+### Features
+
+* **provider:** decouple engine from LLM provider via env injection ([c80a362](https://github.com/0xranx/golembot/commit/c80a3628bf669460d0e5085f5e2c31e940e88cb3))
+
 # [0.25.0](https://github.com/0xranx/golembot/compare/v0.24.2...v0.25.0) (2026-03-11)
 
 
