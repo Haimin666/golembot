@@ -455,7 +455,7 @@ export class FeishuAdapter implements ChannelAdapter {
 
         const senderId = item.sender?.id;
         const senderName = senderId ? await this.resolveUserName(senderId) : undefined;
-        const createTime = item.create_time ? new Date(Number(item.create_time) * 1000).toISOString() : undefined;
+        const createTime = item.create_time ? new Date(Number(item.create_time)).toISOString() : undefined;
 
         messages.push({
           channelType: 'feishu',
