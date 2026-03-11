@@ -187,11 +187,11 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
 
       totalEnqueued++;
 
-      // Update watermark to the latest message's time
-      // Use the create_time from raw data if available, otherwise current time
+      // Update watermark to 1ms after the latest message's time,
+      // so the next fetch excludes this message (APIs typically use >= for start_time).
       const rawData = lastMsg.raw as any;
-      const latestTime = rawData?._fetchedAt ? new Date(rawData._fetchedAt) : new Date();
-      watermarks.set(wmKey, latestTime);
+      const latestMs = rawData?._fetchedAt ? new Date(rawData._fetchedAt).getTime() : Date.now();
+      watermarks.set(wmKey, new Date(latestMs + 1));
     }
   }
 

@@ -236,6 +236,25 @@ describe('InboxStore', () => {
       expect(store.has('telegram', 'msg-2')).toBe(false);
     });
 
+    it('dedup uses channelType not source', async () => {
+      // source='history-fetch' but channelType='feishu' — has() should use channelType
+      await store.enqueue({
+        sessionKey: 'k1',
+        message: 'triage',
+        source: 'history-fetch',
+        channelMsg: {
+          channelType: 'feishu',
+          senderId: 'u1',
+          chatId: 'c1',
+          chatType: 'group',
+          messageId: 'msg-hf-1',
+        },
+      });
+      // Should be findable by channelType, not source
+      expect(store.has('feishu', 'msg-hf-1')).toBe(true);
+      expect(store.has('history-fetch', 'msg-hf-1')).toBe(false);
+    });
+
     it('populates dedup set from getPending', async () => {
       await mkdir(join(dir, '.golem'), { recursive: true });
       const entry: InboxEntry = {

@@ -200,13 +200,13 @@ describe('fetchMissedMessages', () => {
 
     await fetchMissedMessages({ dir, adapters, inbox, config: {}, verbose: false }, watermarks);
 
-    // Watermark should be updated
-    expect(watermarks.get('feishu:chat1')?.toISOString()).toBe('2026-03-11T12:00:00.000Z');
+    // Watermark should be updated to 1ms after the latest message time
+    expect(watermarks.get('feishu:chat1')?.toISOString()).toBe('2026-03-11T12:00:00.001Z');
 
     // Verify persisted to disk
     const raw = await readFile(join(dir, '.golem', 'watermarks.json'), 'utf-8');
     const parsed = JSON.parse(raw);
-    expect(parsed['feishu:chat1']).toBe('2026-03-11T12:00:00.000Z');
+    expect(parsed['feishu:chat1']).toBe('2026-03-11T12:00:00.001Z');
   });
 
   it('handles fetchHistory errors gracefully', async () => {

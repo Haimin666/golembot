@@ -13,6 +13,8 @@ export interface InboxChannelMsg {
   chatId: string;
   chatType: 'dm' | 'group';
   messageId?: string;
+  /** Whether the bot was @mentioned in this message. */
+  mentioned?: boolean;
 }
 
 export interface InboxEntry {
@@ -62,9 +64,9 @@ export class InboxStore {
     this.dir = dir;
   }
 
-  /** Check if a message has already been enqueued (by source + messageId). */
-  has(source: string, messageId: string): boolean {
-    return this.seen.has(`${source}:${messageId}`);
+  /** Check if a message has already been enqueued (by channelType + messageId). */
+  has(channelType: string, messageId: string): boolean {
+    return this.seen.has(`${channelType}:${messageId}`);
   }
 
   /** Append a new entry to the JSONL file. */
@@ -76,9 +78,9 @@ export class InboxStore {
       ...partial,
     };
 
-    // Track in dedup set
+    // Track in dedup set — use channelType (not source) for consistent keying
     if (entry.channelMsg?.messageId) {
-      this.seen.add(`${entry.source}:${entry.channelMsg.messageId}`);
+      this.seen.add(`${entry.channelMsg.channelType}:${entry.channelMsg.messageId}`);
     }
 
     const line = `${JSON.stringify(entry)}\n`;
@@ -110,9 +112,9 @@ export class InboxStore {
         entry.status = 'pending';
         needRewrite = true;
       }
-      // Populate dedup set
+      // Populate dedup set — use channelType for consistent keying
       if (entry.channelMsg?.messageId) {
-        this.seen.add(`${entry.source}:${entry.channelMsg.messageId}`);
+        this.seen.add(`${entry.channelMsg.channelType}:${entry.channelMsg.messageId}`);
       }
     }
 

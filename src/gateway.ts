@@ -661,6 +661,7 @@ export function channelMsgToInbox(
       chatId: msg.chatId,
       chatType: msg.chatType,
       messageId: msg.messageId,
+      mentioned: msg.mentioned,
     },
   };
 }
@@ -913,8 +914,8 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
           messageId: chMsg.messageId,
           text: entry.message,
           raw: {},
-          // History-fetch triage messages should always be processed (bypass mention-only check)
-          mentioned: entry.source === 'history-fetch' ? true : undefined,
+          // Restore mentioned state: use stored value, or force true for history-fetch triage
+          mentioned: entry.source === 'history-fetch' ? true : chMsg.mentioned,
         };
 
         // For inbox entries (especially history-fetch), the raw object is empty,
