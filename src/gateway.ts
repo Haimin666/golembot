@@ -504,13 +504,14 @@ export async function handleMessage(
       // but "[PASS]" is non-empty. For smart groups, the [PASS] typically
       // arrives as a single text event and gets flushed. This is acceptable:
       // smart mode is an advanced feature, and the tradeoff is documented.
-      if (fullReply.trim() === '[PASS]') {
-        log(verbose, `[${channelType}] [PASS] — bot chose not to respond`);
+      const trimmed = fullReply.trim();
+      if (trimmed === '[PASS]' || trimmed === '[SKIP]') {
+        log(verbose, `[${channelType}] ${trimmed} — bot chose not to respond`);
         trackMetrics({ passed: true, responsePreview: '' });
         return;
       }
 
-      if (!fullReply.trim() && hasError) {
+      if (!trimmed && hasError) {
         await sendChunk('Sorry, an error occurred while processing your message. Please try again later.');
         fullReply = 'Sorry, an error occurred while processing your message. Please try again later.';
       }
@@ -535,9 +536,10 @@ export async function handleMessage(
         }
       }
 
-      // [PASS] sentinel: smart mode bot chose to stay silent
-      if (fullReply.trim() === '[PASS]') {
-        log(verbose, `[${channelType}] [PASS] — bot chose not to respond`);
+      // [PASS] / [SKIP] sentinel: bot chose to stay silent
+      const trimmedBuf = fullReply.trim();
+      if (trimmedBuf === '[PASS]' || trimmedBuf === '[SKIP]') {
+        log(verbose, `[${channelType}] ${trimmedBuf} — bot chose not to respond`);
         trackMetrics({ passed: true, responsePreview: '' });
         return;
       }

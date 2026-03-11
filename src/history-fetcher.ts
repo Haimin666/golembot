@@ -82,6 +82,7 @@ export function buildTriagePrompt(messages: TriageMessage[], chatId: string): st
     '- Reply to messages that need a response',
     '- Skip or briefly acknowledge messages that were already resolved',
     '- Batch-reply when multiple messages are related',
+    '- If none of the messages need a reply, respond with exactly: [SKIP]',
     'Address each person by name.]',
     '',
   ];

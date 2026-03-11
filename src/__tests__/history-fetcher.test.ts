@@ -54,10 +54,11 @@ describe('buildTriagePrompt', () => {
     expect(prompt).toContain('[2026-03-11T10:30:00Z] Alice: Never mind, done');
   });
 
-  it('includes instructions for batch reply', () => {
+  it('includes instructions for batch reply and skip', () => {
     const prompt = buildTriagePrompt([{ ts: '2026-01-01T00:00:00Z', senderName: 'User', text: 'hi' }], 'slack:C123');
     expect(prompt).toContain('Batch-reply');
     expect(prompt).toContain('Skip or briefly acknowledge');
+    expect(prompt).toContain('[SKIP]');
   });
 });
 
