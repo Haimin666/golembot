@@ -16,7 +16,7 @@
   <a href="https://discord.gg/tgU5FXChgM"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
-<p align="center"><strong>Your Coding Agent is trapped in a terminal. GolemBot sets it free.</strong></p>
+<p align="center"><strong>Any Agent × Any Provider × Anywhere</strong></p>
 
 <p align="center">
   <a href="https://clawhub.ai"><img src="https://raw.githubusercontent.com/0xranx/golembot/main/docs/public/icons/clawhub.png" alt="ClawHub" width="28" valign="middle"></a>

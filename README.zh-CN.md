@@ -16,7 +16,7 @@
   <a href="https://discord.gg/tgU5FXChgM"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
-<p align="center"><strong>你的 Coding Agent 被困在终端里。GolemBot 把它释放出来。</strong></p>
+<p align="center"><strong>任意 Agent × 任意供应商 × 随处运行</strong></p>
 
 <p align="center">
   <a href="https://clawhub.ai"><img src="https://raw.githubusercontent.com/0xranx/golembot/main/docs/public/icons/clawhub.png" alt="ClawHub" width="28" valign="middle"></a>
