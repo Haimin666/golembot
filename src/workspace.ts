@@ -115,6 +115,18 @@ export interface ProviderConfig {
   codexWireApi?: 'responses';
   /** Codex custom provider key env var name (e.g. "MINIMAX_API_KEY") */
   codexEnvKey?: string;
+  /**
+   * Secondary provider to use when the primary fails consecutively.
+   * GolemBot switches to this config after `failoverThreshold` consecutive
+   * errors and stays on it until the assistant instance is restarted.
+   * Nested `fallback` on this config is ignored.
+   */
+  fallback?: ProviderConfig;
+  /**
+   * Number of consecutive errors from the primary provider before activating
+   * the fallback. Default: 3.
+   */
+  failoverThreshold?: number;
 }
 
 export interface GolemConfig {

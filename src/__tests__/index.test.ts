@@ -679,3 +679,129 @@ describe('createAssistant', () => {
     });
   });
 });
+
+// ── Provider fallback circuit breaker ────────────────────
+
+describe('provider fallback circuit breaker', () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'golem-test-fallback-'));
+    await writeFile(
+      join(dir, 'golem.yaml'),
+      [
+        'name: test-bot',
+        'engine: claude-code',
+        'provider:',
+        '  apiKey: "sk-primary"',
+        '  failoverThreshold: 2',
+        '  fallback:',
+        '    apiKey: "sk-fallback"',
+      ].join('\n'),
+    );
+    await mkdir(join(dir, 'skills', 'general'), { recursive: true });
+    await writeFile(
+      join(dir, 'skills', 'general', 'SKILL.md'),
+      '---\nname: general\ndescription: General assistant\n---\n# General\n',
+    );
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+    vi.clearAllMocks();
+  });
+
+  async function drainChat(assistant: ReturnType<typeof createAssistant>, message = 'hello') {
+    const events: StreamEvent[] = [];
+    for await (const e of assistant.chat(message)) {
+      events.push(e);
+    }
+    return events;
+  }
+
+  it('uses primary provider when no failures', async () => {
+    let capturedProvider: unknown;
+    mockedCreateEngine.mockReturnValue({
+      async *invoke(_: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
+        capturedProvider = opts.provider;
+        yield { type: 'text', content: 'ok' };
+        yield { type: 'done', sessionId: 's1' };
+      },
+    });
+
+    const assistant = createAssistant({ dir });
+    await drainChat(assistant);
+    expect((capturedProvider as { apiKey?: string })?.apiKey).toBe('sk-primary');
+  });
+
+  it('resets failure count on success', async () => {
+    let callCount = 0;
+    let lastProvider: unknown;
+    mockedCreateEngine.mockReturnValue({
+      async *invoke(_: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
+        callCount++;
+        lastProvider = opts.provider;
+        if (callCount === 1) {
+          yield { type: 'error', message: 'temporary error' };
+        } else {
+          yield { type: 'text', content: 'success' };
+          yield { type: 'done', sessionId: 's1' };
+        }
+      },
+    });
+
+    const assistant = createAssistant({ dir });
+    await drainChat(assistant); // 1 failure → count = 1
+    await drainChat(assistant); // success → count resets to 0
+    await drainChat(assistant); // still uses primary
+    expect((lastProvider as { apiKey?: string })?.apiKey).toBe('sk-primary');
+  });
+
+  it('activates fallback after threshold failures and emits warning', async () => {
+    let capturedProvider: unknown;
+    mockedCreateEngine.mockReturnValue({
+      async *invoke(_: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
+        capturedProvider = opts.provider;
+        yield { type: 'error', message: 'provider unavailable' };
+      },
+    });
+
+    const assistant = createAssistant({ dir });
+    await drainChat(assistant); // failure 1
+    const events = await drainChat(assistant); // failure 2 → threshold reached
+
+    const warning = events.find((e) => e.type === 'warning');
+    expect(warning).toBeDefined();
+    expect((warning as { type: 'warning'; message: string }).message).toMatch(/fallback/i);
+
+    // Next call should use the fallback provider
+    mockedCreateEngine.mockReturnValue({
+      async *invoke(_: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
+        capturedProvider = opts.provider;
+        yield { type: 'text', content: 'fallback response' };
+        yield { type: 'done', sessionId: 's2' };
+      },
+    });
+
+    await drainChat(assistant);
+    expect((capturedProvider as { apiKey?: string })?.apiKey).toBe('sk-fallback');
+  });
+
+  it('stays on primary when no fallback is configured', async () => {
+    await writeFile(join(dir, 'golem.yaml'), 'name: test-bot\nengine: claude-code\nprovider:\n  apiKey: "sk-only"\n');
+    let capturedProvider: unknown;
+    mockedCreateEngine.mockReturnValue({
+      async *invoke(_: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
+        capturedProvider = opts.provider;
+        yield { type: 'error', message: 'error without fallback' };
+      },
+    });
+
+    const assistant = createAssistant({ dir });
+    for (let i = 0; i < 5; i++) {
+      await drainChat(assistant);
+    }
+    // Still using the only provider — no switch, no warning
+    expect((capturedProvider as { apiKey?: string })?.apiKey).toBe('sk-only');
+  });
+});

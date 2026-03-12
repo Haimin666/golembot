@@ -198,6 +198,12 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
   // Prune expired sessions once per process lifetime per assistant instance
   let pruneDone = false;
 
+  // Circuit breaker: track consecutive primary-provider failures in memory.
+  // Once primaryFailureCount reaches the threshold, all subsequent calls use
+  // provider.fallback until the assistant instance is restarted.
+  let primaryFailureCount = 0;
+  let usingFallback = false;
+
   async function* doChat(
     message: string,
     sessionKey: string,
@@ -207,7 +213,10 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     const { config, skills } = await ensureReady(dir);
 
     const engineType = engineOverride || config.engine;
-    const provider = providerOverride || config.provider;
+    const baseProvider = providerOverride || config.provider;
+    // Circuit breaker: route to fallback when the primary has failed too many times
+    const provider =
+      usingFallback && baseProvider?.fallback ? baseProvider.fallback : baseProvider;
     // Model priority: per-engine provider override > modelOverride > provider.model > config.model
     const model = provider?.models?.[engineType] || modelOverride || provider?.model || config.model;
     const engine: AgentEngine = createEngine(engineType);
@@ -322,6 +331,24 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
 
     if (lastSessionId) {
       await saveSession(dir, lastSessionId, sessionKey, engineType);
+    }
+
+    // Update circuit breaker state for the primary provider.
+    // Only track when a fallback is configured and we are still using the primary.
+    if (baseProvider?.fallback && !usingFallback) {
+      if (gotError) {
+        primaryFailureCount++;
+        const threshold = baseProvider.failoverThreshold ?? 3;
+        if (primaryFailureCount >= threshold) {
+          usingFallback = true;
+          yield {
+            type: 'warning' as const,
+            message: `Primary provider failed ${primaryFailureCount} time${primaryFailureCount === 1 ? '' : 's'} in a row. Switching to fallback provider.`,
+          };
+        }
+      } else {
+        primaryFailureCount = 0;
+      }
     }
 
     if (gotError && sessionId && !isRetry) {

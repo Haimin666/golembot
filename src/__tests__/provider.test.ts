@@ -193,6 +193,65 @@ describe('provider in golem.yaml', () => {
     const cfg = await loadConfig(dir);
     expect(cfg.provider).toEqual(provider);
   });
+
+  it('loadConfig parses provider.fallback', async () => {
+    await writeFile(
+      join(dir, 'golem.yaml'),
+      [
+        'name: bot',
+        'engine: claude-code',
+        'provider:',
+        '  apiKey: "sk-primary"',
+        '  model: "primary-model"',
+        '  failoverThreshold: 5',
+        '  fallback:',
+        '    apiKey: "sk-fallback"',
+        '    model: "fallback-model"',
+        '    baseUrl: "https://fallback.api.example.com/v1"',
+      ].join('\n'),
+    );
+    const cfg = await loadConfig(dir);
+    expect(cfg.provider?.apiKey).toBe('sk-primary');
+    expect(cfg.provider?.failoverThreshold).toBe(5);
+    expect(cfg.provider?.fallback?.apiKey).toBe('sk-fallback');
+    expect(cfg.provider?.fallback?.model).toBe('fallback-model');
+    expect(cfg.provider?.fallback?.baseUrl).toBe('https://fallback.api.example.com/v1');
+  });
+
+  it('loadConfig resolves ${ENV_VAR} in provider.fallback', async () => {
+    process.env.TEST_FALLBACK_KEY = 'fb-resolved-key';
+    await writeFile(
+      join(dir, 'golem.yaml'),
+      [
+        'name: bot',
+        'engine: claude-code',
+        'provider:',
+        '  apiKey: "sk-primary"',
+        '  fallback:',
+        '    apiKey: "${TEST_FALLBACK_KEY}"',
+      ].join('\n'),
+    );
+    const cfg = await loadConfig(dir);
+    expect(cfg.provider?.fallback?.apiKey).toBe('fb-resolved-key');
+    delete process.env.TEST_FALLBACK_KEY;
+  });
+
+  it('writeConfig/loadConfig round-trips provider.fallback and failoverThreshold', async () => {
+    const provider: ProviderConfig = {
+      apiKey: 'sk-primary',
+      model: 'primary-model',
+      failoverThreshold: 2,
+      fallback: {
+        apiKey: 'sk-fallback',
+        baseUrl: 'https://fallback.example.com/v1',
+      },
+    };
+    await writeConfig(dir, { name: 'test', engine: 'claude-code', provider });
+    const cfg = await loadConfig(dir);
+    expect(cfg.provider?.failoverThreshold).toBe(2);
+    expect(cfg.provider?.fallback?.apiKey).toBe('sk-fallback');
+    expect(cfg.provider?.fallback?.baseUrl).toBe('https://fallback.example.com/v1');
+  });
 });
 
 // ── discoverEngines ───────────────────────────────────────
