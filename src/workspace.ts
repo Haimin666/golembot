@@ -127,6 +127,15 @@ export interface ProviderConfig {
    * the fallback. Default: 3.
    */
   failoverThreshold?: number;
+  /**
+   * How long in milliseconds to wait before retrying the primary provider
+   * after switching to the fallback. Once the cooldown expires, the next
+   * request will attempt the primary again. If the primary succeeds the
+   * circuit resets; if it fails again, the fallback is reactivated.
+   * Set to 0 to disable automatic recovery (stay on fallback until restart).
+   * Default: 60000 (1 minute).
+   */
+  fallbackRecoveryMs?: number;
 }
 
 export interface GolemConfig {

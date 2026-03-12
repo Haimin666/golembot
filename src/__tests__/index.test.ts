@@ -804,4 +804,93 @@ describe('provider fallback circuit breaker', () => {
     // Still using the only provider — no switch, no warning
     expect((capturedProvider as { apiKey?: string })?.apiKey).toBe('sk-only');
   });
+
+  it('retries primary after fallbackRecoveryMs cooldown', async () => {
+    vi.useFakeTimers();
+    await writeFile(
+      join(dir, 'golem.yaml'),
+      [
+        'name: test-bot',
+        'engine: claude-code',
+        'provider:',
+        '  apiKey: "sk-primary"',
+        '  failoverThreshold: 2',
+        '  fallbackRecoveryMs: 5000',
+        '  fallback:',
+        '    apiKey: "sk-fallback"',
+      ].join('\n'),
+    );
+
+    const providers: string[] = [];
+    mockedCreateEngine.mockReturnValue({
+      async *invoke(_: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
+        providers.push((opts.provider as { apiKey?: string })?.apiKey ?? '');
+        // Fail for first 3 calls, succeed after cooldown
+        if (providers.length <= 3) {
+          yield { type: 'error', message: 'down' };
+        } else {
+          yield { type: 'text', content: 'ok' };
+          yield { type: 'done', sessionId: 's1' };
+        }
+      },
+    });
+
+    const assistant = createAssistant({ dir });
+    await drainChat(assistant); // failure 1 → primary
+    await drainChat(assistant); // failure 2 → threshold reached, switch to fallback
+    await drainChat(assistant); // still on fallback
+
+    expect(providers[0]).toBe('sk-primary');
+    expect(providers[1]).toBe('sk-primary');
+    expect(providers[2]).toBe('sk-fallback');
+
+    // Advance clock past the 5 s recovery window
+    vi.advanceTimersByTime(6000);
+
+    await drainChat(assistant); // recovery attempt → primary
+    expect(providers[3]).toBe('sk-primary');
+
+    vi.useRealTimers();
+  });
+
+  it('reactivates fallback if primary fails again after recovery', async () => {
+    vi.useFakeTimers();
+    await writeFile(
+      join(dir, 'golem.yaml'),
+      [
+        'name: test-bot',
+        'engine: claude-code',
+        'provider:',
+        '  apiKey: "sk-primary"',
+        '  failoverThreshold: 1',
+        '  fallbackRecoveryMs: 3000',
+        '  fallback:',
+        '    apiKey: "sk-fallback"',
+      ].join('\n'),
+    );
+
+    const providers: string[] = [];
+    mockedCreateEngine.mockReturnValue({
+      async *invoke(_: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
+        providers.push((opts.provider as { apiKey?: string })?.apiKey ?? '');
+        yield { type: 'error', message: 'still down' };
+      },
+    });
+
+    const assistant = createAssistant({ dir });
+    await drainChat(assistant); // failure 1 → switches to fallback
+    await drainChat(assistant); // on fallback
+
+    vi.advanceTimersByTime(4000); // recovery: back to primary
+
+    await drainChat(assistant); // primary tried again, fails → back to fallback
+    await drainChat(assistant); // on fallback again
+
+    expect(providers[0]).toBe('sk-primary');
+    expect(providers[1]).toBe('sk-fallback');
+    expect(providers[2]).toBe('sk-primary'); // recovery attempt
+    expect(providers[3]).toBe('sk-fallback'); // failed again, back to fallback
+
+    vi.useRealTimers();
+  });
 });
