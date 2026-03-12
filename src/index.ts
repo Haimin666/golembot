@@ -215,8 +215,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     const engineType = engineOverride || config.engine;
     const baseProvider = providerOverride || config.provider;
     // Circuit breaker: route to fallback when the primary has failed too many times
-    const provider =
-      usingFallback && baseProvider?.fallback ? baseProvider.fallback : baseProvider;
+    const provider = usingFallback && baseProvider?.fallback ? baseProvider.fallback : baseProvider;
     // Model priority: per-engine provider override > modelOverride > provider.model > config.model
     const model = provider?.models?.[engineType] || modelOverride || provider?.model || config.model;
     const engine: AgentEngine = createEngine(engineType);

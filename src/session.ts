@@ -1,5 +1,5 @@
-import { appendFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { join, basename } from 'node:path';
+import { appendFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 const GOLEM_DIR = '.golem';
 const SESSION_FILE = 'sessions.json';
@@ -114,11 +114,7 @@ export async function listHistoryFiles(dir: string): Promise<string[]> {
   }
 }
 
-export async function readHistory(
-  dir: string,
-  sessionKey: string,
-  limit?: number,
-): Promise<HistoryEntry[]> {
+export async function readHistory(dir: string, sessionKey: string, limit?: number): Promise<HistoryEntry[]> {
   const path = historyPath(dir, sessionKey);
   try {
     const raw = await readFile(path, 'utf-8');
