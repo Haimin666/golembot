@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { isOnPath } from './engine.js';
-import { loadConfig, scanSkills } from './workspace.js';
+import { loadConfig, type ProviderConfig, scanSkills } from './workspace.js';
 
 const GREEN = '\x1b[32m';
 const RED = '\x1b[31m';
@@ -28,9 +28,11 @@ export async function runDoctor(dir: string): Promise<void> {
 
   // 2. golem.yaml exists and is valid
   let engine = '';
+  let providerConfig: ProviderConfig | undefined;
   try {
     const config = await loadConfig(dir);
     engine = config.engine;
+    providerConfig = config.provider;
     results.push({
       name: 'golem.yaml',
       ok: true,
@@ -102,6 +104,35 @@ export async function runDoctor(dir: string): Promise<void> {
       ok: false,
       detail: 'could not scan skills directory',
     });
+  }
+
+  // 6. Provider config (if set in golem.yaml)
+  if (providerConfig) {
+    const apiKey = providerConfig.apiKey;
+    const keyResolved = apiKey && !apiKey.includes('${');
+    results.push({
+      name: 'Provider apiKey',
+      ok: !!keyResolved,
+      detail: keyResolved
+        ? 'set'
+        : apiKey
+          ? `unresolved placeholder — set the env var (${apiKey})`
+          : 'not set — add apiKey to provider block in golem.yaml',
+    });
+
+    if (providerConfig.fallback) {
+      const fbKey = providerConfig.fallback.apiKey;
+      const fbResolved = fbKey && !fbKey.includes('${');
+      results.push({
+        name: 'Provider fallback apiKey',
+        ok: !!fbResolved,
+        detail: fbResolved
+          ? 'set'
+          : fbKey
+            ? `unresolved placeholder — set the env var (${fbKey})`
+            : 'not set — add apiKey to provider.fallback block in golem.yaml',
+      });
+    }
   }
 
   // Output
