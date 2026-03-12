@@ -253,6 +253,34 @@ curl -s https://your-provider/v1/responses \
   -d '{"model":"model-name","input":[{"role":"user","content":"hello"}]}'
 ```
 
+## Automatic Fallback
+
+When a provider becomes unreliable, GolemBot can automatically switch to a backup. Add a `fallback` block inside `provider`:
+
+```yaml
+provider:
+  apiKey: ${MINIMAX_API_KEY}
+  baseUrl: https://api.minimaxi.com/anthropic
+  model: MiniMax-M2.5
+  failoverThreshold: 3          # consecutive errors before switching (default: 3)
+  fallback:
+    apiKey: ${OPENROUTER_API_KEY}
+    baseUrl: https://openrouter.ai/api
+    model: anthropic/claude-sonnet-4
+```
+
+### How it works
+
+1. Each `chat()` call goes to the **primary** provider.
+2. On error, a failure counter increments. On success, the counter resets to 0.
+3. When the counter reaches `failoverThreshold` (default: 3), GolemBot switches to `fallback` and emits a `warning` StreamEvent so IM channels can notify users.
+4. All subsequent calls use the fallback until the assistant instance is restarted.
+5. When no `fallback` is configured, the circuit breaker is a no-op (zero overhead).
+
+::: tip Validate with `golembot doctor`
+`golembot doctor` checks that both `provider.apiKey` and `provider.fallback.apiKey` are set and resolved. Run it after configuring fallback to catch missing env vars early.
+:::
+
 ## Backward Compatibility
 
 The `provider` feature is **fully backward compatible**. Existing configurations without a `provider` block work exactly as before:

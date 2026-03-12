@@ -247,6 +247,8 @@ Route any engine to a third-party LLM API. See [Provider Routing](/guide/provide
 | `apiKey` | `string` | API key (supports `${ENV_VAR}` placeholders) |
 | `model` | `string` | Default model for all engines |
 | `models` | `object` | Per-engine model overrides (key = engine name) |
+| `fallback` | `object` | Secondary provider config — GolemBot switches to this after consecutive failures. Same fields as `provider` (except nested `fallback` is ignored) |
+| `failoverThreshold` | `number` | Consecutive errors before activating fallback (default: `3`) |
 
 ### `gateway`
 
@@ -416,6 +418,12 @@ interface GolemConfig {
     apiKey?: string;
     model?: string;
     models?: Record<string, string>;
+    fallback?: {                 // secondary provider for automatic failover
+      baseUrl?: string;
+      apiKey?: string;
+      model?: string;
+    };
+    failoverThreshold?: number;  // default: 3
   };
   gateway?: {
     port?: number;

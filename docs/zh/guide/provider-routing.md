@@ -253,6 +253,34 @@ curl -s https://your-provider/v1/responses \
   -d '{"model":"model-name","input":[{"role":"user","content":"hello"}]}'
 ```
 
+## 自动 Fallback
+
+当供应商变得不稳定时，GolemBot 可以自动切换到备用供应商。在 `provider` 中添加 `fallback` 块：
+
+```yaml
+provider:
+  apiKey: ${MINIMAX_API_KEY}
+  baseUrl: https://api.minimaxi.com/anthropic
+  model: MiniMax-M2.5
+  failoverThreshold: 3          # 连续错误多少次后切换（默认：3）
+  fallback:
+    apiKey: ${OPENROUTER_API_KEY}
+    baseUrl: https://openrouter.ai/api
+    model: anthropic/claude-sonnet-4
+```
+
+### 工作原理
+
+1. 每次 `chat()` 调用发往**主供应商**。
+2. 出错时失败计数器递增；成功时计数器重置为 0。
+3. 计数器达到 `failoverThreshold`（默认 3）时，GolemBot 切换到 `fallback` 并 emit 一个 `warning` StreamEvent，IM 通道可以据此通知用户。
+4. 之后所有调用都使用 fallback，直到 assistant 实例重启。
+5. 未配置 `fallback` 时，circuit breaker 完全不执行（零开销）。
+
+::: tip 用 `golembot doctor` 验证
+`golembot doctor` 会检查 `provider.apiKey` 和 `provider.fallback.apiKey` 是否已设置且已解析。配置 fallback 后运行它，可以提前发现环境变量缺失。
+:::
+
 ## 向后兼容性
 
 `provider` 功能**完全向后兼容**。没有 `provider` 配置块的现有配置行为不变：
