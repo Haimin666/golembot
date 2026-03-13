@@ -4,7 +4,7 @@ layout: home
 hero:
   name: GolemBot
   text: Any Agent × Any Provider × Anywhere
-  tagline: Connect Cursor, Claude Code, OpenCode, or Codex to IM platforms, HTTP APIs, or your own product — with any LLM provider. Compatible with 13,000+ OpenClaw community skills.
+  tagline: Turn your Coding Agent into a deployable AI assistant. Connect to IM, HTTP, or embed in your product.
   image:
     light: /logo-icon-light.svg
     dark: /logo-icon-dark.svg
@@ -14,12 +14,6 @@ hero:
       text: Get Started
       link: /guide/getting-started
     - theme: alt
-      text: API Reference
-      link: /api/create-assistant
-    - theme: alt
-      text: Browse Skills
-      link: /skills/overview
-    - theme: alt
       text: Join Discord
       link: https://discord.gg/tgU5FXChgM
 
@@ -27,25 +21,18 @@ features:
   - icon:
       src: /icons/cpu.svg
     title: Your Agent Is the Brain
-    details: GolemBot doesn't reinvent AI. It uses the Coding Agent you already have — Cursor, Claude Code, OpenCode, or Codex — as the engine. When the agent gets smarter, your assistant gets smarter automatically.
+    details: Use the Coding Agent you already have as the engine. When the agent gets smarter, your assistant gets smarter.
   - icon: "&#x1F310;"
     title: Provider Routing
-    details: 4 engines × unlimited providers. Route Claude Code, Codex, OpenCode, or Cursor to OpenRouter, MiniMax, DeepSeek, SiliconFlow, or any compatible API. One config block — zero code changes, zero CLI modifications.
+    details: 4 engines × unlimited providers. Route any engine to OpenRouter, DeepSeek, SiliconFlow, or any compatible API — one config block.
   - icon:
       src: /icons/plug.svg
     title: Connect Anywhere
-    details: Connect to Slack, Telegram, Discord, Feishu, DingTalk, WeCom, or HTTP out of the box — no public URL required. Write a custom adapter to plug in email, GitHub Issues, or any other source. Or embed as a library in Express, Next.js, or any Node.js app in 5 lines.
+    details: Slack, Telegram, Discord, Feishu, DingTalk, WeCom, HTTP — out of the box, no public URL. Or embed as a library in 5 lines.
   - icon:
       src: /icons/clawhub.png
     title: 13,000+ OpenClaw Skills
-    details: Fully compatible with the OpenClaw ecosystem. Search and install skills from ClawHub — the largest AI agent skill marketplace — with one command. Your agent can even discover and install skills autonomously during conversations.
-  - icon:
-      src: /icons/folder.svg
-    title: Directory Is the Assistant
-    details: Skills, memory, config, and work artifacts all live in one directory. Fully transparent, version-controllable, and shareable via git.
-  - icon: "&#x23F0;"
-    title: Scheduled Tasks
-    details: Define cron tasks in golem.yaml — daily standups, dependency audits, test health reports. The agent runs on schedule and pushes results to Slack, Telegram, Feishu, or any channel. Manage with /cron commands from CLI, HTTP, or IM.
+    details: Search and install community skills from ClawHub with one command. Your agent can even discover and install skills autonomously.
 ---
 
 <div class="home-content">
@@ -197,6 +184,8 @@ Connect to any message source. Built-in adapters need no public URL. Add `_adapt
 </div>
 
 <style>
+/* ── Layout ──────────────────────────────────────────── */
+
 .home-content {
   max-width: 960px;
   margin: 0 auto;
@@ -206,15 +195,36 @@ Connect to any message source. Built-in adapters need no public URL. Add `_adapt
 .home-content h2 {
   font-size: 24px;
   font-weight: 700;
-  margin: 64px 0 16px;
+  margin: 72px 0 20px;
   border-bottom: none;
+  letter-spacing: -0.02em;
 }
 
-/* Light mode background texture */
-html:not(.dark) body {
-  background-image: radial-gradient(var(--vp-c-divider) 1px, transparent 1px);
-  background-size: 24px 24px;
+/* ── Stagger entrance animation ─────────────────────── */
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
+.engines-grid,
+.channels-grid,
+.demo-section,
+.home-content > .vp-doc {
+  animation: fadeSlideUp 600ms cubic-bezier(0.25, 1, 0.3, 1) both;
+}
+
+.demo-section { animation-delay: 0ms; }
+.engines-grid { animation-delay: 80ms; }
+.channels-grid { animation-delay: 160ms; }
+
+/* ── Engines grid ────────────────────────────────────── */
 
 .engines-grid {
   display: grid;
@@ -223,26 +233,21 @@ html:not(.dark) body {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.channels-grid {
-  display: grid;
-  gap: 16px;
-  margin-top: 24px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .engine-card {
   position: relative;
   background: var(--vp-c-bg-soft);
   border: 1px solid var(--vp-c-divider);
   border-radius: 16px;
-  padding: 32px 24px;
+  padding: 24px 20px;
   text-align: left;
-  transition: transform 0.4s cubic-bezier(0.25, 1, 0.3, 1), box-shadow 0.4s, border-color 0.4s;
+  transition:
+    transform 400ms cubic-bezier(0.25, 1, 0.3, 1),
+    box-shadow 400ms cubic-bezier(0.25, 1, 0.3, 1),
+    border-color 250ms ease-out;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  min-height: 280px;
 }
 
 html:not(.dark) .engine-card {
@@ -258,7 +263,7 @@ html:not(.dark) .engine-card {
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--vp-c-brand-1), transparent);
   opacity: 0;
-  transition: opacity 0.3s;
+  transition: opacity 250ms ease-out;
 }
 
 .engine-card:hover::before {
@@ -275,6 +280,85 @@ html:not(.dark) .engine-card {
   box-shadow: 0 8px 32px var(--vp-c-brand-soft);
 }
 
+.engine-icon {
+  width: 40px;
+  height: 40px;
+  margin: 0 0 16px 0;
+  transition: transform 400ms cubic-bezier(0.25, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.engine-icon-cursor { color: #1a1a1a; }
+.dark .engine-icon-cursor { color: #e8e8e8; }
+
+.engine-icon-claude { color: #D97757; }
+
+.engine-icon-opencode { color: #2a2626; }
+.dark .engine-icon-opencode { color: #F1ECEC; }
+
+.engine-icon-codex { color: #412991; }
+.dark .engine-icon-codex { color: #a78bfa; }
+
+.engine-name {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+  transition: color 250ms ease-out;
+}
+
+.engine-desc {
+  font-size: 13px;
+  color: var(--vp-c-text-2);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.engine-env {
+  margin-top: auto;
+  padding-top: 16px;
+  width: 100%;
+}
+
+.engine-card:hover .engine-name {
+  color: var(--vp-c-text-1);
+}
+
+.engine-card:hover .engine-icon {
+  transform: scale(1.08) translateY(-2px);
+}
+
+.engine-env code {
+  font-family: var(--vp-font-family-mono);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--vp-c-bg-mute);
+  color: var(--vp-c-text-2);
+  border: 1px solid var(--vp-c-divider);
+  display: inline-block;
+  word-break: break-all;
+  transition:
+    color 250ms ease-out,
+    border-color 250ms ease-out,
+    background 250ms ease-out;
+}
+
+.engine-card:hover .engine-env code {
+  color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-soft);
+  background: var(--vp-c-brand-soft);
+}
+
+/* ── Channels grid ───────────────────────────────────── */
+
+.channels-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .channel-card {
   position: relative;
   background: var(--vp-c-bg-soft);
@@ -282,7 +366,10 @@ html:not(.dark) .engine-card {
   border-radius: 12px;
   padding: 16px 20px;
   text-align: left;
-  transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+  transition:
+    transform 250ms cubic-bezier(0.25, 1, 0.3, 1),
+    border-color 250ms ease-out,
+    box-shadow 250ms ease-out;
   display: grid;
   grid-template-columns: 36px 1fr;
   grid-template-rows: auto auto;
@@ -305,6 +392,11 @@ html:not(.dark) .channel-card {
   box-shadow: 0 4px 20px var(--vp-c-brand-soft);
 }
 
+.channel-card:focus-within {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+
 .card-link {
   position: absolute;
   inset: 0;
@@ -312,70 +404,8 @@ html:not(.dark) .channel-card {
   z-index: 10;
 }
 
-.engine-icon {
-  width: 48px;
-  height: 48px;
-  margin: 0 0 20px 0;
-  transition: transform 0.4s cubic-bezier(0.25, 1, 0.3, 1);
-  flex-shrink: 0;
-}
-
-.engine-icon-cursor { color: #000; }
-.dark .engine-icon-cursor { color: #fff; }
-
-.engine-icon-claude { color: #D97757; }
-
-.engine-icon-opencode { color: #211E1E; }
-.dark .engine-icon-opencode { color: #F1ECEC; }
-
-.engine-icon-codex { color: #412991; }
-.dark .engine-icon-codex { color: #a78bfa; }
-
-.engine-name {
-  font-size: 22px;
-  font-weight: 700;
-  margin-bottom: 8px;
-  letter-spacing: -0.01em;
-  transition: color 0.4s;
-}
-
-.engine-desc {
-  font-size: 14px;
-  color: var(--vp-c-text-2);
-  margin-bottom: 24px;
-  line-height: 1.6;
-}
-
-.engine-env {
-  margin-top: auto;
-  padding-top: 20px;
-  width: 100%;
-}
-
-.engine-card:hover .engine-name {
-  color: var(--vp-c-text-1);
-}
-
-.engine-card:hover .engine-icon {
-  transform: scale(1.1) translateY(-4px);
-}
-
-.engine-env code {
-  font-family: var(--vp-font-family-mono);
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  background: var(--vp-c-bg-mute);
-  color: var(--vp-c-text-2);
-  border: 1px solid var(--vp-c-divider);
-  display: inline-block;
-  word-break: break-all;
-}
-
-.engine-card:hover .engine-env code {
-  color: var(--vp-c-brand-1);
-  border-color: var(--vp-c-brand-soft);
-  background: var(--vp-c-brand-soft);
+.card-link:focus-visible {
+  outline: none;
 }
 
 .channel-icon {
@@ -399,7 +429,7 @@ html:not(.dark) .channel-card {
 .channel-name {
   grid-column: 2;
   grid-row: 1;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   margin-bottom: 0;
 }
@@ -412,32 +442,10 @@ html:not(.dark) .channel-card {
   margin-top: 2px;
 }
 
-@media (max-width: 960px) {
-  .engines-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 768px) {
-  .engines-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .channels-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 480px) {
-  .engines-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .channels-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
+/* ── Demo section ────────────────────────────────────── */
 
 .demo-section {
-  margin: 64px 0 32px;
+  margin: 72px 0 40px;
   text-align: center;
 }
 
@@ -450,7 +458,11 @@ html:not(.dark) .channel-card {
   background: var(--vp-c-bg-soft);
   border: 1px solid var(--vp-c-divider);
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.05);
-  transition: box-shadow 0.3s, border-color 0.3s;
+  transition: box-shadow 250ms ease-out, border-color 250ms ease-out;
+}
+
+.demo-window:hover {
+  box-shadow: 0 28px 56px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.05);
 }
 
 html:not(.dark) .demo-window {
@@ -461,6 +473,10 @@ html:not(.dark) .demo-window {
 .dark .demo-window {
   box-shadow: 0 0 0 1px rgba(125, 249, 255, 0.05), 0 12px 48px rgba(0, 0, 0, 0.4), 0 0 64px rgba(79, 195, 247, 0.08);
   border: 1px solid rgba(125, 249, 255, 0.1);
+}
+
+.dark .demo-window:hover {
+  box-shadow: 0 0 0 1px rgba(125, 249, 255, 0.08), 0 16px 56px rgba(0, 0, 0, 0.5), 0 0 80px rgba(79, 195, 247, 0.12);
 }
 
 .demo-titlebar {
@@ -494,14 +510,14 @@ html:not(.dark) .demo-window {
 }
 
 .demo-titlebar-text::before {
-  content: '❯';
+  content: '\276F';
   color: var(--vp-c-brand-1);
 }
 
 .demo-window video {
   width: 100%;
   display: block;
-  background: #000;
+  background: #0a0a0a;
 }
 
 .demo-caption {
@@ -509,5 +525,34 @@ html:not(.dark) .demo-window {
   font-size: 15px;
   color: var(--vp-c-text-2);
   font-weight: 500;
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+
+@media (max-width: 960px) {
+  .engines-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .channels-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .engines-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .channels-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .engines-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .channels-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

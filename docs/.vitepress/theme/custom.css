@@ -1,50 +1,92 @@
-/* GolemBot brand colors — clay brown + cyan glow */
+/* GolemBot brand colors — clay brown + teal */
 
 :root {
-  --vp-c-brand-1: #4FC3F7;
-  --vp-c-brand-2: #29B6F6;
-  --vp-c-brand-3: #03A9F4;
-  --vp-c-brand-soft: rgba(79, 195, 247, 0.14);
+  --vp-c-brand-1: #3BA0A8;
+  --vp-c-brand-2: #2E8E96;
+  --vp-c-brand-3: #257A82;
+  --vp-c-brand-soft: rgba(59, 160, 168, 0.14);
 
   --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: linear-gradient(135deg, #D4A574 10%, #4FC3F7);
+  --vp-home-hero-name-background: linear-gradient(135deg, #D4A574 20%, #3BA0A8);
 
-  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(212, 165, 116, 0.4) 30%, rgba(79, 195, 247, 0.4));
+  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(212, 165, 116, 0.4) 30%, rgba(59, 160, 168, 0.4));
   --vp-home-hero-image-filter: blur(64px);
 }
 
 .dark {
-  --vp-c-brand-1: #7DF9FF;
-  --vp-c-brand-2: #4FC3F7;
-  --vp-c-brand-3: #29B6F6;
-  --vp-c-brand-soft: rgba(125, 249, 255, 0.15);
+  --vp-c-brand-1: #7CC8CC;
+  --vp-c-brand-2: #5BB0B4;
+  --vp-c-brand-3: #3BA0A8;
+  --vp-c-brand-soft: rgba(124, 200, 204, 0.12);
 
-  --vp-home-hero-name-background: linear-gradient(135deg, #D4A574 10%, #7DF9FF);
+  --vp-home-hero-name-background: linear-gradient(135deg, #E0C09A 20%, #7CC8CC);
 
-  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(212, 165, 116, 0.5) 30%, rgba(125, 249, 255, 0.4));
+  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(224, 192, 154, 0.4) 30%, rgba(124, 200, 204, 0.3));
 }
 
-/* Subtle tech grid in dark mode */
+/* Subtle tech grid in dark mode — warmer tone */
 html.dark body {
-  background-image: 
-    linear-gradient(rgba(125, 249, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(125, 249, 255, 0.03) 1px, transparent 1px);
+  background-image:
+    linear-gradient(rgba(124, 200, 204, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 200, 204, 0.025) 1px, transparent 1px);
   background-size: 32px 32px;
   background-position: center top;
 }
 
-/* Hero image sizing — show only the golem head icon */
+/* Light mode background texture */
+html:not(.dark) body {
+  background-image: radial-gradient(var(--vp-c-divider) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ── Hero refinements ────────────────────────────────── */
+
 .VPHero .VPImage {
   max-width: 180px;
   max-height: 180px;
 }
 
-/* Social link icons — use brand colors instead of theme gray */
+.VPHero .tagline {
+  line-height: 1.5;
+  max-width: 560px;
+}
+
+/* ── Feature cards — break uniform look ──────────────── */
+
+.VPFeatures .VPFeature {
+  transition:
+    transform 300ms cubic-bezier(0.25, 1, 0.3, 1),
+    box-shadow 300ms cubic-bezier(0.25, 1, 0.3, 1),
+    border-color 200ms ease-out;
+}
+
+.VPFeatures .VPFeature:hover {
+  transform: translateY(-3px);
+  border-color: var(--vp-c-brand-1);
+  box-shadow: 0 8px 24px var(--vp-c-brand-soft);
+}
+
+.VPFeature .icon {
+  font-size: 28px;
+}
+
+/* ── Section headings — visual rhythm ────────────────── */
+
+.home-content h2 {
+  letter-spacing: -0.02em;
+}
+
+.home-content h2:first-of-type {
+  font-size: 28px;
+}
+
+/* ── Social links ────────────────────────────────────── */
+
 .VPSocialLinks .VPSocialLink[href*="github"] {
   color: #333;
 }
 .dark .VPSocialLinks .VPSocialLink[href*="github"] {
-  color: #fff;
+  color: #e8e8e8;
 }
 .VPSocialLinks .VPSocialLink[href*="discord"] {
   color: #5865F2;
@@ -53,7 +95,14 @@ html.dark body {
   color: #CB3837;
 }
 
-/* Feature card icon sizing fix */
-.VPFeature .icon {
-  font-size: 28px;
+/* ── Reduced motion ─────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
