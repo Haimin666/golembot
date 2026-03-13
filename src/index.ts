@@ -200,9 +200,12 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
 
   // Circuit breaker: track consecutive primary-provider failures in memory.
   // Once primaryFailureCount reaches the threshold, all subsequent calls use
-  // provider.fallback until the assistant instance is restarted.
+  // provider.fallback. A recovery timer periodically resets the circuit so the
+  // primary is retried — if it succeeds the circuit closes; if it fails again
+  // the fallback is reactivated.
   let primaryFailureCount = 0;
   let usingFallback = false;
+  let recoveryTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function* doChat(
     message: string,
@@ -340,13 +343,31 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
         const threshold = baseProvider.failoverThreshold ?? 3;
         if (primaryFailureCount >= threshold) {
           usingFallback = true;
+          const recoveryMs = baseProvider.fallbackRecoveryMs ?? 60_000;
+          const recoveryNote = recoveryMs > 0 ? ` Will retry primary in ${Math.round(recoveryMs / 1000)}s.` : '';
           yield {
             type: 'warning' as const,
-            message: `Primary provider failed ${primaryFailureCount} time${primaryFailureCount === 1 ? '' : 's'} in a row. Switching to fallback provider.`,
+            message: `Primary provider failed ${primaryFailureCount} time${primaryFailureCount === 1 ? '' : 's'} in a row. Switching to fallback provider.${recoveryNote}`,
           };
+          // Schedule automatic recovery: after the cooldown, tentatively
+          // reset to the primary. The next chat call will test it; if it
+          // fails again the fallback will be reactivated.
+          if (recoveryMs > 0) {
+            if (recoveryTimer) clearTimeout(recoveryTimer);
+            recoveryTimer = setTimeout(() => {
+              usingFallback = false;
+              primaryFailureCount = 0;
+              recoveryTimer = null;
+            }, recoveryMs);
+          }
         }
       } else {
         primaryFailureCount = 0;
+        // Primary recovered — cancel any pending recovery timer (already back on primary)
+        if (recoveryTimer) {
+          clearTimeout(recoveryTimer);
+          recoveryTimer = null;
+        }
       }
     }
 
