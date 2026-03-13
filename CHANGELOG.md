@@ -1,3 +1,16 @@
+# [0.28.0](https://github.com/0xranx/golembot/compare/v0.27.0...v0.28.0) (2026-03-13)
+
+
+### Bug Fixes
+
+* **lint:** apply Biome formatting and remove unused import ([1b0eec9](https://github.com/0xranx/golembot/commit/1b0eec92cfdc8d05ae9fbb28089c28472ebb7bc2))
+* **provider:** strip nested fallback chains in loadConfig ([dd13d0a](https://github.com/0xranx/golembot/commit/dd13d0a5914e4e6f30da4428287030d22c4a964f))
+
+
+### Features
+
+* **provider:** add primary-provider recovery after fallback cooldown ([aec7f8d](https://github.com/0xranx/golembot/commit/aec7f8dfff95f19f16ea26f72656325525765a8c))
+
 # [0.27.0](https://github.com/0xranx/golembot/compare/v0.26.0...v0.27.0) (2026-03-12)
 
 
