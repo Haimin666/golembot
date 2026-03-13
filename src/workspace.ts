@@ -228,7 +228,15 @@ export async function loadConfig(dir: string): Promise<GolemConfig> {
     config.permissions = doc.permissions as PermissionsConfig;
   }
   if (doc.provider && typeof doc.provider === 'object') {
-    config.provider = resolveEnvPlaceholders(doc.provider as ProviderConfig);
+    const provider = resolveEnvPlaceholders(doc.provider as ProviderConfig);
+    // Guard against nested fallback chains (fallback.fallback.fallback...).
+    // Only one level of fallback is supported; strip any deeper nesting here
+    // so runtime code never has to defend against it.
+    if (provider.fallback) {
+      const { fallback: _nested, ...cleanFallback } = provider.fallback;
+      provider.fallback = cleanFallback as ProviderConfig;
+    }
+    config.provider = provider;
   }
   if (doc.historyFetch && typeof doc.historyFetch === 'object') {
     const hf = doc.historyFetch as Record<string, unknown>;

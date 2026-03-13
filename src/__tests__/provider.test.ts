@@ -252,6 +252,27 @@ describe('provider in golem.yaml', () => {
     expect(cfg.provider?.fallback?.apiKey).toBe('sk-fallback');
     expect(cfg.provider?.fallback?.baseUrl).toBe('https://fallback.example.com/v1');
   });
+
+  it('loadConfig strips nested fallback chains beyond one level', async () => {
+    await writeFile(
+      join(dir, 'golem.yaml'),
+      [
+        'name: bot',
+        'engine: claude-code',
+        'provider:',
+        '  apiKey: "sk-primary"',
+        '  fallback:',
+        '    apiKey: "sk-fallback"',
+        '    fallback:',
+        '      apiKey: "sk-deep"',
+        '      fallback:',
+        '        apiKey: "sk-deeper"',
+      ].join('\n'),
+    );
+    const cfg = await loadConfig(dir);
+    expect(cfg.provider?.fallback?.apiKey).toBe('sk-fallback');
+    expect((cfg.provider?.fallback as Record<string, unknown>)?.fallback).toBeUndefined();
+  });
 });
 
 // ── discoverEngines ───────────────────────────────────────
