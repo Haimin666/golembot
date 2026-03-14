@@ -11,6 +11,7 @@ import {
   pruneExpiredSessions,
   saveSession,
 } from './session.js';
+import { daysUntilExpiry, ensureTokenMeta } from './token-meta.js';
 import {
   ensureReady,
   type GolemConfig,
@@ -207,6 +208,12 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
   let usingFallback = false;
   let recoveryTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // OAuth token expiry warning: emit at most once per hour
+  let lastExpiryWarningAt = 0;
+  function canEmitExpiryWarning(): boolean {
+    return Date.now() - lastExpiryWarningAt > 3_600_000;
+  }
+
   async function* doChat(
     message: string,
     sessionKey: string,
@@ -222,6 +229,19 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     // Model priority: per-engine provider override > modelOverride > provider.model > config.model
     const model = provider?.models?.[engineType] || modelOverride || provider?.model || config.model;
     const engine: AgentEngine = createEngine(engineType);
+
+    // OAuth token expiry warning (rate-limited: once per hour)
+    if (config.oauthToken && canEmitExpiryWarning()) {
+      const meta = await ensureTokenMeta(join(dir, '.golem'), config.oauthToken);
+      const daysLeft = daysUntilExpiry(meta);
+      if (daysLeft <= 30) {
+        lastExpiryWarningAt = Date.now();
+        yield {
+          type: 'warning' as const,
+          message: `Claude Max OAuth token expires in ~${daysLeft} days. Run \`claude setup-token\` to renew.`,
+        };
+      }
+    }
 
     const sessionId = await loadSession(dir, sessionKey, engineType);
     const skillPaths = skills.map((s) => s.path);
@@ -299,6 +319,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
         imagePaths: imagePaths.length > 0 ? imagePaths : undefined,
         hasPermissionsConfig: !!config.permissions,
         provider,
+        oauthToken: config.oauthToken,
       })) {
         if (event.type === 'done') {
           if (event.sessionId) lastSessionId = event.sessionId;
@@ -368,6 +389,21 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
           clearTimeout(recoveryTimer);
           recoveryTimer = null;
         }
+      }
+    }
+
+    // Detect OAuth token authentication failures
+    if (gotError && config.oauthToken) {
+      const lower = errorMessage.toLowerCase();
+      const isAuthError = ['401', 'unauthorized', 'authentication', 'token expired', 'invalid token'].some((kw) =>
+        lower.includes(kw),
+      );
+      if (isAuthError) {
+        yield {
+          type: 'warning' as const,
+          message:
+            'Authentication failed — your Claude Max OAuth token may have expired. Run `claude setup-token` to generate a new one.',
+        };
       }
     }
 

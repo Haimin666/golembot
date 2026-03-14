@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { isOnPath } from './engine.js';
+import { daysUntilExpiry, loadTokenMeta } from './token-meta.js';
 import { loadConfig, type ProviderConfig, scanSkills } from './workspace.js';
 
 const GREEN = '\x1b[32m';
@@ -29,10 +30,12 @@ export async function runDoctor(dir: string): Promise<void> {
   // 2. golem.yaml exists and is valid
   let engine = '';
   let providerConfig: ProviderConfig | undefined;
+  let oauthToken: string | undefined;
   try {
     const config = await loadConfig(dir);
     engine = config.engine;
     providerConfig = config.provider;
+    oauthToken = config.oauthToken;
     results.push({
       name: 'golem.yaml',
       ok: true,
@@ -132,6 +135,29 @@ export async function runDoctor(dir: string): Promise<void> {
             ? `unresolved placeholder — set the env var (${fbKey})`
             : 'not set — add apiKey to provider.fallback block in golem.yaml',
       });
+    }
+  }
+
+  // 7. Claude Max OAuth token (setup-token)
+  if (engine === 'claude-code' && oauthToken) {
+    const resolved = !oauthToken.includes('${');
+    results.push({
+      name: 'Claude Max OAuth token',
+      ok: resolved,
+      detail: resolved ? 'set' : `unresolved placeholder (${oauthToken})`,
+    });
+
+    if (resolved) {
+      const meta = await loadTokenMeta(join(dir, '.golem'));
+      if (meta) {
+        const days = daysUntilExpiry(meta);
+        results.push({
+          name: 'OAuth token expiry',
+          ok: days > 30,
+          detail:
+            days > 30 ? `~${days} days remaining` : `expires in ~${days} days — run \`claude setup-token\` to renew`,
+        });
+      }
     }
   }
 

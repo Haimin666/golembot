@@ -193,7 +193,11 @@ export class ClaudeCodeEngine implements AgentEngine {
     if (opts.provider && opts.model && !env.ANTHROPIC_MODEL) {
       env.ANTHROPIC_MODEL = opts.model;
     }
-    if (opts.apiKey) env.ANTHROPIC_API_KEY = opts.apiKey;
+    if (opts.oauthToken) {
+      env.CLAUDE_CODE_OAUTH_TOKEN = opts.oauthToken;
+      // OAuth token and API key are mutually exclusive; OAuth takes precedence
+      delete env.ANTHROPIC_API_KEY;
+    } else if (opts.apiKey) env.ANTHROPIC_API_KEY = opts.apiKey;
     // Allow spawning Claude Code from within a Claude Code session
     delete env.CLAUDECODE;
     delete env.CLAUDE_CODE_ENTRYPOINT;

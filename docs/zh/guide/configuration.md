@@ -142,6 +142,7 @@ gateway:
 | `channels` | `object` | — | IM 通道配置 |
 | `inbox` | `object` | — | 持久化消息队列，详见 [`inbox`](#inbox) |
 | `historyFetch` | `object` | — | 历史消息抓取，详见 [`historyFetch`](#historyfetch) |
+| `oauthToken` | `string` | — | Claude Max 订阅 token（通过 `claude setup-token` 生成），仅 Claude Code 引擎。详见 [Claude Code](/zh/engines/claude-code#claude-max-订阅) |
 | `provider` | `object` | — | 第三方 LLM 供应商路由，详见 [Provider 路由](/zh/guide/provider-routing) |
 | `gateway` | `object` | — | Gateway 服务设置 |
 
@@ -407,6 +408,7 @@ interface GolemConfig {
     };
     failoverThreshold?: number;  // 默认：3
   };
+  oauthToken?: string;           // Claude Max setup-token（仅 claude-code 引擎）
   gateway?: {
     port?: number;
     host?: string;

@@ -273,6 +273,31 @@ describe('provider in golem.yaml', () => {
     expect(cfg.provider?.fallback?.apiKey).toBe('sk-fallback');
     expect((cfg.provider?.fallback as Record<string, unknown>)?.fallback).toBeUndefined();
   });
+  it('loadConfig parses oauthToken with env var placeholder', async () => {
+    process.env.TEST_OAUTH_TOKEN = 'sk-ant-oat01-test-token';
+    await writeFile(
+      join(dir, 'golem.yaml'),
+      ['name: bot', 'engine: claude-code', 'oauthToken: "${TEST_OAUTH_TOKEN}"'].join('\n'),
+    );
+    const cfg = await loadConfig(dir);
+    expect(cfg.oauthToken).toBe('sk-ant-oat01-test-token');
+    delete process.env.TEST_OAUTH_TOKEN;
+  });
+
+  it('loadConfig parses oauthToken as plain string', async () => {
+    await writeFile(
+      join(dir, 'golem.yaml'),
+      ['name: bot', 'engine: claude-code', 'oauthToken: "sk-ant-oat01-inline"'].join('\n'),
+    );
+    const cfg = await loadConfig(dir);
+    expect(cfg.oauthToken).toBe('sk-ant-oat01-inline');
+  });
+
+  it('loadConfig ignores oauthToken when not a string', async () => {
+    await writeFile(join(dir, 'golem.yaml'), ['name: bot', 'engine: claude-code', 'oauthToken: 123'].join('\n'));
+    const cfg = await loadConfig(dir);
+    expect(cfg.oauthToken).toBeUndefined();
+  });
 });
 
 // ── discoverEngines ───────────────────────────────────────

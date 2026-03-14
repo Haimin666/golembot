@@ -24,6 +24,8 @@ export interface InvokeOpts {
   hasPermissionsConfig?: boolean;
   /** Provider config from golem.yaml, for custom LLM API routing */
   provider?: ProviderConfig;
+  /** Claude Max OAuth token (from `claude setup-token`). Claude Code engine only. */
+  oauthToken?: string;
 }
 
 export interface ListModelsOpts {

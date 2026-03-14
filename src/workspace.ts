@@ -164,6 +164,8 @@ export interface GolemConfig {
   tasks?: ScheduledTaskDef[];
   /** Custom LLM provider — decouples engine from API backend. */
   provider?: ProviderConfig;
+  /** Claude Max subscription OAuth token (from `claude setup-token`). Claude Code engine only. */
+  oauthToken?: string;
   /** Persistent message inbox for IM channels. */
   inbox?: import('./inbox.js').InboxConfig;
   /** Historical message fetching for offline awareness. */
@@ -246,6 +248,9 @@ export async function loadConfig(dir: string): Promise<GolemConfig> {
       provider.fallback = cleanFallback as ProviderConfig;
     }
     config.provider = provider;
+  }
+  if (typeof doc.oauthToken === 'string') {
+    config.oauthToken = resolveEnvPlaceholders(doc.oauthToken);
   }
   if (doc.historyFetch && typeof doc.historyFetch === 'object') {
     const hf = doc.historyFetch as Record<string, unknown>;

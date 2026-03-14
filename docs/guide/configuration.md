@@ -141,6 +141,7 @@ gateway:
 | `channels` | `object` | — | IM channel configurations |
 | `inbox` | `object` | — | Persistent message queue — see [`inbox`](#inbox) section |
 | `historyFetch` | `object` | — | History fetch for missed messages — see [`historyFetch`](#historyfetch) section |
+| `oauthToken` | `string` | — | Claude Max subscription token (from `claude setup-token`). Claude Code engine only — see [Claude Code](/engines/claude-code#claude-max-subscription) |
 | `provider` | `object` | — | Third-party LLM provider routing — see [Provider Routing](/guide/provider-routing) |
 | `gateway` | `object` | — | Gateway service settings |
 
@@ -436,6 +437,7 @@ interface GolemConfig {
     };
     failoverThreshold?: number;  // default: 3
   };
+  oauthToken?: string;           // Claude Max setup-token (claude-code engine only)
   gateway?: {
     port?: number;
     host?: string;
