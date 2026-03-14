@@ -1,3 +1,10 @@
+# [0.29.0](https://github.com/0xranx/golembot/compare/v0.28.0...v0.29.0) (2026-03-14)
+
+
+### Features
+
+* **auth:** support Claude Max subscription OAuth token (setup-token) ([b2beb5f](https://github.com/0xranx/golembot/commit/b2beb5f954c9ebba0c72d971beefba28ad7be8ad))
+
 # [0.28.0](https://github.com/0xranx/golembot/compare/v0.27.0...v0.28.0) (2026-03-13)
 
 
