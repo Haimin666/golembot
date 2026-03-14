@@ -2,6 +2,17 @@
 
 GolemBot 使用一个配置文件：助手目录根目录下的 `golem.yaml`。
 
+## 最小配置
+
+一个可用的 `golem.yaml` 只需要两行：
+
+```yaml
+name: my-bot
+engine: claude-code
+```
+
+以下所有字段都是可选的——按需添加即可。
+
 ## 完整示例
 
 ```yaml

@@ -2,6 +2,17 @@
 
 GolemBot uses a single configuration file: `golem.yaml` in the assistant directory root.
 
+## Minimal Config
+
+A working `golem.yaml` only needs two lines:
+
+```yaml
+name: my-bot
+engine: claude-code
+```
+
+Everything else below is optional — add fields as you need them.
+
 ## Full Example
 
 ```yaml

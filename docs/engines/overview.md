@@ -55,9 +55,25 @@ const assistant = createAssistant({
 });
 ```
 
+::: info One-line switch
+Switching engines requires only changing the `engine` field in `golem.yaml`. All engines expose the same `StreamEvent` interface — your code doesn't need to change.
+:::
+
 ## Choosing an Engine
+
+::: tip Not sure which engine to use?
+Start with **Claude Code** — it has the best overall experience, provides cost tracking, and works with Anthropic's latest models. You can switch anytime.
+:::
 
 - **Cursor** — best if you already use Cursor IDE and have a Cursor subscription
 - **Claude Code** — first-party Anthropic CLI, provides cost and turn tracking
 - **OpenCode** — open-source, supports multiple LLM providers (Anthropic, OpenAI, OpenRouter, etc.)
 - **Codex** — OpenAI's CLI agent (`@openai/codex`), uses `CODEX_API_KEY`
+
+## What's Next
+
+- [Cursor](/engines/cursor) — setup, auth, model table
+- [Claude Code](/engines/claude-code) — setup, auth, cost tracking
+- [OpenCode](/engines/opencode) — setup, multi-provider configuration
+- [Codex](/engines/codex) — setup, API key modes
+- [Configuration](/guide/configuration) — full `golem.yaml` reference

@@ -1,5 +1,14 @@
 # Getting Started
 
+::: tip 30-second quickstart
+```bash
+npm install -g golembot
+mkdir my-bot && cd my-bot
+golembot onboard
+```
+Three commands. You'll be chatting with an AI agent in under a minute.
+:::
+
 ## Prerequisites
 
 - **Node.js** >= 18
@@ -98,6 +107,15 @@ GolemBot supports the following IM platforms out of the box:
 | [Discord](/channels/discord) | Gateway API (no public IP needed) |
 
 See [Channels Overview](/channels/overview) for setup instructions.
+
+## Which Approach Is Right for You?
+
+| Scenario | Approach | Command / Entry Point |
+|----------|----------|-----------------------|
+| Try it out, personal use | CLI REPL | `golembot run` |
+| Connect to IM (Feishu, Slack, Telegram...) | Gateway | `golembot gateway` |
+| Embed in your Node.js app | Library | `createAssistant()` |
+| Expose API for frontend / external services | HTTP API | Gateway + `POST /chat` |
 
 ## Use as a Library
 

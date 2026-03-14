@@ -14,6 +14,10 @@ GolemBot's gateway connects your assistant to IM platforms. Each platform is han
 | [Discord](/channels/discord) | Gateway WebSocket | No | `discord.js` |
 | Custom | Any | Depends | Your own adapter class |
 
+::: warning WeCom requires a public IP
+WeCom uses HTTP webhooks — your server must be reachable from the internet. All other channels use WebSocket or polling and work behind NAT / firewalls without port forwarding.
+:::
+
 ## Architecture
 
 ```
@@ -144,3 +148,10 @@ pnpm add discord.js
 ```
 
 If a configured channel's SDK is not installed, the gateway will print an error with installation instructions.
+
+## What's Next
+
+- [Feishu](/channels/feishu), [DingTalk](/channels/dingtalk), [WeCom](/channels/wecom), [Slack](/channels/slack), [Telegram](/channels/telegram), [Discord](/channels/discord) — per-channel setup guides
+- [Group Chat](/guide/group-chat) — response policies, @mention, quote reply
+- [Inbox & History Fetch](/guide/inbox) — crash-safe queue, offline catch-up
+- [Channel Adapter API](/api/channel-adapter) — build custom adapters

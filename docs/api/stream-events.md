@@ -25,7 +25,9 @@ Streamed text content from the agent.
 { type: 'text', content: 'Here is the analysis...' }
 ```
 
-Multiple `text` events form the complete response. Concatenate `content` fields to build the full text.
+::: tip
+Multiple `text` events form the complete response. Concatenate all `content` fields to build the full reply — each event is a partial chunk, not a complete message.
+:::
 
 ### `tool_call`
 
@@ -131,3 +133,9 @@ for await (const event of assistant.chat(message)) {
 }
 await sendToIM(reply);
 ```
+
+## What's Next
+
+- [createAssistant()](/api/create-assistant) — library entry point and options
+- [HTTP API](/api/http-api) — SSE streaming via `POST /chat`
+- [Engine Overview](/engines/overview) — how engines produce these events

@@ -1,5 +1,14 @@
 # 快速开始
 
+::: tip 30 秒快速体验
+```bash
+npm install -g golembot
+mkdir my-bot && cd my-bot
+golembot onboard
+```
+三条命令，一分钟内开始和 AI Agent 对话。
+:::
+
 ## 前置条件
 
 - **Node.js** >= 18
@@ -98,6 +107,15 @@ GolemBot 内置支持以下 IM 平台：
 | [Discord](/zh/channels/discord) | Gateway API（无需公网 IP） |
 
 IM 配置详见[通道概览](/zh/channels/overview)。
+
+## 选择适合你的方式
+
+| 场景 | 方式 | 命令 / 入口 |
+|------|------|-------------|
+| 试用、个人使用 | CLI 交互 | `golembot run` |
+| 接入 IM（飞书、Slack、Telegram…） | Gateway 服务 | `golembot gateway` |
+| 嵌入 Node.js 应用 | 库调用 | `createAssistant()` |
+| 给前端 / 外部服务提供 API | HTTP API | Gateway + `POST /chat` |
 
 ## 作为库使用
 

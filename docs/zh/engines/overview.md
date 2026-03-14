@@ -29,9 +29,25 @@ type StreamEvent =
       costUsd?: number; numTurns?: number };
 ```
 
+::: info 一行切换
+切换引擎只需修改 `golem.yaml` 中的 `engine` 字段。所有引擎暴露相同的 `StreamEvent` 接口——你的代码无需任何改动。
+:::
+
 ## 如何选择
+
+::: tip 不确定选哪个？
+从 **Claude Code** 开始——综合体验最好，支持费用追踪，搭配 Anthropic 最新模型。随时可以切换。
+:::
 
 - **Cursor** — 如果你已经在用 Cursor IDE 并有订阅
 - **Claude Code** — 综合体验最佳；提供费用和轮次追踪
 - **OpenCode** — 开源，支持多 LLM Provider（Anthropic、OpenAI、OpenRouter 等）
 - **Codex** — OpenAI 官方 CLI agent（`@openai/codex`），使用 `CODEX_API_KEY`
+
+## 下一步
+
+- [Cursor](/zh/engines/cursor) — 安装、鉴权、模型列表
+- [Claude Code](/zh/engines/claude-code) — 安装、鉴权、费用追踪
+- [OpenCode](/zh/engines/opencode) — 安装、多 Provider 配置
+- [Codex](/zh/engines/codex) — 安装、API Key 模式
+- [配置说明](/zh/guide/configuration) — 完整 `golem.yaml` 参考

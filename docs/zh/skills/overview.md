@@ -68,3 +68,9 @@ description: 这个技能做什么的简要说明
 - **即放即用** — 复制目录即添加技能；删除目录即移除技能
 - **引擎无关** — 同一个 Skill 在 Cursor、Claude Code、OpenCode 和 Codex 上都能用
 
+## 下一步
+
+- [创建技能](/zh/skills/create-skill) — 从零编写自定义技能
+- [内置技能](/zh/skills/builtin) — `general` 和 `im-adapter` 的功能说明
+- [ClawHub](https://clawhub.ai) — 浏览 13,000+ 社区技能
+

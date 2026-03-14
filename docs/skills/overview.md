@@ -100,3 +100,9 @@ golembot skill remove my-skill
 
 Or simply copy/delete directories manually — no CLI required.
 
+## What's Next
+
+- [Create a Skill](/skills/create-skill) — write your own skill from scratch
+- [Built-in Skills](/skills/builtin) — what `general` and `im-adapter` do
+- [ClawHub](https://clawhub.ai) — browse 13,000+ community skills
+
