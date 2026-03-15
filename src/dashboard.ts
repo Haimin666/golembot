@@ -3,7 +3,7 @@ import type { ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import type { TaskExecution, TaskRecord, TaskStore } from './task-store.js';
 import { BASE_CSS, DOCS_BASE, ENGINE_COLORS, esc, FAVICON, formatUptime } from './ui-shared.js';
-import type { GolemConfig, PersonaConfig, SkillInfo } from './workspace.js';
+import type { GolemConfig, SkillInfo } from './workspace.js';
 
 export interface EscalationEntry {
   ts: string;
@@ -54,6 +54,8 @@ export interface DashboardContext {
   taskStore?: TaskStore;
   /** Working directory for reading .golem/ files. */
   dir?: string;
+  /** Optional: fleet peers for multi-bot visibility. */
+  getFleetPeers?: () => Promise<FleetPeer[]>;
 }
 
 export function createMetrics(): GatewayMetrics {
@@ -128,6 +130,17 @@ interface DashboardData {
   persona?: PersonaConfig;
   activeSessions?: { key: string; lastActivity: string }[];
   memoryOverview?: { notesPreview?: string; groupFiles?: string[]; recentSummaries?: string[] };
+  config: GolemConfig;
+  fleetPeers?: FleetPeer[];
+}
+
+export interface FleetPeer {
+  name: string;
+  url: string;
+  engine: string;
+  model?: string;
+  role?: string;
+  alive: boolean;
 }
 
 export async function buildDashboardData(ctx: DashboardContext): Promise<DashboardData> {
@@ -185,6 +198,8 @@ export async function buildDashboardData(ctx: DashboardContext): Promise<Dashboa
     persona: ctx.config.persona,
     activeSessions: await loadActiveSessions(ctx.dir),
     memoryOverview: await loadMemoryOverview(ctx.dir),
+    config: ctx.config,
+    fleetPeers: await loadFleetPeers(ctx),
   };
 }
 
@@ -263,6 +278,238 @@ async function loadMemoryOverview(
 
   if (!notesPreview && !groupFiles && !recentSummaries) return undefined;
   return { notesPreview, groupFiles, recentSummaries };
+}
+
+async function loadFleetPeers(ctx: DashboardContext): Promise<FleetPeer[] | undefined> {
+  if (!ctx.getFleetPeers) return undefined;
+  try {
+    return await ctx.getFleetPeers();
+  } catch {
+    return undefined;
+  }
+}
+
+// ── Helper: mask secrets ────────────────────────────────────────────────────
+
+function maskSecret(s?: string): string {
+  if (!s) return '<span class="dim">not set</span>';
+  if (s.length <= 8) return '****';
+  return `${esc(s.slice(0, 4))}****${esc(s.slice(-4))}`;
+}
+
+function configBadge(val: boolean | undefined, defaultVal = false): string {
+  const v = val ?? defaultVal;
+  return v
+    ? '<span class="config-badge config-badge-on">Enabled</span>'
+    : '<span class="config-badge config-badge-off">Disabled</span>';
+}
+
+function configVal(val: unknown, defaultVal?: string, suffix = ''): string {
+  if (val === undefined || val === null) {
+    return defaultVal
+      ? `<span class="dim">${esc(String(defaultVal))}${suffix ? ` ${esc(suffix)}` : ''}</span>`
+      : '<span class="dim">-</span>';
+  }
+  return `<code>${esc(String(val))}${suffix ? ` ${esc(suffix)}` : ''}</code>`;
+}
+
+function configList(items?: string[]): string {
+  if (!items || items.length === 0) return '<span class="dim">none</span>';
+  return items.map((i) => `<code class="config-code-item">${esc(i)}</code>`).join(' ');
+}
+
+/**
+ * Wrap a config value with an inline edit button.
+ * @param path - dot-separated config path e.g. "timeout" or "groupChat.maxTurns"
+ * @param type - input type: "text", "number", "boolean", "select"
+ * @param options - for select type, the available options
+ */
+function editable(
+  html: string,
+  path: string,
+  currentVal: unknown,
+  type: 'text' | 'number' | 'boolean' | 'select' = 'text',
+  options?: string[],
+): string {
+  const val = currentVal ?? '';
+  const optAttr = options ? ` data-options="${esc(options.join(','))}"` : '';
+  return `<span class="config-editable" data-path="${esc(path)}" data-type="${type}" data-val="${esc(String(val))}"${optAttr}>${html}<button class="config-edit-btn" onclick="editConfig(this)" title="Edit">✎</button></span>`;
+}
+
+// ── Configuration Panel ─────────────────────────────────────────────────────
+
+function renderConfigPanel(data: DashboardData): string {
+  const cfg = data.config;
+  const gw = cfg.gateway;
+  const gc = cfg.groupChat;
+  const st = cfg.streaming;
+  const perm = cfg.permissions;
+  const prov = cfg.provider;
+  const mcp = cfg.mcp;
+  const esc_ = cfg.escalation;
+  const inbox = cfg.inbox;
+  const hf = cfg.historyFetch;
+
+  // Engine & Runtime
+  const engineSection = `<details open class="config-group">
+    <summary>Engine & Runtime</summary>
+    <div class="config-row"><span class="config-key">Engine</span>${editable(configVal(data.engine), 'engine', data.engine, 'select', ['cursor', 'claude-code', 'opencode', 'codex'])}</div>
+    <div class="config-row"><span class="config-key">Model</span>${editable(configVal(data.model, 'default'), 'model', data.model)}</div>
+    <div class="config-row"><span class="config-key">Skip Permissions</span>${editable(configBadge(cfg.skipPermissions), 'skipPermissions', cfg.skipPermissions ?? false, 'boolean')}</div>
+    <div class="config-row"><span class="config-key">Timeout</span>${editable(configVal(cfg.timeout, '300', 's'), 'timeout', cfg.timeout ?? 300, 'number')}</div>
+    <div class="config-row"><span class="config-key">Max Concurrent</span>${editable(configVal(cfg.maxConcurrent, '10'), 'maxConcurrent', cfg.maxConcurrent ?? 10, 'number')}</div>
+    <div class="config-row"><span class="config-key">Max Queue/Session</span>${editable(configVal(cfg.maxQueuePerSession, '3'), 'maxQueuePerSession', cfg.maxQueuePerSession ?? 3, 'number')}</div>
+    <div class="config-row"><span class="config-key">Session TTL</span>${editable(configVal(cfg.sessionTtlDays, '30', 'days'), 'sessionTtlDays', cfg.sessionTtlDays ?? 30, 'number')}</div>
+  </details>`;
+
+  // Gateway
+  const gatewaySection = `<details open class="config-group">
+    <summary>Gateway</summary>
+    <div class="config-row"><span class="config-key">Host</span>${editable(configVal(gw?.host, '127.0.0.1'), 'gateway.host', gw?.host ?? '127.0.0.1')}</div>
+    <div class="config-row"><span class="config-key">Port</span>${editable(configVal(gw?.port, '3000'), 'gateway.port', gw?.port ?? 3000, 'number')}</div>
+    <div class="config-row"><span class="config-key">Auth Token</span><span class="config-masked">${gw?.token ? maskSecret(gw.token) : configBadge(false)}</span></div>
+  </details>`;
+
+  // Provider
+  let providerSection = '';
+  if (prov) {
+    const fallbackHtml = prov.fallback
+      ? `<div class="config-sub"><div class="config-row"><span class="config-key">Fallback URL</span>${configVal(prov.fallback.baseUrl)}</div>
+         <div class="config-row"><span class="config-key">Fallback API Key</span><span class="config-masked">${maskSecret(prov.fallback.apiKey)}</span></div>
+         <div class="config-row"><span class="config-key">Fallback Model</span>${configVal(prov.fallback.model)}</div></div>`
+      : '';
+    providerSection = `<details class="config-group">
+      <summary>Provider</summary>
+      <div class="config-row"><span class="config-key">Base URL</span>${editable(configVal(prov.baseUrl), 'provider.baseUrl', prov.baseUrl ?? '')}</div>
+      <div class="config-row"><span class="config-key">API Key</span><span class="config-masked">${maskSecret(prov.apiKey)}</span></div>
+      <div class="config-row"><span class="config-key">Model Override</span>${editable(configVal(prov.model), 'provider.model', prov.model ?? '')}</div>
+      <div class="config-row"><span class="config-key">Failover Threshold</span>${editable(configVal(prov.failoverThreshold, '3', 'errors'), 'provider.failoverThreshold', prov.failoverThreshold ?? 3, 'number')}</div>
+      <div class="config-row"><span class="config-key">Recovery Cooldown</span>${editable(configVal(prov.fallbackRecoveryMs, '60000', 'ms'), 'provider.fallbackRecoveryMs', prov.fallbackRecoveryMs ?? 60000, 'number')}</div>
+      ${fallbackHtml}
+    </details>`;
+  }
+
+  // Group Chat
+  let groupChatSection = '';
+  if (gc) {
+    groupChatSection = `<details class="config-group">
+      <summary>Group Chat</summary>
+      <div class="config-row"><span class="config-key">Policy</span>${editable(configVal(gc.groupPolicy, 'mention-only'), 'groupChat.groupPolicy', gc.groupPolicy ?? 'mention-only', 'select', ['mention-only', 'smart', 'always'])}</div>
+      <div class="config-row"><span class="config-key">History Limit</span>${editable(configVal(gc.historyLimit, '20', 'messages'), 'groupChat.historyLimit', gc.historyLimit ?? 20, 'number')}</div>
+      <div class="config-row"><span class="config-key">Max Turns</span>${editable(configVal(gc.maxTurns, '10'), 'groupChat.maxTurns', gc.maxTurns ?? 10, 'number')}</div>
+    </details>`;
+  }
+
+  // Streaming
+  let streamingSection = '';
+  if (st) {
+    streamingSection = `<details class="config-group">
+      <summary>Streaming</summary>
+      <div class="config-row"><span class="config-key">Mode</span>${editable(configVal(st.mode, 'buffered'), 'streaming.mode', st.mode ?? 'buffered', 'select', ['buffered', 'streaming'])}</div>
+      <div class="config-row"><span class="config-key">Show Tool Calls</span>${editable(configBadge(st.showToolCalls), 'streaming.showToolCalls', st.showToolCalls ?? false, 'boolean')}</div>
+    </details>`;
+  }
+
+  // Permissions
+  let permissionsSection = '';
+  if (perm) {
+    permissionsSection = `<details class="config-group">
+      <summary>Permissions</summary>
+      <div class="config-row"><span class="config-key">Allowed Paths</span>${configList(perm.allowedPaths)}</div>
+      <div class="config-row"><span class="config-key">Denied Paths</span>${configList(perm.deniedPaths)}</div>
+      <div class="config-row"><span class="config-key">Allowed Commands</span>${configList(perm.allowedCommands)}</div>
+      <div class="config-row"><span class="config-key">Denied Commands</span>${configList(perm.deniedCommands)}</div>
+    </details>`;
+  }
+
+  // Advanced (MCP, Inbox, History Fetch, Escalation, System Prompt)
+  const advancedParts: string[] = [];
+
+  if (cfg.systemPrompt) {
+    const preview = cfg.systemPrompt.length > 200 ? `${cfg.systemPrompt.slice(0, 200)}...` : cfg.systemPrompt;
+    advancedParts.push(
+      `<div class="config-row"><span class="config-key">System Prompt</span><pre class="config-prompt">${esc(preview)}</pre></div>`,
+    );
+  }
+
+  if (mcp && Object.keys(mcp).length > 0) {
+    const mcpRows = Object.entries(mcp)
+      .map(
+        ([name, srv]) =>
+          `<div class="config-row"><span class="config-key" style="min-width:auto">${esc(name)}</span><code>${esc(srv.command)}${srv.args ? ` ${srv.args.map(esc).join(' ')}` : ''}</code></div>`,
+      )
+      .join('');
+    advancedParts.push(`<div class="config-sub-label">MCP Servers</div>${mcpRows}`);
+  }
+
+  if (inbox) {
+    advancedParts.push(
+      `<div class="config-row"><span class="config-key">Inbox</span>${configBadge(inbox.enabled)} <span class="dim" style="margin-left:8px">retention: ${inbox.retentionDays ?? 7} days</span></div>`,
+    );
+  }
+
+  if (hf) {
+    advancedParts.push(
+      `<div class="config-row"><span class="config-key">History Fetch</span>${configBadge(hf.enabled)} <span class="dim" style="margin-left:8px">poll: ${hf.pollIntervalMinutes ?? 15} min</span></div>`,
+    );
+  }
+
+  if (esc_) {
+    const targetDesc = esc_.target ? `${esc_.target.channel}:${esc_.target.chatId.slice(0, 16)}` : 'no target';
+    advancedParts.push(
+      `<div class="config-row"><span class="config-key">Escalation</span>${configBadge(esc_.enabled)} <span class="dim" style="margin-left:8px">${esc(targetDesc)}</span></div>`,
+    );
+  }
+
+  const advancedSection =
+    advancedParts.length > 0
+      ? `<details class="config-group"><summary>Advanced</summary>${advancedParts.join('\n')}</details>`
+      : '';
+
+  return `
+<div class="section-label">Configuration</div>
+<div class="card" style="margin-bottom:24px">
+  <h2><span class="icon">⚙️</span> Configuration <span class="dim" style="font-weight:400;font-size:12px">golem.yaml</span></h2>
+  <p class="config-file-hint">All settings from <code>golem.yaml</code>. Edit the file or use <code>PATCH /api/config</code> to update.</p>
+  ${engineSection}
+  ${gatewaySection}
+  ${providerSection}
+  ${groupChatSection}
+  ${streamingSection}
+  ${permissionsSection}
+  ${advancedSection}
+</div>`;
+}
+
+// ── Fleet Peers Panel ───────────────────────────────────────────────────────
+
+function renderFleetPeers(data: DashboardData): string {
+  if (!data.fleetPeers || data.fleetPeers.length === 0) return '';
+
+  const rows = data.fleetPeers
+    .map((p) => {
+      const dot = p.alive ? 'dot-green' : 'dot-gray';
+      const engineColor = ENGINE_COLORS[p.engine] ?? '#58a6ff';
+      const roleBadge = p.role ? `<span class="dim" style="margin-left:4px">(${esc(p.role)})</span>` : '';
+      const modelBadge = p.model
+        ? `<span class="dim" style="font-size:11px;margin-left:4px">${esc(p.model)}</span>`
+        : '';
+      const dashLink = p.alive ? `<a href="${esc(p.url)}" target="_blank" class="fleet-link">Dashboard</a>` : '';
+      return `<div class="fleet-row">
+        <span class="ch-dot ${dot}"></span>
+        <span class="fleet-name">${esc(p.name)}</span>${roleBadge}
+        <span class="badge" style="background:${engineColor};font-size:10px;padding:1px 6px">${esc(p.engine)}</span>${modelBadge}
+        ${dashLink}
+      </div>`;
+    })
+    .join('\n');
+
+  return `
+<div class="card" style="margin-bottom:24px">
+  <h2><span class="icon">🤖</span> Fleet Peers <span class="dim" style="font-weight:400;font-size:13px">(${data.fleetPeers.length})</span></h2>
+  <p class="card-desc">Other GolemBot instances discovered on this machine.</p>
+  ${rows}
+</div>`;
 }
 
 // ── HTML section renderers ───────────────────────────────────────────────────
@@ -393,33 +640,16 @@ function renderMonitoring(data: DashboardData): string {
           .join('\n')
       : '<div class="empty">No messages yet</div>';
 
-  const skillRows =
-    data.skills.length > 0
-      ? data.skills
-          .map(
-            (s) =>
-              `<div class="skill-row"><span class="skill-name">${esc(s.name)}</span><span class="skill-desc">${esc(s.description)}</span></div>`,
-          )
-          .join('\n')
-      : '<div class="empty">No skills installed</div>';
-
   return `
 <div class="section-label">Monitoring</div>
-<div class="grid">
-  <div class="card">
-    <h2><span class="icon">📊</span> Statistics</h2>
-    <div class="stat-grid">
-      <div class="stat-box"><div class="stat-val" id="stat-msgs">${totalMessages}</div><div class="stat-label">Messages</div></div>
-      <div class="stat-box"><div class="stat-val" id="stat-cost">$${totalCostUsd.toFixed(4)}</div><div class="stat-label">Total Cost</div></div>
-      <div class="stat-box"><div class="stat-val" id="stat-avg">${avgDisplay}</div><div class="stat-label">Avg Response</div></div>
-    </div>
-    <div id="stat-bars">${statBars}</div>
+<div class="card" style="margin-bottom:24px">
+  <h2><span class="icon">📊</span> Statistics</h2>
+  <div class="stat-grid">
+    <div class="stat-box"><div class="stat-val" id="stat-msgs">${totalMessages}</div><div class="stat-label">Messages</div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-cost">$${totalCostUsd.toFixed(4)}</div><div class="stat-label">Total Cost</div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-avg">${avgDisplay}</div><div class="stat-label">Avg Response</div></div>
   </div>
-  <div class="card">
-    <h2><span class="icon">⚡</span> Skills</h2>
-    ${skillRows}
-    <p style="font-size:12px;color:var(--dim);margin-top:8px"><a href="${DOCS_BASE}/skills/overview" target="_blank">Browse 13,000+ skills on ClawHub</a></p>
-  </div>
+  <div id="stat-bars">${statBars}</div>
 </div>`;
 }
 
@@ -733,6 +963,113 @@ function renderClientScript(data: DashboardData): string {
   };
 
   function esc(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+  // Show restart banner if redirected after restart-required config change
+  if(location.search.indexOf('_restart=1') !== -1){
+    var banner = document.createElement('div');
+    banner.id = 'restart-banner';
+    banner.className = 'restart-banner';
+    banner.innerHTML = '⚠ Configuration updated — restart the gateway for changes to take full effect.';
+    document.querySelector('.container').prepend(banner);
+    // Clean URL without reload
+    history.replaceState(null, '', location.pathname);
+  }
+
+  // Config inline editing
+  window.editConfig = function(btn){
+    var span = btn.closest('.config-editable');
+    if(!span || span.classList.contains('editing')) return;
+    var path = span.getAttribute('data-path');
+    var type = span.getAttribute('data-type') || 'text';
+    var val = span.getAttribute('data-val') || '';
+    var options = span.getAttribute('data-options');
+
+    span.classList.add('editing');
+    var origHtml = span.innerHTML;
+
+    var inputHtml = '';
+    if(type === 'boolean'){
+      inputHtml = '<select class="config-edit-input"><option value="true"'+(val==='true'?' selected':'')+'>Enabled</option><option value="false"'+(val==='false'?' selected':'')+'>Disabled</option></select>';
+    } else if(type === 'select' && options){
+      var opts = options.split(',').map(function(o){ return '<option value="'+esc(o)+'"'+(o===val?' selected':'')+'>'+esc(o)+'</option>'; }).join('');
+      inputHtml = '<select class="config-edit-input">'+opts+'</select>';
+    } else {
+      var inputType = type === 'number' ? 'number' : 'text';
+      inputHtml = '<input class="config-edit-input" type="'+inputType+'" value="'+esc(val)+'">';
+    }
+
+    span.innerHTML = inputHtml +
+      '<button class="config-save-btn" onclick="saveConfig(this)">Save</button>' +
+      '<button class="config-cancel-btn" onclick="cancelEdit(this)">Cancel</button>';
+
+    var inp = span.querySelector('.config-edit-input');
+    if(inp) inp.focus();
+  };
+
+  window.cancelEdit = function(btn){
+    var span = btn.closest('.config-editable');
+    if(!span) return;
+    span.classList.remove('editing');
+    // Rebuild original display — reload page to get fresh state
+    location.reload();
+  };
+
+  window.saveConfig = function(btn){
+    var span = btn.closest('.config-editable');
+    if(!span) return;
+    var path = span.getAttribute('data-path');
+    var type = span.getAttribute('data-type') || 'text';
+    var inp = span.querySelector('.config-edit-input');
+    if(!inp) return;
+
+    var raw = inp.value;
+    var value;
+    if(type === 'boolean') value = raw === 'true';
+    else if(type === 'number') value = Number(raw);
+    else value = raw;
+
+    // Build nested patch object from dot path
+    var patch = {};
+    var parts = path.split('.');
+    var obj = patch;
+    for(var i = 0; i < parts.length - 1; i++){
+      obj[parts[i]] = {};
+      obj = obj[parts[i]];
+    }
+    obj[parts[parts.length - 1]] = value;
+
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    var headers = { 'Content-Type': 'application/json' };
+    if(testToken) headers['Authorization'] = 'Bearer ' + testToken;
+
+    fetch('/api/config', {
+      method: 'PATCH',
+      headers: headers,
+      body: JSON.stringify(patch)
+    }).then(function(res){ return res.json(); }).then(function(data){
+      if(data.ok){
+        span.setAttribute('data-val', String(value));
+        span.classList.remove('editing');
+        if(data.needsRestart){
+          // Reload with query param so banner survives the reload
+          var sep = location.search ? '&' : '?';
+          location.href = location.pathname + location.search + sep + '_restart=1';
+        } else {
+          location.reload();
+        }
+      } else {
+        alert('Save failed: ' + (data.error || 'unknown error'));
+        btn.disabled = false;
+        btn.textContent = 'Save';
+      }
+    }).catch(function(e){
+      alert('Request failed: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = 'Save';
+    });
+  };
 })();
 </script>`;
 }
@@ -833,6 +1170,47 @@ pre{background:var(--bg);border:1px solid var(--border);border-radius:6px;paddin
 .memory-list{display:flex;flex-wrap:wrap;gap:6px}
 .memory-file{font-size:11px;background:var(--bg);border:1px solid var(--border);padding:2px 8px;border-radius:4px;font-family:"SFMono-Regular",Consolas,monospace}
 
+/* Configuration panel */
+.config-file-hint{font-size:12px;color:var(--dim);margin-bottom:12px}
+.config-group{margin-bottom:8px;border:1px solid var(--border);border-radius:6px;padding:0}
+.config-group summary{padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg);border-radius:6px;user-select:none}
+.config-group summary:hover{color:var(--accent)}
+.config-group[open] summary{border-radius:6px 6px 0 0;border-bottom:1px solid var(--border)}
+.config-row{display:flex;align-items:baseline;gap:12px;padding:5px 12px;font-size:13px}
+.config-key{min-width:160px;color:var(--dim);flex-shrink:0}
+.config-badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;color:#fff}
+.config-badge-on{background:var(--green)} .config-badge-off{background:var(--dim)}
+.config-masked{font-family:"SFMono-Regular",Consolas,monospace;font-size:12px;color:var(--dim)}
+.config-code-item{margin-right:4px}
+.config-sub{margin-left:20px;border-left:2px solid var(--border);padding-left:8px;margin-top:4px;margin-bottom:4px}
+.config-sub-label{font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;padding:6px 12px 2px}
+.config-prompt{font-size:11px;max-height:80px;overflow:hidden;margin:0;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;line-height:1.4;flex:1}
+.config-editable{display:inline-flex;align-items:center;gap:4px}
+.config-edit-btn{background:none;border:none;color:var(--dim);cursor:pointer;font-size:13px;padding:0 4px;opacity:0;transition:opacity .15s}
+.config-editable:hover .config-edit-btn{opacity:1}
+.config-edit-btn:hover{color:var(--accent)}
+.config-editable.editing{gap:6px}
+.config-edit-input{background:var(--bg);border:1px solid var(--accent);border-radius:4px;padding:2px 8px;color:var(--text);font-size:12px;font-family:inherit;min-width:120px}
+.config-edit-input:focus{outline:none;box-shadow:0 0 0 2px rgba(88,166,255,0.2)}
+.config-save-btn{background:var(--accent);color:#fff;border:none;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer;font-weight:600}
+.config-save-btn:hover{opacity:0.9} .config-save-btn:disabled{opacity:0.5;cursor:not-allowed}
+.config-cancel-btn{background:var(--border);color:var(--text);border:none;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer}
+.config-cancel-btn:hover{background:var(--dim);color:#fff}
+.restart-banner{background:#f59e0b22;border:1px solid #f59e0b;color:#f59e0b;padding:10px 16px;border-radius:6px;margin-bottom:16px;font-size:13px;text-align:center}
+
+/* Fleet peers */
+.fleet-row{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;border-bottom:1px solid var(--border)}
+.fleet-row:last-child{border-bottom:none}
+.fleet-name{font-weight:600;flex:1}
+.fleet-link{font-size:11px;color:var(--accent)}
+
+/* Escalation panel */
+.escalation-header{display:grid;grid-template-columns:160px 1fr 120px 70px;gap:8px;padding:6px 0;font-size:11px;font-weight:600;color:var(--dim);border-bottom:2px solid var(--border)}
+.escalation-row{display:grid;grid-template-columns:160px 1fr 120px 70px;gap:8px;padding:6px 0;font-size:13px;border-bottom:1px solid var(--border);align-items:center}
+.escalation-time{font-size:11px;color:var(--dim)}
+.escalation-reason{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.escalation-session{font-size:11px;color:var(--dim);font-family:"SFMono-Regular",Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 /* Responsive (dashboard-specific) */
 @media(max-width:768px){
   .feed-row{grid-template-columns:1fr;gap:2px}
@@ -841,6 +1219,10 @@ pre{background:var(--bg);border:1px solid var(--border);border-radius:6px;paddin
   .task-header{display:none}
   .task-main{grid-template-columns:12px 1fr;gap:4px}
   .task-hist-row{grid-template-columns:1fr 1fr;gap:4px}
+  .config-row{flex-direction:column;gap:2px}
+  .config-key{min-width:auto}
+  .escalation-header{display:none}
+  .escalation-row{grid-template-columns:1fr;gap:2px}
 }`.trim();
 
 // ── Persona card panel ──────────────────────────────────────────────────────
@@ -879,7 +1261,22 @@ function renderPersonaCard(data: DashboardData): string {
 function renderSkillInventory(data: DashboardData): string {
   if (data.skills.length === 0) return '';
   const hasTypes = data.skills.some((s) => s.type);
-  if (!hasTypes) return ''; // Already rendered in Monitoring section
+
+  // When no types, render flat list
+  if (!hasTypes) {
+    const rows = data.skills
+      .map(
+        (s) =>
+          `<div class="skill-row"><span class="skill-name">${esc(s.name)}</span><span class="skill-desc">${esc(s.description)}</span></div>`,
+      )
+      .join('\n');
+    return `
+<div class="card" style="margin-bottom:24px">
+  <h2><span class="icon">⚡</span> Skills <span class="dim" style="font-weight:400;font-size:13px">(${data.skills.length})</span></h2>
+  ${rows}
+  <p style="font-size:12px;color:var(--dim);margin-top:8px"><a href="${DOCS_BASE}/skills/overview" target="_blank">Browse 13,000+ skills on ClawHub</a></p>
+</div>`;
+  }
 
   const grouped = new Map<string, typeof data.skills>();
   for (const s of data.skills) {
@@ -985,27 +1382,23 @@ function renderEscalationPanel(data: DashboardData): string {
     .map((e) => {
       const statusBadge =
         e.status === 'resolved' ? '<span class="task-ok">resolved</span>' : '<span class="task-err">open</span>';
-      return `<tr>
-        <td style="font-size:11px;color:var(--dim)">${esc(e.ts)}</td>
-        <td>${esc(e.reason)}</td>
-        <td style="font-size:11px;color:var(--dim)">${esc(e.sessionKey ?? '')}</td>
-        <td>${statusBadge}</td>
-      </tr>`;
+      return `<div class="escalation-row">
+        <span class="escalation-time">${esc(e.ts)}</span>
+        <span class="escalation-reason">${esc(e.reason)}</span>
+        <span class="escalation-session">${esc(e.sessionKey ?? '')}</span>
+        ${statusBadge}
+      </div>`;
     })
     .join('');
 
-  return `<section>
-<h2>Escalations</h2>
-<table style="width:100%;border-collapse:collapse;font-size:13px">
-<thead><tr style="border-bottom:2px solid var(--border);font-size:11px;font-weight:600;color:var(--dim)">
-  <th style="text-align:left;padding:4px 0">Time</th>
-  <th style="text-align:left;padding:4px 0">Reason</th>
-  <th style="text-align:left;padding:4px 0">Session</th>
-  <th style="text-align:left;padding:4px 0">Status</th>
-</tr></thead>
-<tbody>${rows}</tbody>
-</table>
-</section>`;
+  return `
+<div class="card" style="margin-bottom:24px">
+  <h2><span class="icon">🚨</span> Escalations <span class="dim" style="font-weight:400;font-size:13px">(${data.escalations.length})</span></h2>
+  <div class="escalation-header">
+    <span>Time</span><span>Reason</span><span>Session</span><span>Status</span>
+  </div>
+  ${rows}
+</div>`;
 }
 
 // ── Main renderer (assembler) ────────────────────────────────────────────────
@@ -1024,8 +1417,10 @@ export function renderDashboard(data: DashboardData): string {
 <div class="container">
 ${renderHeader(data)}
 ${renderPersonaCard(data)}
+${renderConfigPanel(data)}
 ${renderAccessCards(data)}
 ${renderQuickTest(data)}
+${renderFleetPeers(data)}
 ${renderScheduledTasks(data)}
 ${renderEscalationPanel(data)}
 ${renderSkillInventory(data)}

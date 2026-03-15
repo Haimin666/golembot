@@ -19,6 +19,7 @@ const sidebarEn = [
       { text: 'Memory', link: '/guide/memory' },
       { text: 'Embed in Your Product', link: '/guide/embed' },
       { text: 'Provider Routing', link: '/guide/provider-routing' },
+      { text: 'Dashboard', link: '/guide/dashboard' },
     ],
   },
   {
@@ -100,6 +101,7 @@ const sidebarZh = [
       { text: '记忆系统', link: '/zh/guide/memory' },
       { text: '嵌入到你的产品', link: '/zh/guide/embed' },
       { text: 'Provider 路由', link: '/zh/guide/provider-routing' },
+      { text: 'Dashboard 仪表盘', link: '/zh/guide/dashboard' },
     ],
   },
   {

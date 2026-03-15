@@ -813,4 +813,71 @@ describe('Golem HTTP Server', () => {
       expect(JSON.parse(res.body).channels).toEqual([]);
     });
   });
+
+  describe('PATCH /api/config', () => {
+    function startServerWithDir(token?: string) {
+      const assistant = createAssistant({ dir });
+      server = createGolemServer(assistant, { token }, undefined, dir);
+      return new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+    }
+
+    it('updates config and returns new values', async () => {
+      await startServerWithDir();
+      const res = await request(server, 'PATCH', '/api/config', { timeout: 600 });
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.ok).toBe(true);
+      expect(body.config.timeout).toBe(600);
+      expect(body.config.name).toBe('srv-bot');
+      expect(body.config.engine).toBe('cursor');
+    });
+
+    it('returns needsRestart=true when engine is changed', async () => {
+      await startServerWithDir();
+      const res = await request(server, 'PATCH', '/api/config', { engine: 'opencode' });
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.needsRestart).toBe(true);
+    });
+
+    it('returns needsRestart=false for hot-reloadable fields', async () => {
+      await startServerWithDir();
+      const res = await request(server, 'PATCH', '/api/config', { timeout: 300, sessionTtlDays: 7 });
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.needsRestart).toBe(false);
+    });
+
+    it('returns 401 without auth when token is set', async () => {
+      await startServerWithDir('my-secret');
+      const res = await request(server, 'PATCH', '/api/config', { timeout: 600 });
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 400 for invalid JSON', async () => {
+      await startServerWithDir();
+      const addr = server.address() as { port: number };
+      const res = await new Promise<{ status: number; body: string }>((resolve) => {
+        const req = http.request(
+          {
+            hostname: '127.0.0.1',
+            port: addr.port,
+            path: '/api/config',
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+          },
+          (r) => {
+            let body = '';
+            r.on('data', (d) => {
+              body += d;
+            });
+            r.on('end', () => resolve({ status: r.statusCode!, body }));
+          },
+        );
+        req.write('not-json');
+        req.end();
+      });
+      expect(res.status).toBe(400);
+    });
+  });
 });

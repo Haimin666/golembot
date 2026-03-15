@@ -142,9 +142,13 @@ Health check endpoint (no authentication required).
 
 When running in gateway mode (`golembot gateway`), the root path serves an HTML Dashboard with:
 - Bot status, engine, model, and uptime
+- **Configuration Panel** — all `golem.yaml` settings at a glance (engine, model, timeout, gateway, provider, group chat, streaming, permissions, MCP servers, system prompt, inbox, escalation)
+- **Fleet Peers** — multi-bot visibility when running multiple GolemBot instances
 - Channel connection status (connected / failed / not configured)
 - Real-time message statistics and cost tracking
 - Live activity feed via SSE
+- Skill Inventory
+- Escalation panel (card-based design)
 - Quick Test panel for sending messages directly from the browser
 - HTTP API and embed SDK code examples with copy buttons
 
@@ -209,6 +213,43 @@ Send a proactive message to an IM channel (group or DM). Requires authentication
 | `404` | Channel not found (response includes available channels) |
 | `501` | Channel adapter does not support proactive send |
 | `503` | No channel adapters available |
+
+### `PATCH /api/config`
+
+Update `golem.yaml` settings remotely. Requires authentication.
+
+**Body:** Partial `GolemConfig` JSON — only include the fields you want to change.
+
+```json
+{
+  "timeout": 180,
+  "groupChat": { "groupPolicy": "smart" }
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true,
+  "config": { /* full GolemConfig after merge */ },
+  "needsRestart": false
+}
+```
+
+The `needsRestart` flag indicates whether the change takes effect immediately or requires a gateway restart:
+
+| Hot-reloadable (immediate) | Restart required |
+|---|---|
+| `timeout`, `maxConcurrent`, `sessionTtlDays`, `groupChat`, `streaming`, `persona`, `permissions`, `systemPrompt` | `engine`, `model`, `channels`, `gateway`, `mcp`, `provider.baseUrl`, `provider.apiKey`, `provider.fallback` |
+
+**Example:**
+
+```bash
+curl -X PATCH http://localhost:3000/api/config \
+  -H "Authorization: Bearer my-secret" \
+  -H "Content-Type: application/json" \
+  -d '{"timeout": 180, "streaming": {"mode": "streaming"}}'
+```
 
 ### `GET /api/channels`
 

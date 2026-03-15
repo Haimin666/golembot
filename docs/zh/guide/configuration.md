@@ -346,6 +346,12 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxx
 
 详见各引擎页面中的完整模型表格和运行时覆盖用法。
 
+## Dashboard 配置面板
+
+运行 `golembot gateway` 后，Web 仪表盘包含一个**配置面板**，展示所有 `golem.yaml` 设置并支持**内联编辑** — 悬停在值上，点击铅笔按钮（✎），修改后保存，变更立即写入 `golem.yaml`。
+
+仪表盘的完整功能说明、内联编辑流程、热加载与重启行为，详见 [Dashboard 仪表盘](/zh/guide/dashboard)。
+
 ## 技能不在配置中声明
 
 技能**不**在 `golem.yaml` 中声明。`skills/` 目录是唯一的事实来源 — 目录里有什么技能，助手就有什么能力。详见[技能](/zh/skills/overview)。
