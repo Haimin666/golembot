@@ -3,7 +3,7 @@ import type { ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import type { TaskExecution, TaskRecord, TaskStore } from './task-store.js';
 import { BASE_CSS, DOCS_BASE, ENGINE_COLORS, esc, FAVICON, formatUptime } from './ui-shared.js';
-import type { GolemConfig, SkillInfo } from './workspace.js';
+import type { GolemConfig, PersonaConfig, SkillInfo } from './workspace.js';
 
 export interface EscalationEntry {
   ts: string;
@@ -1245,7 +1245,7 @@ function renderPersonaCard(data: DashboardData): string {
     );
   if (data.persona.boundaries?.length) {
     rows.push(
-      `<div class="persona-row"><span class="persona-label">Boundaries</span><span>${data.persona.boundaries.map((b) => esc(b)).join(', ')}</span></div>`,
+      `<div class="persona-row"><span class="persona-label">Boundaries</span><span>${data.persona.boundaries.map((b: string) => esc(b)).join(', ')}</span></div>`,
     );
   }
 
