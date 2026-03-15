@@ -51,7 +51,7 @@ Multi-select which IM platforms to connect (optional). All 6 platforms are suppo
 
 - **Feishu (Lark)** — WebSocket, no public IP needed
 - **DingTalk** — Stream mode, no public IP needed
-- **WeCom (WeChat Work)** — Webhook, requires public URL
+- **WeCom (WeChat Work)** — WebSocket, no public IP needed
 - **Slack** — Socket Mode, no public IP needed
 - **Telegram** — Polling, no public IP needed
 - **Discord** — Gateway API, no public IP needed

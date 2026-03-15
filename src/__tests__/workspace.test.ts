@@ -8,6 +8,7 @@ import {
   generateCursorCliJson,
   initWorkspace,
   loadConfig,
+  refreshSkillInjection,
   scanSkills,
   writeConfig,
 } from '../workspace.js';
@@ -119,6 +120,27 @@ describe('workspace', () => {
       const raw = await readFile(join(dir, 'golem.yaml'), 'utf-8');
       expect(raw).not.toContain('provider');
     });
+
+    it('reads persona config', async () => {
+      await writeFile(
+        join(dir, 'golem.yaml'),
+        'name: bot\nengine: cursor\npersona:\n  displayName: Alice\n  role: Support Agent\n  tone: friendly\n  boundaries:\n    - No pricing\n',
+      );
+      const cfg = await loadConfig(dir);
+      expect(cfg.persona).toEqual({
+        displayName: 'Alice',
+        role: 'Support Agent',
+        tone: 'friendly',
+        boundaries: ['No pricing'],
+      });
+    });
+
+    it('round-trips persona through writeConfig/loadConfig', async () => {
+      const persona = { displayName: 'Bob', role: 'Engineer', tone: 'concise', boundaries: ['No deploys'] };
+      await writeConfig(dir, { name: 'test', engine: 'cursor', persona });
+      const cfg = await loadConfig(dir);
+      expect(cfg.persona).toEqual(persona);
+    });
   });
 
   // ── scanSkills ────────────────────────────────────
@@ -191,6 +213,29 @@ describe('workspace', () => {
       const skills = await scanSkills(dir);
       expect(skills).toEqual([]);
     });
+
+    it('parses type from SKILL.md front matter', async () => {
+      const skillDir = join(dir, 'skills', 'my-task');
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(
+        join(skillDir, 'SKILL.md'),
+        '---\nname: my-task\ndescription: Task manager\ntype: capability\n---\n',
+      );
+
+      const skills = await scanSkills(dir);
+      expect(skills).toHaveLength(1);
+      expect(skills[0].type).toBe('capability');
+    });
+
+    it('returns undefined type when not in front matter', async () => {
+      const skillDir = join(dir, 'skills', 'plain');
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, 'SKILL.md'), '---\nname: plain\ndescription: No type\n---\n');
+
+      const skills = await scanSkills(dir);
+      expect(skills).toHaveLength(1);
+      expect(skills[0].type).toBeUndefined();
+    });
   });
 
   // ── generateAgentsMd ─────────────────────────────
@@ -212,6 +257,54 @@ describe('workspace', () => {
       await generateAgentsMd(dir, []);
       const content = await readFile(join(dir, 'AGENTS.md'), 'utf-8');
       expect(content).toContain('no skills installed');
+    });
+
+    it('groups skills by type when types are present', async () => {
+      await generateAgentsMd(dir, [
+        { name: 'general', path: '/tmp/a', description: 'General assistant', type: 'behavior' },
+        { name: 'im-adapter', path: '/tmp/b', description: 'IM guidelines', type: 'behavior' },
+        { name: 'task-mgr', path: '/tmp/c', description: 'Task manager', type: 'capability' },
+      ]);
+
+      const content = await readFile(join(dir, 'AGENTS.md'), 'utf-8');
+      expect(content).toContain('### behavior');
+      expect(content).toContain('### capability');
+      expect(content).toContain('- general: General assistant');
+      expect(content).toContain('- task-mgr: Task manager');
+    });
+
+    it('uses flat list when no skills have types', async () => {
+      await generateAgentsMd(dir, [
+        { name: 'alpha', path: '/tmp/a', description: 'Alpha skill' },
+        { name: 'beta', path: '/tmp/b', description: 'Beta skill' },
+      ]);
+
+      const content = await readFile(join(dir, 'AGENTS.md'), 'utf-8');
+      expect(content).not.toContain('###');
+      expect(content).toContain('- alpha: Alpha skill');
+    });
+
+    it('renders persona section when persona config is provided', async () => {
+      await generateAgentsMd(dir, [{ name: 'general', path: '/tmp/a', description: 'General' }], undefined, {
+        displayName: 'Alice',
+        role: 'Support Agent',
+        tone: 'friendly',
+        boundaries: ['No pricing info'],
+      });
+
+      const content = await readFile(join(dir, 'AGENTS.md'), 'utf-8');
+      expect(content).toContain('## Persona');
+      expect(content).toContain('- Display Name: Alice');
+      expect(content).toContain('- Role: Support Agent');
+      expect(content).toContain('- Tone: friendly');
+      expect(content).toContain('- No pricing info');
+    });
+
+    it('omits persona section when no persona config', async () => {
+      await generateAgentsMd(dir, [{ name: 'general', path: '/tmp/a', description: 'General' }]);
+
+      const content = await readFile(join(dir, 'AGENTS.md'), 'utf-8');
+      expect(content).not.toContain('## Persona');
     });
   });
 
@@ -314,6 +407,25 @@ describe('workspace', () => {
 
       await expect(stat(join(dir, '.cursor', 'cli.json'))).rejects.toThrow();
     });
+
+    it('installs multi-bot skill as a builtin', async () => {
+      const builtinDir = join(__dirname, '..', '..', 'skills');
+      await initWorkspace(dir, { name: 'fleet-bot', engine: 'cursor' }, builtinDir);
+
+      const skillMd = await readFile(join(dir, 'skills', 'multi-bot', 'SKILL.md'), 'utf-8');
+      expect(skillMd).toContain('multi-bot');
+    });
+
+    it('writes persona.role when provided', async () => {
+      await initWorkspace(
+        dir,
+        { name: 'analyst-bot', engine: 'cursor', persona: { role: 'product analyst' } },
+        '/tmp/nonexistent',
+      );
+
+      const cfg = await loadConfig(dir);
+      expect(cfg.persona?.role).toBe('product analyst');
+    });
   });
 
   // ── generateCursorCliJson ─────────────────────────
@@ -385,6 +497,151 @@ describe('workspace', () => {
       await writeFile(join(dir, 'golem.yaml'), 'name: bot\nengine: cursor\n', 'utf-8');
       const config = await loadConfig(dir);
       expect(config.permissions).toBeUndefined();
+    });
+  });
+
+  // ── loadConfig mcp ──────────────────────────────────
+
+  describe('loadConfig mcp', () => {
+    it('parses mcp server config from golem.yaml', async () => {
+      await writeFile(
+        join(dir, 'golem.yaml'),
+        [
+          'name: bot',
+          'engine: cursor',
+          'mcp:',
+          '  memory:',
+          '    command: npx',
+          '    args:',
+          '      - -y',
+          '      - "@anthropic-ai/mcp-memory"',
+          '    env:',
+          '      MEM_DIR: /tmp/mem',
+        ].join('\n'),
+        'utf-8',
+      );
+
+      const config = await loadConfig(dir);
+      expect(config.mcp).toEqual({
+        memory: {
+          command: 'npx',
+          args: ['-y', '@anthropic-ai/mcp-memory'],
+          env: { MEM_DIR: '/tmp/mem' },
+        },
+      });
+    });
+
+    it('resolves env placeholders in mcp config', async () => {
+      process.env.__TEST_MCP_KEY = 'secret-key';
+      try {
+        await writeFile(
+          join(dir, 'golem.yaml'),
+          [
+            'name: bot',
+            'engine: cursor',
+            'mcp:',
+            '  kb:',
+            '    command: node',
+            '    args:',
+            '      - server.js',
+            '    env:',
+            '      API_KEY: ${__TEST_MCP_KEY}',
+          ].join('\n'),
+          'utf-8',
+        );
+
+        const config = await loadConfig(dir);
+        expect(config.mcp!.kb.env!.API_KEY).toBe('secret-key');
+      } finally {
+        delete process.env.__TEST_MCP_KEY;
+      }
+    });
+
+    it('mcp is undefined when not in config', async () => {
+      await writeFile(join(dir, 'golem.yaml'), 'name: bot\nengine: cursor\n', 'utf-8');
+      const config = await loadConfig(dir);
+      expect(config.mcp).toBeUndefined();
+    });
+
+    it('round-trips mcp through writeConfig/loadConfig', async () => {
+      const mcp = {
+        memory: { command: 'npx', args: ['-y', 'mcp-memory'], env: { DIR: '/tmp' } },
+        search: { command: 'node', args: ['search.js'] },
+      };
+      await writeConfig(dir, { name: 'test', engine: 'cursor', mcp });
+      const cfg = await loadConfig(dir);
+      expect(cfg.mcp).toEqual(mcp);
+    });
+  });
+
+  // ── loadConfig escalation ───────────────────────────
+
+  describe('loadConfig escalation', () => {
+    it('parses escalation config from golem.yaml', async () => {
+      await writeFile(
+        join(dir, 'golem.yaml'),
+        [
+          'name: bot',
+          'engine: cursor',
+          'escalation:',
+          '  enabled: true',
+          '  target:',
+          '    channel: feishu',
+          '    chatId: oc_123',
+        ].join('\n'),
+        'utf-8',
+      );
+
+      const config = await loadConfig(dir);
+      expect(config.escalation).toEqual({
+        enabled: true,
+        target: { channel: 'feishu', chatId: 'oc_123' },
+      });
+    });
+
+    it('escalation is undefined when not in config', async () => {
+      await writeFile(join(dir, 'golem.yaml'), 'name: bot\nengine: cursor\n', 'utf-8');
+      const config = await loadConfig(dir);
+      expect(config.escalation).toBeUndefined();
+    });
+
+    it('round-trips escalation through writeConfig/loadConfig', async () => {
+      const escalation = { enabled: true, target: { channel: 'slack', chatId: 'C123' } };
+      await writeConfig(dir, { name: 'test', engine: 'cursor', escalation });
+      const cfg = await loadConfig(dir);
+      expect(cfg.escalation).toEqual(escalation);
+    });
+  });
+
+  describe('refreshSkillInjection', () => {
+    it('returns false when no skills directory exists', async () => {
+      await writeFile(join(dir, 'golem.yaml'), 'name: bot\nengine: cursor\n', 'utf-8');
+      const changed = await refreshSkillInjection(dir);
+      expect(changed).toBe(false);
+    });
+
+    it('regenerates AGENTS.md on first call', async () => {
+      await writeFile(join(dir, 'golem.yaml'), 'name: bot\nengine: cursor\n', 'utf-8');
+      const skillDir = join(dir, 'skills', 'test-skill');
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, 'SKILL.md'), '---\nname: test\ndescription: A test\n---\n# Test\n', 'utf-8');
+
+      const changed = await refreshSkillInjection(dir);
+      expect(changed).toBe(true);
+
+      const agents = await readFile(join(dir, 'AGENTS.md'), 'utf-8');
+      expect(agents).toContain('test-skill');
+    });
+
+    it('returns false on second call without changes', async () => {
+      await writeFile(join(dir, 'golem.yaml'), 'name: bot\nengine: cursor\n', 'utf-8');
+      const skillDir = join(dir, 'skills', 'test-skill');
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, 'SKILL.md'), '---\nname: test\ndescription: A test\n---\n# Test\n', 'utf-8');
+
+      await refreshSkillInjection(dir);
+      const changed = await refreshSkillInjection(dir);
+      expect(changed).toBe(false);
     });
   });
 });

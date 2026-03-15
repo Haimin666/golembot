@@ -62,4 +62,4 @@ docker compose up -d
 
 - Coding Agent CLI（如 `claude`）需要在容器内可用。基础镜像 `node:22-slim` 不包含它 — 你可能需要添加安装步骤。
 - API Key 和通道凭据应通过 `-e` 或 `env_file` 传递，不要写入镜像。
-- 企业微信需要容器可通过公网 URL 访问（Webhook 回调模式）。飞书和钉钉使用出站 WebSocket，可以在 NAT 后运行。
+- 飞书、钉钉和企业微信都使用出站 WebSocket 连接，可以在 NAT 后运行，无需公网 IP。

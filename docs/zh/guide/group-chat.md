@@ -113,6 +113,48 @@ memory/groups/<group-key>.md
 | `mention-only` | 仅被 @mention 时 | 间歇更新——仅在 Bot 被调用时更新 |
 | `always` | 每条消息 | 持续更新 |
 
+## 多 Bot 协作
+
+当多个 GolemBot 实例在同一台机器上运行（各自有独立的 `golem.yaml` 和 Gateway 端口）时，它们通过 **Fleet** 机制自动发现彼此，并在共享群聊中协调分工。
+
+### 工作原理
+
+1. 每个 Gateway 启动时将自身注册到 `~/.golembot/fleet/`
+2. Gateway 定期刷新 peer 列表（每 60 秒）
+3. 在群聊中，prompt 会注入 `[Peers: BotName (role)]` 标头，显示所有同伴 Bot
+4. 群聊历史中每个 Bot 的消息带 `[bot:BotName]` 标签，便于区分
+
+### 快速配置
+
+```bash
+# Bot A：产品分析师
+golembot init -n analyst-bot -e claude-code -r "产品分析师"
+
+# Bot B：用户研究员（在另一个目录）
+golembot init -n research-bot -e claude-code -r "用户研究员"
+```
+
+启动两个 Gateway 即可——它们会自动发现彼此，无需额外配置。
+
+### 不同策略下的协作行为
+
+| 策略 | 多 Bot 行为 |
+|------|-----------|
+| `mention-only` | 仅被 @mention 时回复。轻量引导帮助 Bot 将非本领域问题引导给同伴。 |
+| `smart` | 完整 `[PASS]` 协调——Bot 根据领域专长和同伴角色自行决定是否回复。多 Bot 群聊最推荐此策略。 |
+| `always` | 所有 Bot 回复每条消息。有同伴感知的轻量引导，但不会主动沉默。 |
+
+### 跨 Bot 委派
+
+Bot 可通过 HTTP API 调用同伴，显式委派任务：
+
+```
+POST http://127.0.0.1:<peer-port>/chat
+{"message": "分析用户研究数据", "sessionKey": "delegation-123"}
+```
+
+内置的 `multi-bot` 技能教会 Agent 何时以及如何使用此能力。
+
 ## 会话路由
 
 **私聊消息**使用 per-user key：`${channelType}:${chatId}:${senderId}`——每个用户拥有独立的对话上下文。

@@ -177,6 +177,54 @@ Returns the current bot status and metrics as JSON. Requires authentication.
 }
 ```
 
+### `POST /api/send`
+
+Send a proactive message to an IM channel (group or DM). Requires authentication.
+
+**Body:**
+```json
+{
+  "channel": "feishu",
+  "chatId": "oc_xxxx",
+  "text": "Meeting moved to 3pm"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `channel` | `string` | Yes | Channel name: `feishu`, `dingtalk`, `wecom`, `slack`, `telegram`, `discord` |
+| `chatId` | `string` | Yes | Chat/group/user ID on the target platform |
+| `text` | `string` | Yes | Message content (Markdown supported) |
+
+**Response:**
+```json
+{ "ok": true }
+```
+
+**Error responses:**
+
+| Status | Reason |
+|--------|--------|
+| `400` | Missing required fields |
+| `404` | Channel not found (response includes available channels) |
+| `501` | Channel adapter does not support proactive send |
+| `503` | No channel adapters available |
+
+### `GET /api/channels`
+
+List available IM channels and whether they support proactive send. Requires authentication.
+
+**Response:**
+```json
+{
+  "channels": [
+    { "name": "feishu", "canSend": true },
+    { "name": "slack", "canSend": true },
+    { "name": "dingtalk", "canSend": false }
+  ]
+}
+```
+
 ### `GET /api/events`
 
 Real-time activity stream via Server-Sent Events. Each message processed by the gateway is broadcast as an SSE event. Requires authentication.
@@ -208,7 +256,7 @@ The token is configured via:
 
 ## CORS
 
-The server allows all origins with `GET`, `POST`, `OPTIONS` methods and `Content-Type` + `Authorization` headers.
+The server allows all origins with `GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` methods and `Content-Type` + `Authorization` headers.
 
 ## Using the Server Programmatically
 

@@ -18,7 +18,7 @@ import {
   KNOWN_CHANNELS,
   recordMessage,
 } from './dashboard.js';
-import { registerInstance, unregisterInstance } from './fleet.js';
+import { listInstances, registerInstance, unregisterInstance } from './fleet.js';
 import { startHistoryFetcher } from './history-fetcher.js';
 import { type InboxEntry, InboxStore } from './inbox.js';
 import { type Assistant, type CommandContext, createAssistant, executeCommand, parseCommand } from './index.js';
@@ -137,6 +137,12 @@ export function resolveStreamingConfig(config: GolemConfig): Required<StreamingC
   };
 }
 
+/** Peer bot info for multi-bot awareness in group prompts. */
+export interface PeerBot {
+  name: string;
+  role?: string;
+}
+
 export function buildGroupPrompt(
   history: GroupMessage[],
   senderName: string,
@@ -146,6 +152,8 @@ export function buildGroupPrompt(
   _dir: string,
   /** When set, the message explicitly @mentions someone else — this bot should almost always [PASS]. */
   othersAddressed?: string[],
+  /** Other GolemBot instances discovered via fleet, for multi-bot coordination. */
+  peers?: PeerBot[],
 ): string {
   const parts: string[] = [];
 
@@ -166,6 +174,21 @@ export function buildGroupPrompt(
     }
   }
 
+  // Inject peer bot awareness — lets the agent know about other bots in the fleet
+  if (peers && peers.length > 0) {
+    const peerDescs = peers.map((p) => (p.role ? `${p.name} (${p.role})` : p.name));
+    parts.push(`[Peers: ${peerDescs.join(', ')}]`);
+    // When not in smart mode (no [PASS] instructions), add lighter guidance
+    // so the agent still understands it has peer bots and can defer on out-of-domain topics
+    if (!injectPass) {
+      parts.push(
+        '[System: Other bots listed above are your peers. ' +
+          'Focus on your own domain expertise. If a question is clearly better suited ' +
+          'for a peer, mention them by name and let them handle it.]',
+      );
+    }
+  }
+
   // Inject group identity + memory file path so the agent can read/update group memory
   const safeKey = groupKey.replace(/[^a-z0-9_-]/gi, '-');
   const memoryPath = join('memory', 'groups', `${safeKey}.md`);
@@ -176,7 +199,8 @@ export function buildGroupPrompt(
     const recentHistory = history.slice(0, -1);
     parts.push('--- Recent group conversation ---');
     for (const m of recentHistory) {
-      const label = m.isBot ? '[bot]' : `[${m.senderName}]`;
+      // In multi-bot scenarios, show which bot spoke (not just generic [bot])
+      const label = m.isBot ? `[bot:${m.senderName}]` : `[${m.senderName}]`;
       parts.push(`${label} ${m.text}`);
     }
     parts.push('--- New message ---');
@@ -236,7 +260,7 @@ async function createChannelAdapter(
       return new DingtalkAdapter(channelConfig as unknown as DingtalkChannelConfig);
     }
     case 'wecom': {
-      requireFields(type, channelConfig, ['corpId', 'agentId', 'secret', 'token', 'encodingAESKey']);
+      requireFields(type, channelConfig, ['botId', 'secret']);
       const { WecomAdapter } = await import('./channels/wecom.js');
       return new WecomAdapter(channelConfig as unknown as WecomChannelConfig);
     }
@@ -291,6 +315,8 @@ export async function handleMessage(
   dir: string,
   metrics?: GatewayMetrics,
   cronCtx?: { taskStore: TaskStore; scheduler: Scheduler; runTask: (id: string) => Promise<string> },
+  /** Fleet peers for multi-bot awareness. */
+  peers?: PeerBot[],
 ): Promise<void> {
   const userText = msg.chatType === 'group' ? stripMention(msg.text) : msg.text;
   if (!userText && (!msg.images || msg.images.length === 0)) return;
@@ -323,6 +349,7 @@ export async function handleMessage(
   const senderLabel = msg.senderName || msg.senderId;
   let sessionKey: string;
   let fullText: string;
+  let injectPass = false;
 
   if (msg.chatType === 'group') {
     const groupKey = `${msg.channelType}:${msg.chatId}`;
@@ -342,7 +369,8 @@ export async function handleMessage(
 
     // Always update history buffer, regardless of policy
     const hist = groupHistories.get(groupKey) ?? [];
-    hist.push({ senderName: msg.senderName ?? msg.senderId, text: userText, isBot: false });
+    const isBotSender = msg.senderType === 'bot';
+    hist.push({ senderName: msg.senderName ?? msg.senderId, text: userText, isBot: isBotSender });
     if (hist.length > gc.historyLimit) hist.shift();
     groupHistories.set(groupKey, hist);
 
@@ -362,7 +390,7 @@ export async function handleMessage(
     // Ensure memory/groups/ directory exists (agent will read/write memory files here)
     await mkdir(join(dir, 'memory', 'groups'), { recursive: true }).catch(() => {});
 
-    const injectPass = gc.groupPolicy === 'smart' && !mentioned;
+    injectPass = gc.groupPolicy === 'smart' && !mentioned;
 
     // Use adapter-provided mention info for stronger [PASS] hint in multi-bot chats.
     const othersAddressed = injectPass ? msg.mentionedOthers : undefined;
@@ -375,6 +403,7 @@ export async function handleMessage(
       groupKey,
       dir,
       othersAddressed,
+      peers,
     );
   } else {
     sessionKey = buildSessionKey(msg);
@@ -440,7 +469,11 @@ export async function handleMessage(
     let fullReply = '';
     let hasError = false;
 
-    if (streamingConfig.mode === 'streaming') {
+    // When injectPass is active (smart mode, not mentioned), force buffered behavior
+    // to prevent [PASS] sentinel from leaking to IM before we can detect and suppress it.
+    const effectiveMode = injectPass ? 'buffered' : streamingConfig.mode;
+
+    if (effectiveMode === 'streaming') {
       // ── Streaming mode: send text at logical boundaries ──
       let buffer = '';
 
@@ -498,12 +531,9 @@ export async function handleMessage(
       // Flush remaining buffer
       await flush();
 
-      // [PASS] sentinel — in streaming mode, check the full accumulated reply.
-      // If it was only "[PASS]", the text may have already been sent to IM.
-      // To prevent this, the flush above skips whitespace-only buffers,
-      // but "[PASS]" is non-empty. For smart groups, the [PASS] typically
-      // arrives as a single text event and gets flushed. This is acceptable:
-      // smart mode is an advanced feature, and the tradeoff is documented.
+      // [PASS] sentinel — in streaming mode (which is now only used when injectPass=false),
+      // this check handles the rare case where a non-smart-mode agent outputs [PASS].
+      // Smart-mode [PASS] leak is prevented by forcing buffered mode above.
       const trimmed = fullReply.trim();
       if (trimmed === '[PASS]' || trimmed === '[SKIP]') {
         log(verbose, `[${channelType}] ${trimmed} — bot chose not to respond`);
@@ -784,18 +814,38 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
       return { engine: s.engine, model: s.model };
     },
     taskStore,
+    dir,
   };
 
   // shutdown is assigned later after httpServer is created — use a wrapper
   let shutdownFn: (() => Promise<void>) | undefined;
   const serverOpts: ServerOpts = { port, token, hostname: host, onShutdown: () => shutdownFn?.() };
-  const httpServer: GolemServer = createGolemServer(assistant, serverOpts, dashboardCtx, dir, () =>
-    coordinator ? { taskStore, scheduler, runTask: (id) => coordinator!.runTask(id) } : undefined,
+  const httpServer: GolemServer = createGolemServer(
+    assistant,
+    serverOpts,
+    dashboardCtx,
+    dir,
+    () => (coordinator ? { taskStore, scheduler, runTask: (id) => coordinator!.runTask(id) } : undefined),
+    () => adapterMap,
   );
 
   // Declare scheduler & coordinator early so adapter callbacks can reference them safely.
   const scheduler = new Scheduler();
   let coordinator: ProactiveCoordinator | undefined;
+
+  // ── Fleet peer cache (multi-bot awareness) ─────────────────────────────────
+  let fleetPeers: PeerBot[] = [];
+  const refreshFleetPeers = async () => {
+    try {
+      const instances = await listInstances();
+      fleetPeers = instances.filter((i) => i.name !== config.name).map((i) => ({ name: i.name, role: i.role }));
+    } catch {
+      /* best effort */
+    }
+  };
+  await refreshFleetPeers();
+  const peerRefreshTimer = setInterval(refreshFleetPeers, 60_000);
+  peerRefreshTimer.unref();
 
   const adapters: ChannelAdapter[] = [];
   const adapterMap = new Map<string, ChannelAdapter>();
@@ -849,6 +899,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
               dir,
               metrics,
               coordinator ? { taskStore, scheduler, runTask: (id) => coordinator!.runTask(id) } : undefined,
+              fleetPeers,
             ),
           );
         }
@@ -949,6 +1000,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
           dir,
           metrics,
           coordinator ? { taskStore, scheduler, runTask: (id) => coordinator!.runTask(id) } : undefined,
+          fleetPeers,
         );
       },
       verbose,
@@ -1030,6 +1082,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
         .map((c) => ({ type: c.type, status: c.status })),
       authEnabled: !!token,
       dir,
+      role: config.persona?.role,
     }).catch(() => {}); // best-effort
   });
 
@@ -1040,6 +1093,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
   const shutdown = async () => {
     console.log('\nShutting down Gateway...');
     clearInterval(purgeTimer);
+    clearInterval(peerRefreshTimer);
     if (historyPoller) historyPoller.stop();
     if (inboxConsumer) inboxConsumer.stop();
     if (coordinator) coordinator.stop();

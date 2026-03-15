@@ -101,12 +101,8 @@ channels:
     clientId: ${DINGTALK_CLIENT_ID}
     clientSecret: ${DINGTALK_CLIENT_SECRET}
   wecom:
-    corpId: ${WECOM_CORP_ID}
-    agentId: ${WECOM_AGENT_ID}
+    botId: ${WECOM_BOT_ID}
     secret: ${WECOM_SECRET}
-    token: ${WECOM_TOKEN}
-    encodingAESKey: ${WECOM_ENCODING_AES_KEY}
-    port: 9000
 
 # Optional: gateway service configuration
 gateway:
@@ -142,6 +138,7 @@ gateway:
 | `inbox` | `object` | — | Persistent message queue — see [`inbox`](#inbox) section |
 | `historyFetch` | `object` | — | History fetch for missed messages — see [`historyFetch`](#historyfetch) section |
 | `oauthToken` | `string` | — | Claude Max subscription token (from `claude setup-token`). Claude Code engine only — see [Claude Code](/engines/claude-code#claude-max-subscription) |
+| `persona` | `object` | — | Structured agent identity — see [`persona`](#persona) section |
 | `provider` | `object` | — | Third-party LLM provider routing — see [Provider Routing](/guide/provider-routing) |
 | `gateway` | `object` | — | Gateway service settings |
 
@@ -176,6 +173,24 @@ permissions:
 | `deniedCommands` | `string[]` | Shell commands the agent must not run |
 
 All fields are optional. Empty or omitted arrays have no effect. Run `golembot init` after changing permissions to regenerate `.cursor/cli.json`.
+
+### `persona`
+
+Structured agent identity rendered into `AGENTS.md`. The `role` field is also propagated to fleet registration, enabling multi-bot peer awareness.
+
+```yaml
+persona:
+  role: product analyst
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `role` | `string` | Agent's domain role (e.g. `"product analyst"`, `"customer support"`, `"user researcher"`) |
+| `displayName` | `string` | Display name (defaults to `name`) |
+| `tone` | `string` | Communication style (e.g. `"professional"`, `"casual"`) |
+| `boundaries` | `string[]` | Topics or actions the agent should decline |
+
+You can also set the role during initialization with `golembot init --role "product analyst"`.
 
 ### `streaming`
 
@@ -407,8 +422,7 @@ interface GolemConfig {
     feishu?: { appId: string; appSecret: string };
     dingtalk?: { clientId: string; clientSecret: string };
     wecom?: {
-      corpId: string; agentId: string; secret: string;
-      token: string; encodingAESKey: string; port?: number;
+      botId: string; secret: string; websocketUrl?: string;
     };
     slack?: { botToken: string; appToken: string };
     telegram?: { botToken: string };

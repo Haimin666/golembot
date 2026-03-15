@@ -102,12 +102,8 @@ channels:
     clientId: ${DINGTALK_CLIENT_ID}
     clientSecret: ${DINGTALK_CLIENT_SECRET}
   wecom:
-    corpId: ${WECOM_CORP_ID}
-    agentId: ${WECOM_AGENT_ID}
+    botId: ${WECOM_BOT_ID}
     secret: ${WECOM_SECRET}
-    token: ${WECOM_TOKEN}
-    encodingAESKey: ${WECOM_ENCODING_AES_KEY}
-    port: 9000
 
 # 可选：Gateway 服务配置
 gateway:
@@ -143,6 +139,7 @@ gateway:
 | `inbox` | `object` | — | 持久化消息队列，详见 [`inbox`](#inbox) |
 | `historyFetch` | `object` | — | 历史消息抓取，详见 [`historyFetch`](#historyfetch) |
 | `oauthToken` | `string` | — | Claude Max 订阅 token（通过 `claude setup-token` 生成），仅 Claude Code 引擎。详见 [Claude Code](/zh/engines/claude-code#claude-max-订阅) |
+| `persona` | `object` | — | 结构化 Agent 身份，详见 [`persona`](#persona) |
 | `provider` | `object` | — | 第三方 LLM 供应商路由，详见 [Provider 路由](/zh/guide/provider-routing) |
 | `gateway` | `object` | — | Gateway 服务设置 |
 
@@ -177,6 +174,24 @@ permissions:
 | `deniedCommands` | `string[]` | Agent 不可执行的 Shell 命令 |
 
 所有字段可选。空数组或未提供不产生影响。修改 permissions 后需重新运行 `golembot init` 以重新生成 `.cursor/cli.json`。
+
+### `persona`
+
+结构化 Agent 身份，渲染到 `AGENTS.md` 中。`role` 字段会传播到 Fleet 注册，支持多 Bot 互相感知彼此的专长。
+
+```yaml
+persona:
+  role: product analyst
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `role` | `string` | Agent 领域角色（如 `"产品分析师"`、`"客户支持"`、`"用户研究员"`） |
+| `displayName` | `string` | 显示名称（默认使用 `name`） |
+| `tone` | `string` | 沟通风格（如 `"专业"`、`"随意"`） |
+| `boundaries` | `string[]` | Agent 应拒绝的话题或操作 |
+
+也可以在初始化时直接设置角色：`golembot init --role "产品分析师"`。
 
 ### `streaming`
 
@@ -367,8 +382,7 @@ interface GolemConfig {
     feishu?: { appId: string; appSecret: string };
     dingtalk?: { clientId: string; clientSecret: string };
     wecom?: {
-      corpId: string; agentId: string; secret: string;
-      token: string; encodingAESKey: string; port?: number;
+      botId: string; secret: string; websocketUrl?: string;
     };
     slack?: { botToken: string; appToken: string };
     telegram?: { botToken: string };

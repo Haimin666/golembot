@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { lstat, mkdir, readdir, symlink, unlink } from 'node:fs/promises';
+import { lstat, mkdir, readdir, symlink, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import type { AgentEngine, InvokeOpts, ListModelsOpts, StreamEvent } from '../engine.js';
@@ -140,6 +140,16 @@ function findAgentBin(): string {
 export class CursorEngine implements AgentEngine {
   async *invoke(prompt: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
     await injectSkills(opts.workspace, opts.skillPaths);
+
+    if (opts.mcpConfig && Object.keys(opts.mcpConfig).length > 0) {
+      const cursorDir = join(opts.workspace, '.cursor');
+      await mkdir(cursorDir, { recursive: true });
+      const mcpServers: Record<string, unknown> = {};
+      for (const [name, cfg] of Object.entries(opts.mcpConfig)) {
+        mcpServers[name] = { command: cfg.command, args: cfg.args, env: cfg.env };
+      }
+      await writeFile(join(cursorDir, 'mcp.json'), `${JSON.stringify({ mcpServers }, null, 2)}\n`, 'utf-8');
+    }
 
     const agentBin = findAgentBin();
     const args = [

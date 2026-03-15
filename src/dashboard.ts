@@ -1,7 +1,17 @@
+import { readdir, readFile } from 'node:fs/promises';
 import type { ServerResponse } from 'node:http';
+import { join } from 'node:path';
 import type { TaskExecution, TaskRecord, TaskStore } from './task-store.js';
 import { BASE_CSS, DOCS_BASE, ENGINE_COLORS, esc, FAVICON, formatUptime } from './ui-shared.js';
-import type { GolemConfig, SkillInfo } from './workspace.js';
+import type { GolemConfig, PersonaConfig, SkillInfo } from './workspace.js';
+
+export interface EscalationEntry {
+  ts: string;
+  reason: string;
+  sessionKey?: string;
+  context?: string;
+  status?: 'open' | 'resolved';
+}
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -42,6 +52,8 @@ export interface DashboardContext {
   getRuntimeStatus?: () => Promise<{ engine: string; model: string | undefined }>;
   /** Optional: task store for scheduled tasks panel. */
   taskStore?: TaskStore;
+  /** Working directory for reading .golem/ files. */
+  dir?: string;
 }
 
 export function createMetrics(): GatewayMetrics {
@@ -99,7 +111,7 @@ interface DashboardData {
   version: string;
   uptime: number;
   channels: ChannelStatus[];
-  skills: { name: string; description: string }[];
+  skills: { name: string; description: string; type?: string }[];
   metrics: {
     totalMessages: number;
     totalCostUsd: number;
@@ -112,6 +124,10 @@ interface DashboardData {
   port: number;
   tasks: TaskRecord[];
   taskHistory: Map<string, TaskExecution[]>;
+  escalations: EscalationEntry[];
+  persona?: PersonaConfig;
+  activeSessions?: { key: string; lastActivity: string }[];
+  memoryOverview?: { notesPreview?: string; groupFiles?: string[]; recentSummaries?: string[] };
 }
 
 export async function buildDashboardData(ctx: DashboardContext): Promise<DashboardData> {
@@ -152,7 +168,7 @@ export async function buildDashboardData(ctx: DashboardContext): Promise<Dashboa
     version: ctx.version,
     uptime: Date.now() - ctx.startTime,
     channels: ctx.channelStatuses,
-    skills: ctx.skills.map((s) => ({ name: s.name, description: s.description })),
+    skills: ctx.skills.map((s) => ({ name: s.name, description: s.description, type: s.type })),
     metrics: {
       totalMessages: ctx.metrics.totalMessages,
       totalCostUsd: ctx.metrics.totalCostUsd,
@@ -165,7 +181,88 @@ export async function buildDashboardData(ctx: DashboardContext): Promise<Dashboa
     port: ctx.config.gateway?.port ?? 3000,
     tasks,
     taskHistory,
+    escalations: await loadEscalations(ctx.dir),
+    persona: ctx.config.persona,
+    activeSessions: await loadActiveSessions(ctx.dir),
+    memoryOverview: await loadMemoryOverview(ctx.dir),
   };
+}
+
+// ── Escalation data ─────────────────────────────────────────────────────────
+
+async function loadEscalations(dir?: string): Promise<EscalationEntry[]> {
+  if (!dir) return [];
+  try {
+    const raw = await readFile(join(dir, '.golem', 'escalations.jsonl'), 'utf-8');
+    const entries: EscalationEntry[] = [];
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        entries.push(JSON.parse(trimmed) as EscalationEntry);
+      } catch {
+        /* skip malformed */
+      }
+    }
+    return entries.slice(-20); // keep most recent 20
+  } catch {
+    return [];
+  }
+}
+
+// ── Active sessions data ─────────────────────────────────────────────────────
+
+async function loadActiveSessions(dir?: string): Promise<{ key: string; lastActivity: string }[]> {
+  if (!dir) return [];
+  try {
+    const raw = await readFile(join(dir, '.golem', 'sessions.json'), 'utf-8');
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data)) return [];
+    return data
+      .filter((s: Record<string, unknown>) => s.key && s.lastActivity)
+      .slice(-20)
+      .map((s: Record<string, unknown>) => ({ key: String(s.key), lastActivity: String(s.lastActivity) }));
+  } catch {
+    return [];
+  }
+}
+
+// ── Memory overview data ─────────────────────────────────────────────────────
+
+async function loadMemoryOverview(
+  dir?: string,
+): Promise<{ notesPreview?: string; groupFiles?: string[]; recentSummaries?: string[] } | undefined> {
+  if (!dir) return undefined;
+
+  let notesPreview: string | undefined;
+  try {
+    const notes = await readFile(join(dir, 'notes.md'), 'utf-8');
+    notesPreview = notes.slice(0, 300);
+  } catch {
+    /* no notes.md */
+  }
+
+  let groupFiles: string[] | undefined;
+  try {
+    const entries = await readdir(join(dir, 'memory', 'groups'));
+    groupFiles = entries.filter((e) => e.endsWith('.md') || e.endsWith('.json'));
+  } catch {
+    /* no memory/groups */
+  }
+
+  let recentSummaries: string[] | undefined;
+  try {
+    const entries = await readdir(join(dir, 'memory', 'summaries'));
+    recentSummaries = entries
+      .filter((e) => e.endsWith('.md') || e.endsWith('.json'))
+      .sort()
+      .slice(-5);
+  } catch {
+    /* no memory/summaries */
+  }
+
+  if (!notesPreview && !groupFiles && !recentSummaries) return undefined;
+  return { notesPreview, groupFiles, recentSummaries };
 }
 
 // ── HTML section renderers ───────────────────────────────────────────────────
@@ -716,6 +813,26 @@ pre{background:var(--bg);border:1px solid var(--border);border-radius:6px;paddin
 .task-result{margin-top:10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:12px;font-family:"SFMono-Regular",Consolas,monospace;white-space:pre-wrap;max-height:200px;overflow-y:auto;display:none;line-height:1.5}
 .dim{color:var(--dim)}
 
+/* Persona card */
+.persona-row{display:flex;gap:12px;padding:4px 0;font-size:13px}
+.persona-label{font-weight:600;min-width:110px;color:var(--dim)}
+
+/* Skill inventory */
+.skill-group{margin-bottom:12px}
+.skill-type-badge{display:inline-block;font-size:10px;font-weight:600;color:#fff;padding:2px 8px;border-radius:10px;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px}
+
+/* Active sessions */
+.session-row{display:flex;gap:12px;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border)}
+.session-key{font-family:"SFMono-Regular",Consolas,monospace;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-time{font-size:11px;color:var(--dim);flex-shrink:0}
+
+/* Memory overview */
+.memory-section{margin-bottom:12px}
+.memory-section h3{font-size:12px;font-weight:600;color:var(--dim);margin:0 0 6px 0;text-transform:uppercase;letter-spacing:0.5px}
+.memory-preview{font-size:12px;max-height:100px;overflow:hidden;margin:0;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;white-space:pre-wrap;line-height:1.4}
+.memory-list{display:flex;flex-wrap:wrap;gap:6px}
+.memory-file{font-size:11px;background:var(--bg);border:1px solid var(--border);padding:2px 8px;border-radius:4px;font-family:"SFMono-Regular",Consolas,monospace}
+
 /* Responsive (dashboard-specific) */
 @media(max-width:768px){
   .feed-row{grid-template-columns:1fr;gap:2px}
@@ -725,6 +842,171 @@ pre{background:var(--bg);border:1px solid var(--border);border-radius:6px;paddin
   .task-main{grid-template-columns:12px 1fr;gap:4px}
   .task-hist-row{grid-template-columns:1fr 1fr;gap:4px}
 }`.trim();
+
+// ── Persona card panel ──────────────────────────────────────────────────────
+
+function renderPersonaCard(data: DashboardData): string {
+  if (!data.persona || (!data.persona.displayName && !data.persona.role)) return '';
+
+  const rows: string[] = [];
+  if (data.persona.displayName)
+    rows.push(
+      `<div class="persona-row"><span class="persona-label">Display Name</span><span>${esc(data.persona.displayName)}</span></div>`,
+    );
+  if (data.persona.role)
+    rows.push(
+      `<div class="persona-row"><span class="persona-label">Role</span><span>${esc(data.persona.role)}</span></div>`,
+    );
+  if (data.persona.tone)
+    rows.push(
+      `<div class="persona-row"><span class="persona-label">Tone</span><span>${esc(data.persona.tone)}</span></div>`,
+    );
+  if (data.persona.boundaries?.length) {
+    rows.push(
+      `<div class="persona-row"><span class="persona-label">Boundaries</span><span>${data.persona.boundaries.map((b) => esc(b)).join(', ')}</span></div>`,
+    );
+  }
+
+  return `
+<div class="card" style="margin-bottom:24px">
+  <h2><span class="icon">🎭</span> Persona</h2>
+  ${rows.join('\n')}
+</div>`;
+}
+
+// ── Skill inventory panel ────────────────────────────────────────────────────
+
+function renderSkillInventory(data: DashboardData): string {
+  if (data.skills.length === 0) return '';
+  const hasTypes = data.skills.some((s) => s.type);
+  if (!hasTypes) return ''; // Already rendered in Monitoring section
+
+  const grouped = new Map<string, typeof data.skills>();
+  for (const s of data.skills) {
+    const key = s.type || 'other';
+    const list = grouped.get(key) || [];
+    list.push(s);
+    grouped.set(key, list);
+  }
+
+  const typeColors: Record<string, string> = {
+    behavior: '#3b82f6',
+    capability: '#8b5cf6',
+    protocol: '#f59e0b',
+    integration: '#10b981',
+    other: '#6b7280',
+  };
+
+  const sections = [...grouped.entries()]
+    .map(([type, items]) => {
+      const color = typeColors[type] ?? typeColors.other;
+      const skillRows = items
+        .map(
+          (s) =>
+            `<div class="skill-row"><span class="skill-name">${esc(s.name)}</span><span class="skill-desc">${esc(s.description)}</span></div>`,
+        )
+        .join('\n');
+      return `<div class="skill-group"><span class="skill-type-badge" style="background:${color}">${esc(type)}</span>${skillRows}</div>`;
+    })
+    .join('\n');
+
+  return `
+<div class="card" style="margin-bottom:24px">
+  <h2><span class="icon">⚡</span> Skill Inventory</h2>
+  <p class="card-desc">${data.skills.length} skill${data.skills.length !== 1 ? 's' : ''} loaded, grouped by type</p>
+  ${sections}
+</div>`;
+}
+
+// ── Active sessions panel ────────────────────────────────────────────────────
+
+function renderActiveSessionsPanel(data: DashboardData): string {
+  if (!data.activeSessions || data.activeSessions.length === 0) return '';
+
+  const rows = data.activeSessions
+    .slice()
+    .reverse()
+    .slice(0, 10)
+    .map(
+      (s) =>
+        `<div class="session-row"><span class="session-key">${esc(s.key)}</span><span class="session-time">${esc(s.lastActivity)}</span></div>`,
+    )
+    .join('\n');
+
+  return `
+<div class="card" style="margin-bottom:24px">
+  <h2><span class="icon">💬</span> Active Sessions <span class="dim" style="font-weight:400;font-size:13px">(${data.activeSessions.length})</span></h2>
+  ${rows}
+</div>`;
+}
+
+// ── Memory overview panel ────────────────────────────────────────────────────
+
+function renderMemoryOverview(data: DashboardData): string {
+  if (!data.memoryOverview) return '';
+
+  const sections: string[] = [];
+
+  if (data.memoryOverview.notesPreview) {
+    sections.push(
+      `<div class="memory-section"><h3>Notes</h3><pre class="memory-preview">${esc(data.memoryOverview.notesPreview)}${data.memoryOverview.notesPreview.length >= 300 ? '…' : ''}</pre></div>`,
+    );
+  }
+
+  if (data.memoryOverview.groupFiles?.length) {
+    sections.push(
+      `<div class="memory-section"><h3>Memory Groups</h3><div class="memory-list">${data.memoryOverview.groupFiles.map((f) => `<span class="memory-file">${esc(f)}</span>`).join('')}</div></div>`,
+    );
+  }
+
+  if (data.memoryOverview.recentSummaries?.length) {
+    sections.push(
+      `<div class="memory-section"><h3>Recent Summaries</h3><div class="memory-list">${data.memoryOverview.recentSummaries.map((f) => `<span class="memory-file">${esc(f)}</span>`).join('')}</div></div>`,
+    );
+  }
+
+  if (sections.length === 0) return '';
+
+  return `
+<div class="card" style="margin-bottom:24px">
+  <h2><span class="icon">🧠</span> Memory</h2>
+  ${sections.join('\n')}
+</div>`;
+}
+
+// ── Escalation panel ─────────────────────────────────────────────────────────
+
+function renderEscalationPanel(data: DashboardData): string {
+  if (data.escalations.length === 0) return '';
+
+  const rows = data.escalations
+    .slice()
+    .reverse()
+    .map((e) => {
+      const statusBadge =
+        e.status === 'resolved' ? '<span class="task-ok">resolved</span>' : '<span class="task-err">open</span>';
+      return `<tr>
+        <td style="font-size:11px;color:var(--dim)">${esc(e.ts)}</td>
+        <td>${esc(e.reason)}</td>
+        <td style="font-size:11px;color:var(--dim)">${esc(e.sessionKey ?? '')}</td>
+        <td>${statusBadge}</td>
+      </tr>`;
+    })
+    .join('');
+
+  return `<section>
+<h2>Escalations</h2>
+<table style="width:100%;border-collapse:collapse;font-size:13px">
+<thead><tr style="border-bottom:2px solid var(--border);font-size:11px;font-weight:600;color:var(--dim)">
+  <th style="text-align:left;padding:4px 0">Time</th>
+  <th style="text-align:left;padding:4px 0">Reason</th>
+  <th style="text-align:left;padding:4px 0">Session</th>
+  <th style="text-align:left;padding:4px 0">Status</th>
+</tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+}
 
 // ── Main renderer (assembler) ────────────────────────────────────────────────
 
@@ -741,10 +1023,15 @@ export function renderDashboard(data: DashboardData): string {
 <body>
 <div class="container">
 ${renderHeader(data)}
+${renderPersonaCard(data)}
 ${renderAccessCards(data)}
 ${renderQuickTest(data)}
 ${renderScheduledTasks(data)}
+${renderEscalationPanel(data)}
+${renderSkillInventory(data)}
 ${renderMonitoring(data)}
+${renderActiveSessionsPanel(data)}
+${renderMemoryOverview(data)}
 ${renderActivityFeed(data)}
 ${renderFooter()}
 </div>

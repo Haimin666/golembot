@@ -268,7 +268,7 @@ await adapter.start(async (msg) => {
 |---------|--------------|-----|
 | `FeishuAdapter` | `feishu` | `@larksuiteoapi/node-sdk` |
 | `DingtalkAdapter` | `dingtalk` | `dingtalk-stream` |
-| `WecomAdapter` | `wecom` | `@wecom/crypto` + `xml2js` |
+| `WecomAdapter` | `wecom` | `@wecom/aibot-node-sdk` |
 | `SlackAdapter` | `slack` | `@slack/bolt` |
 | `TelegramAdapter` | `telegram` | `grammy` |
 | `DiscordAdapter` | `discord` | `discord.js` |

@@ -18,12 +18,9 @@ export interface DingtalkChannelConfig {
 }
 
 export interface WecomChannelConfig {
-  corpId: string;
-  agentId: string;
+  botId: string;
   secret: string;
-  token: string;
-  encodingAESKey: string;
-  port?: number;
+  websocketUrl?: string;
 }
 
 export interface SlackChannelConfig {
@@ -98,6 +95,24 @@ export interface PermissionsConfig {
   deniedCommands?: string[];
 }
 
+export interface PersonaConfig {
+  displayName?: string;
+  role?: string;
+  tone?: string;
+  boundaries?: string[];
+}
+
+export interface McpServerConfig {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
+
+export interface EscalationConfig {
+  target?: import('./scheduler.js').TaskTarget;
+  enabled?: boolean;
+}
+
 export interface ProviderConfig {
   /** API base URL (e.g. "https://api.minimax.chat/v1") */
   baseUrl?: string;
@@ -170,12 +185,19 @@ export interface GolemConfig {
   inbox?: import('./inbox.js').InboxConfig;
   /** Historical message fetching for offline awareness. */
   historyFetch?: import('./history-fetcher.js').HistoryFetchConfig;
+  /** Structured agent identity — rendered into AGENTS.md as a persona section. */
+  persona?: PersonaConfig;
+  /** MCP server configurations — passed through to the underlying engine. */
+  mcp?: Record<string, McpServerConfig>;
+  /** Human escalation configuration — when the agent cannot handle a request. */
+  escalation?: EscalationConfig;
 }
 
 export interface SkillInfo {
   name: string;
   path: string;
   description: string;
+  type?: string;
 }
 
 /**
@@ -260,6 +282,26 @@ export async function loadConfig(dir: string): Promise<GolemConfig> {
       initialLookbackMinutes: typeof hf.initialLookbackMinutes === 'number' ? hf.initialLookbackMinutes : undefined,
     };
   }
+  if (doc.persona && typeof doc.persona === 'object') {
+    const p = doc.persona as Record<string, unknown>;
+    config.persona = {
+      displayName: typeof p.displayName === 'string' ? p.displayName : undefined,
+      role: typeof p.role === 'string' ? p.role : undefined,
+      tone: typeof p.tone === 'string' ? p.tone : undefined,
+      boundaries: Array.isArray(p.boundaries) ? (p.boundaries as string[]) : undefined,
+    };
+  }
+  if (doc.escalation && typeof doc.escalation === 'object') {
+    const esc = doc.escalation as Record<string, unknown>;
+    config.escalation = {
+      target:
+        esc.target && typeof esc.target === 'object' ? resolveEnvPlaceholders(esc.target as TaskTarget) : undefined,
+      enabled: typeof esc.enabled === 'boolean' ? esc.enabled : undefined,
+    };
+  }
+  if (doc.mcp && typeof doc.mcp === 'object') {
+    config.mcp = resolveEnvPlaceholders(doc.mcp as Record<string, McpServerConfig>);
+  }
   if (doc.inbox && typeof doc.inbox === 'object') {
     const inbox = doc.inbox as Record<string, unknown>;
     config.inbox = {
@@ -328,6 +370,9 @@ export async function writeConfig(dir: string, config: GolemConfig): Promise<voi
   if (config.provider) content.provider = config.provider;
   if (config.inbox) content.inbox = config.inbox;
   if (config.historyFetch) content.historyFetch = config.historyFetch;
+  if (config.persona) content.persona = config.persona;
+  if (config.mcp) content.mcp = config.mcp;
+  if (config.escalation) content.escalation = config.escalation;
   await writeFile(configPath, yaml.dump(content, { lineWidth: -1 }), 'utf-8');
 }
 
@@ -364,6 +409,7 @@ export async function scanSkills(dir: string): Promise<SkillInfo[]> {
         name: basename(skillDir),
         path: skillDir,
         description: fm.description || fm.name || basename(skillDir),
+        type: fm.type || undefined,
       });
     } catch {
       // no SKILL.md — skip this directory
@@ -372,15 +418,49 @@ export async function scanSkills(dir: string): Promise<SkillInfo[]> {
   return skills;
 }
 
-export async function generateAgentsMd(dir: string, skills: SkillInfo[], systemPrompt?: string): Promise<void> {
-  const skillList =
-    skills.length > 0 ? skills.map((s) => `- ${s.name}: ${s.description}`).join('\n') : '- (no skills installed)';
+export async function generateAgentsMd(
+  dir: string,
+  skills: SkillInfo[],
+  systemPrompt?: string,
+  persona?: PersonaConfig,
+): Promise<void> {
+  let skillList: string;
+  if (skills.length === 0) {
+    skillList = '- (no skills installed)';
+  } else if (skills.some((s) => s.type)) {
+    // Group by type when at least one skill has a type
+    const grouped = new Map<string, SkillInfo[]>();
+    for (const s of skills) {
+      const key = s.type || 'other';
+      const list = grouped.get(key) || [];
+      list.push(s);
+      grouped.set(key, list);
+    }
+    skillList = [...grouped.entries()]
+      .map(([type, items]) => `### ${type}\n${items.map((s) => `- ${s.name}: ${s.description}`).join('\n')}`)
+      .join('\n\n');
+  } else {
+    skillList = skills.map((s) => `- ${s.name}: ${s.description}`).join('\n');
+  }
+
+  let personaSection = '';
+  if (persona && (persona.displayName || persona.role)) {
+    const lines: string[] = [];
+    if (persona.displayName) lines.push(`- Display Name: ${persona.displayName}`);
+    if (persona.role) lines.push(`- Role: ${persona.role}`);
+    if (persona.tone) lines.push(`- Tone: ${persona.tone}`);
+    if (persona.boundaries?.length) {
+      lines.push('- Boundaries:');
+      for (const b of persona.boundaries) lines.push(`  - ${b}`);
+    }
+    personaSection = `## Persona\n${lines.join('\n')}\n\n`;
+  }
 
   const systemPromptSection = systemPrompt ? `## System Instructions\n${systemPrompt}\n\n` : '';
 
   const content = `# Assistant Context
 
-${systemPromptSection}## Installed Skills
+${personaSection}${systemPromptSection}## Installed Skills
 ${skillList}
 
 ## Directory Structure
@@ -401,8 +481,58 @@ export async function ensureReady(dir: string): Promise<{
 }> {
   const config = await loadConfig(dir);
   const skills = await scanSkills(dir);
-  await generateAgentsMd(dir, skills, config.systemPrompt);
+  await generateAgentsMd(dir, skills, config.systemPrompt, config.persona);
   return { config, skills };
+}
+
+/**
+ * Re-scan skills and regenerate AGENTS.md if the skills directory has changed.
+ *
+ * Compares the skills directory mtime against a cached timestamp.
+ * Returns true if AGENTS.md was regenerated, false if no change detected.
+ */
+const _skillsMtimeCache = new Map<string, number>();
+
+export async function refreshSkillInjection(dir: string): Promise<boolean> {
+  const skillsDir = join(dir, 'skills');
+  let mtime: number;
+  try {
+    const s = await stat(skillsDir);
+    mtime = s.mtimeMs;
+  } catch {
+    return false; // no skills directory
+  }
+
+  const cached = _skillsMtimeCache.get(dir);
+  if (cached !== undefined && cached >= mtime) {
+    return false; // no change
+  }
+
+  // Check individual skill subdirectories for deeper change detection
+  let maxMtime = mtime;
+  try {
+    const entries = await readdir(skillsDir);
+    for (const entry of entries) {
+      try {
+        const s = await stat(join(skillsDir, entry));
+        if (s.mtimeMs > maxMtime) maxMtime = s.mtimeMs;
+      } catch {
+        /* skip */
+      }
+    }
+  } catch {
+    /* use directory mtime */
+  }
+
+  if (cached !== undefined && cached >= maxMtime) {
+    return false;
+  }
+
+  const config = await loadConfig(dir);
+  const skills = await scanSkills(dir);
+  await generateAgentsMd(dir, skills, config.systemPrompt, config.persona);
+  _skillsMtimeCache.set(dir, maxMtime);
+  return true;
 }
 
 export async function initWorkspace(dir: string, config: GolemConfig, builtinSkillsDir: string): Promise<void> {
@@ -416,7 +546,7 @@ export async function initWorkspace(dir: string, config: GolemConfig, builtinSki
 
   await writeConfig(dir, config);
 
-  const builtinSkills = ['general', 'im-adapter'];
+  const builtinSkills = ['general', 'im-adapter', 'multi-bot', 'message-push'];
   for (const skillName of builtinSkills) {
     const skillDest = join(dir, 'skills', skillName);
     await mkdir(skillDest, { recursive: true });

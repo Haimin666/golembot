@@ -73,10 +73,9 @@
   "peerDependencies": {
     "@larksuiteoapi/node-sdk": "^1.24.0",
     "@slack/bolt": "^4.0.0",
-    "@wecom/crypto": "^1.0.0",
+    "@wecom/aibot-node-sdk": "^1.0.0",
     "dingtalk-stream": "^2.0.0",
-    "grammy": "^1.0.0",
-    "xml2js": "^0.6.0"
+    "grammy": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@larksuiteoapi/node-sdk": {
@@ -88,13 +87,10 @@
     "dingtalk-stream": {
       "optional": true
     },
-    "@wecom/crypto": {
+    "@wecom/aibot-node-sdk": {
       "optional": true
     },
     "grammy": {
-      "optional": true
-    },
-    "xml2js": {
       "optional": true
     }
   },
@@ -109,7 +105,6 @@
     "@slack/bolt": "^4.6.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
-    "@types/xml2js": "^0.4.14",
     "grammy": "^1.41.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.3.2",

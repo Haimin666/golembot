@@ -335,26 +335,17 @@ export async function runOnboard(opts: { dir?: string; template?: string } = {})
   if (channels.includes('wecom')) {
     console.log('\n📱 WeCom config (get credentials at: https://work.weixin.qq.com/wework_admin/frame#apps)');
     const wcAnswer = await inquirer.default.prompt([
-      { type: 'input', name: 'corpId', message: 'Corp ID:', default: '' },
-      { type: 'input', name: 'agentId', message: 'Agent ID:', default: '' },
+      { type: 'input', name: 'botId', message: 'Bot ID:', default: '' },
       { type: 'password', name: 'secret', message: 'Secret:', mask: '*', default: '' },
-      { type: 'input', name: 'token', message: 'Token:', default: '' },
-      { type: 'input', name: 'encodingAESKey', message: 'EncodingAESKey:', default: '' },
     ]);
 
-    if (wcAnswer.corpId) {
+    if (wcAnswer.botId) {
       channelsConfig.wecom = {
-        corpId: '${WECOM_CORP_ID}',
-        agentId: '${WECOM_AGENT_ID}',
+        botId: '${WECOM_BOT_ID}',
         secret: '${WECOM_SECRET}',
-        token: '${WECOM_TOKEN}',
-        encodingAESKey: '${WECOM_ENCODING_AES_KEY}',
       };
-      envLines.push(`WECOM_CORP_ID=${wcAnswer.corpId}`);
-      envLines.push(`WECOM_AGENT_ID=${wcAnswer.agentId}`);
+      envLines.push(`WECOM_BOT_ID=${wcAnswer.botId}`);
       envLines.push(`WECOM_SECRET=${wcAnswer.secret}`);
-      envLines.push(`WECOM_TOKEN=${wcAnswer.token}`);
-      envLines.push(`WECOM_ENCODING_AES_KEY=${wcAnswer.encodingAESKey}`);
     }
   }
 

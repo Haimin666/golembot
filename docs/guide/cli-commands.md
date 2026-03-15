@@ -7,15 +7,16 @@ GolemBot provides a set of CLI commands for managing and running your assistant.
 Initialize a new assistant directory.
 
 ```bash
-golembot init [-e <engine>] [-n <name>]
+golembot init [-e <engine>] [-n <name>] [-r <role>]
 ```
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-e, --engine <engine>` | Engine type (`cursor`, `claude-code`, `opencode`, `codex`) | `cursor` |
 | `-n, --name <name>` | Assistant name | Interactive prompt |
+| `-r, --role <role>` | Persona role (e.g. `"product analyst"`, `"customer support"`) | — |
 
-Creates `golem.yaml`, `skills/` (with built-in skills), `AGENTS.md`, `.golem/`, and `.gitignore`.
+Creates `golem.yaml`, `skills/` (with built-in skills: `general`, `im-adapter`, `multi-bot`), `AGENTS.md`, `.golem/`, and `.gitignore`. When `--role` is provided, it writes `persona.role` into `golem.yaml` — this role is propagated to fleet registration so peer bots can see each other's specializations.
 
 ## `golembot run`
 
@@ -247,13 +248,29 @@ golembot skill list [-d <dir>]
 
 Lists all installed skills with their descriptions.
 
+### `golembot skill search <query>`
+
+```bash
+golembot skill search <query> [-d <dir>] [--registry <name>] [--json]
+```
+
+Search for skills in a community registry.
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--registry <name>` | Registry to search (`clawhub`, `skills.sh`) | `clawhub` |
+| `--json` | Output JSON (agent-friendly) | `false` |
+
 ### `golembot skill add <source>`
 
 ```bash
 golembot skill add <source> [-d <dir>]
 ```
 
-Copies a skill directory from `<source>` into the assistant's `skills/` folder. The source must contain a `SKILL.md` file.
+Copies a skill directory from `<source>` into the assistant's `skills/` folder. The source can be:
+
+- A local path (must contain a `SKILL.md` file)
+- A registry reference: `clawhub:<slug>` or `skills.sh:<owner>/<repo>/<skill>`
 
 ### `golembot skill remove <name>`
 

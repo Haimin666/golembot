@@ -71,9 +71,9 @@ Create a directory under `skills/` containing a `SKILL.md` file with YAML frontm
 
 Claude Code reads `CLAUDE.md` for project-level instructions. Instead of maintaining two files, GolemBot generates `AGENTS.md` (listing skills, conventions) and symlinks `CLAUDE.md` to it. Both files always stay in sync.
 
-## Can Feishu/DingTalk work behind NAT?
+## Can Feishu/DingTalk/WeCom work behind NAT?
 
-Yes. Both use outbound WebSocket connections — no public IP or port forwarding required. Only WeCom requires inbound HTTP (a publicly reachable URL).
+Yes. All three use outbound WebSocket connections — no public IP or port forwarding required.
 
 ## How do I check if everything is set up correctly?
 

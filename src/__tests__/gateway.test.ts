@@ -307,13 +307,13 @@ describe('group chat helpers - buildGroupPrompt', () => {
     expect(result).toContain('[bob] current message');
   });
 
-  it('marks bot messages with [bot] label in history', () => {
+  it('marks bot messages with [bot:name] label in history', () => {
     const history: GroupMessage[] = [
       { senderName: 'golem', text: 'bot reply', isBot: true },
       { senderName: 'alice', text: 'thanks', isBot: false }, // current
     ];
     const result = buildGroupPrompt(history, 'alice', 'thanks', false, 'slack:C123', '');
-    expect(result).toContain('[bot] bot reply');
+    expect(result).toContain('[bot:golem] bot reply');
   });
 
   it('excludes history section when only one or zero history entries', () => {
@@ -339,6 +339,64 @@ describe('group chat helpers - buildGroupPrompt', () => {
   it('lists multiple othersAddressed names', () => {
     const result = buildGroupPrompt([], 'alice', 'hi', true, 'feishu:G1', '', ['小舟', '小忆']);
     expect(result).toContain('directed at 小舟, 小忆');
+  });
+
+  it('injects [Peers:] when peers are provided', () => {
+    const peers = [
+      { name: '小忆', role: 'user research' },
+      { name: '小舟', role: 'content creation' },
+    ];
+    const result = buildGroupPrompt([], 'alice', 'hi', false, 'feishu:G1', '', undefined, peers);
+    expect(result).toContain('[Peers: 小忆 (user research), 小舟 (content creation)]');
+  });
+
+  it('omits [Peers:] when peers list is empty', () => {
+    const result = buildGroupPrompt([], 'alice', 'hi', false, 'feishu:G1', '', undefined, []);
+    expect(result).not.toContain('[Peers:');
+  });
+
+  it('shows peer name without role when role is undefined', () => {
+    const peers = [{ name: '小忆' }];
+    const result = buildGroupPrompt([], 'alice', 'hi', false, 'feishu:G1', '', undefined, peers);
+    expect(result).toContain('[Peers: 小忆]');
+    expect(result).not.toContain('undefined');
+  });
+
+  it('distinguishes multiple bot names in history', () => {
+    const history: GroupMessage[] = [
+      { senderName: '方舟', text: 'product analysis', isBot: true },
+      { senderName: '小忆', text: 'user research', isBot: true },
+      { senderName: 'alice', text: 'thanks', isBot: false }, // current
+    ];
+    const result = buildGroupPrompt(history, 'alice', 'thanks', false, 'slack:C123', '');
+    expect(result).toContain('[bot:方舟] product analysis');
+    expect(result).toContain('[bot:小忆] user research');
+  });
+
+  it('places [Peers:] after [System:] and before [Group:]', () => {
+    const peers = [{ name: 'PeerBot', role: 'helper' }];
+    const result = buildGroupPrompt([], 'alice', 'hi', true, 'feishu:G1', '', undefined, peers);
+    const systemIdx = result.indexOf('[System:');
+    const peersIdx = result.indexOf('[Peers:');
+    const groupIdx = result.indexOf('[Group:');
+    expect(systemIdx).toBeLessThan(peersIdx);
+    expect(peersIdx).toBeLessThan(groupIdx);
+  });
+
+  it('adds lighter peer guidance when injectPass is false', () => {
+    const peers = [{ name: 'AnalystBot', role: 'product analyst' }];
+    const result = buildGroupPrompt([], 'alice', 'hi', false, 'feishu:G1', '', undefined, peers);
+    expect(result).toContain('[Peers: AnalystBot (product analyst)]');
+    expect(result).toContain('Focus on your own domain expertise');
+    expect(result).not.toContain('[PASS]');
+  });
+
+  it('omits lighter peer guidance when injectPass is true (smart mode already has [PASS])', () => {
+    const peers = [{ name: 'AnalystBot', role: 'product analyst' }];
+    const result = buildGroupPrompt([], 'alice', 'hi', true, 'feishu:G1', '', undefined, peers);
+    expect(result).toContain('[Peers: AnalystBot (product analyst)]');
+    expect(result).toContain('[PASS]');
+    expect(result).not.toContain('Focus on your own domain expertise');
   });
 
   it('DM uses per-user session key (buildSessionKey still works)', async () => {
@@ -432,8 +490,8 @@ describe('requireFields', () => {
   });
 
   it('throws listing multiple missing fields', () => {
-    expect(() => requireFields('wecom', {}, ['corpId', 'secret'])).toThrow(
-      'Channel "wecom" is missing required config: corpId, secret',
+    expect(() => requireFields('wecom', {}, ['botId', 'secret'])).toThrow(
+      'Channel "wecom" is missing required config: botId, secret',
     );
   });
 

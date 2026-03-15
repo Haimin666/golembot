@@ -24,6 +24,8 @@ export interface FleetEntry {
   channels: { type: string; status: string }[];
   authEnabled: boolean;
   dir: string;
+  /** Bot's persona role (e.g. "product analyst", "user researcher") for multi-bot peer awareness. */
+  role?: string;
 }
 
 export interface FleetInstance extends FleetEntry {

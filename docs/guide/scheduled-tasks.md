@@ -140,7 +140,7 @@ The gateway Dashboard (`http://localhost:3000/`) displays a **Scheduled Tasks** 
 
 ## Channel Support
 
-Tasks deliver results via `adapter.send()`. Not all channels support proactive sending:
+Tasks deliver results via `adapter.send()`. All 6 built-in channels support proactive sending:
 
 | Channel | Proactive Send | Notes |
 |---------|:--------------:|-------|
@@ -148,8 +148,8 @@ Tasks deliver results via `adapter.send()`. Not all channels support proactive s
 | Slack | Yes | Uses `chat.postMessage` |
 | Telegram | Yes | Uses `sendMessage` |
 | Discord | Yes | Uses `channel.send()` |
-| WeCom | Yes | Uses message push API |
-| DingTalk | No | Webhook mode only supports reply, not proactive send |
+| WeCom | Yes | Uses `@wecom/aibot-node-sdk` send API |
+| DingTalk | Yes | Uses `interactiveCardCreateAndDeliver` |
 
 If no `target` is specified, the task still runs and the result is logged — useful for tasks that modify files or run tests without needing to notify anyone.
 

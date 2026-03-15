@@ -21,6 +21,12 @@ export interface ChannelMessage {
   images?: ImageAttachment[];
   raw: unknown;
   /**
+   * Indicates whether the sender is a human user or a bot/app.
+   * Set by adapters that can distinguish sender types (e.g. Feishu's sender_type field).
+   * Used by the gateway for multi-bot awareness (peer history visibility).
+   */
+  senderType?: 'user' | 'bot';
+  /**
    * Set to `true` by adapters that can reliably detect a bot @mention through
    * platform-native means (e.g. Discord's `<@userId>` token). When set, the
    * gateway treats the message as an @mention regardless of text pattern matching.

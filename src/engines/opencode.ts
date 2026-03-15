@@ -127,7 +127,11 @@ export async function injectOpenCodeSkills(workspace: string, skillPaths: string
   }
 }
 
-export async function ensureOpenCodeConfig(workspace: string, model?: string): Promise<void> {
+export async function ensureOpenCodeConfig(
+  workspace: string,
+  model?: string,
+  mcpConfig?: Record<string, import('../workspace.js').McpServerConfig>,
+): Promise<void> {
   const configPath = join(workspace, 'opencode.json');
   let existing: Record<string, unknown> = {};
   try {
@@ -173,6 +177,16 @@ export async function ensureOpenCodeConfig(workspace: string, model?: string): P
     }
   }
 
+  if (mcpConfig && Object.keys(mcpConfig).length > 0) {
+    const mcpMap = (existing.mcp ?? {}) as Record<string, unknown>;
+    for (const [name, cfg] of Object.entries(mcpConfig)) {
+      if (!mcpMap[name]) {
+        mcpMap[name] = { command: cfg.command, args: cfg.args, env: cfg.env };
+      }
+    }
+    existing.mcp = mcpMap;
+  }
+
   await writeFile(configPath, `${JSON.stringify(existing, null, 2)}\n`, 'utf-8');
 }
 
@@ -192,7 +206,7 @@ function findOpenCodeBin(): string {
 export class OpenCodeEngine implements AgentEngine {
   async *invoke(prompt: string, opts: InvokeOpts): AsyncIterable<StreamEvent> {
     await injectOpenCodeSkills(opts.workspace, opts.skillPaths);
-    await ensureOpenCodeConfig(opts.workspace, opts.model);
+    await ensureOpenCodeConfig(opts.workspace, opts.model, opts.mcpConfig);
 
     const bin = findOpenCodeBin();
     const args = ['run', prompt, '--format', 'json'];

@@ -214,4 +214,105 @@ describe('renderDashboard', () => {
     expect(html).not.toContain('<script>alert(1)</script>');
     expect(html).toContain('&lt;script&gt;');
   });
+
+  it('renders escalation panel when escalations exist', async () => {
+    const data = await buildDashboardData(makeDashboardCtx());
+    // Inject escalation data directly
+    data.escalations = [
+      { ts: '2026-03-15T10:00:00Z', reason: 'User needs help', sessionKey: 'feishu:chat:user1', status: 'open' },
+    ];
+    const html = renderDashboard(data);
+    expect(html).toContain('Escalations');
+    expect(html).toContain('User needs help');
+    expect(html).toContain('open');
+  });
+
+  it('omits escalation panel when no escalations', async () => {
+    const data = await buildDashboardData(makeDashboardCtx());
+    data.escalations = [];
+    const html = renderDashboard(data);
+    expect(html).not.toContain('Escalations');
+  });
+
+  it('renders persona card when persona is set', async () => {
+    const ctx = makeDashboardCtx();
+    ctx.config.persona = {
+      displayName: 'TestBot',
+      role: 'Support Agent',
+      tone: 'friendly',
+      boundaries: ['no financial advice'],
+    };
+    const data = await buildDashboardData(ctx);
+    const html = renderDashboard(data);
+    expect(html).toContain('Persona');
+    expect(html).toContain('TestBot');
+    expect(html).toContain('Support Agent');
+    expect(html).toContain('friendly');
+    expect(html).toContain('no financial advice');
+  });
+
+  it('omits persona card when no persona', async () => {
+    const data = await buildDashboardData(makeDashboardCtx());
+    const html = renderDashboard(data);
+    expect(html).not.toContain('🎭');
+  });
+
+  it('renders skill inventory grouped by type', async () => {
+    const ctx = makeDashboardCtx({
+      skills: [
+        { name: 'general', path: '/skills/general', description: 'General assistant', type: 'behavior' },
+        { name: 'escalation', path: '/skills/escalation', description: 'Escalation protocol', type: 'protocol' },
+        { name: 'kb-guide', path: '/skills/kb-guide', description: 'KB integration', type: 'integration' },
+      ],
+    });
+    const data = await buildDashboardData(ctx);
+    const html = renderDashboard(data);
+    expect(html).toContain('Skill Inventory');
+    expect(html).toContain('behavior');
+    expect(html).toContain('protocol');
+    expect(html).toContain('integration');
+    expect(html).toContain('skill-type-badge');
+  });
+
+  it('renders active sessions panel', async () => {
+    const data = await buildDashboardData(makeDashboardCtx());
+    data.activeSessions = [
+      { key: 'feishu:chat:user1', lastActivity: '2026-03-15T10:00:00Z' },
+      { key: 'slack:chan:user2', lastActivity: '2026-03-15T09:30:00Z' },
+    ];
+    const html = renderDashboard(data);
+    expect(html).toContain('Active Sessions');
+    expect(html).toContain('feishu:chat:user1');
+    expect(html).toContain('slack:chan:user2');
+  });
+
+  it('omits active sessions panel when empty', async () => {
+    const data = await buildDashboardData(makeDashboardCtx());
+    data.activeSessions = [];
+    const html = renderDashboard(data);
+    expect(html).not.toContain('Active Sessions');
+  });
+
+  it('renders memory overview panel', async () => {
+    const data = await buildDashboardData(makeDashboardCtx());
+    data.memoryOverview = {
+      notesPreview: '## Preferences\n- User likes concise style',
+      groupFiles: ['team-a.md', 'team-b.json'],
+      recentSummaries: ['2026-03-14.md', '2026-03-15.md'],
+    };
+    const html = renderDashboard(data);
+    expect(html).toContain('Memory');
+    expect(html).toContain('User likes concise style');
+    expect(html).toContain('team-a.md');
+    expect(html).toContain('2026-03-15.md');
+  });
+
+  it('omits memory overview when no data', async () => {
+    const data = await buildDashboardData(makeDashboardCtx());
+    data.memoryOverview = undefined;
+    const html = renderDashboard(data);
+    // Memory section should not appear (check for the icon+heading combo)
+    const memoryMatches = html.match(/🧠.*Memory/g);
+    expect(memoryMatches).toBeNull();
+  });
 });

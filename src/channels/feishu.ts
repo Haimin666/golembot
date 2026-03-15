@@ -20,6 +20,9 @@ export class FeishuAdapter implements ChannelAdapter {
   private client: any;
   private wsClient: any;
 
+  /** Bot's own open_id — resolved lazily on first group message, used for self-filtering. */
+  private botOpenId: string | undefined;
+
   private userNameCache = new Map<string, string>();
   /** Recent message IDs used to deduplicate re-delivered events. */
   private seenMsgIds = new Set<string>();
@@ -88,21 +91,21 @@ export class FeishuAdapter implements ChannelAdapter {
     this.client = new lark.Client(baseConfig);
 
     // Bot's own open_id — fetched lazily via raw HTTP (client.bot namespace doesn't exist in SDK).
-    let botOpenId: string | undefined;
+    // Stored as class property so fetchHistory() can also use it for self-filtering.
     const fetchBotOpenId = async (): Promise<string | undefined> => {
-      if (botOpenId) return botOpenId;
+      if (this.botOpenId) return this.botOpenId;
       try {
         const token = await this.client.tokenManager.getTenantAccessToken();
         const resp = await fetch('https://open.feishu.cn/open-apis/bot/v3/info', {
           headers: { Authorization: `Bearer ${token}` },
         });
         const json = (await resp.json()) as any;
-        botOpenId = json?.bot?.open_id;
-        if (botOpenId) console.log(`[feishu] Bot open_id resolved: ${botOpenId}`);
+        this.botOpenId = json?.bot?.open_id;
+        if (this.botOpenId) console.log(`[feishu] Bot open_id resolved: ${this.botOpenId}`);
       } catch {
         // Will retry on the next group message.
       }
-      return botOpenId;
+      return this.botOpenId;
     };
 
     // Best-effort initial fetch (non-blocking).
@@ -187,6 +190,9 @@ export class FeishuAdapter implements ChannelAdapter {
         isMentioned = resolvedId ? mentions.some((m) => m.id?.open_id === resolvedId) : mentions.length > 0;
       }
 
+      // Detect sender type for multi-bot awareness
+      const senderType: 'user' | 'bot' | undefined = sender?.sender_type === 'app' ? 'bot' : 'user';
+
       let text = '';
       const images: ImageAttachment[] = [];
 
@@ -238,7 +244,7 @@ export class FeishuAdapter implements ChannelAdapter {
       // - Replace other users' @mention keys with readable @Name format
       if (chatType === 'group' && mentions.length) {
         for (const m of mentions) {
-          const isBot = botOpenId ? m.id?.open_id === botOpenId : true;
+          const isBot = this.botOpenId ? m.id?.open_id === this.botOpenId : true;
           if (isBot) {
             text = text.replace(m.key, '').trim();
           } else if (m.name) {
@@ -256,7 +262,7 @@ export class FeishuAdapter implements ChannelAdapter {
       const otherMentionNames: string[] = [];
       if (chatType === 'group') {
         for (const m of mentions) {
-          const isBot = botOpenId ? m.id?.open_id === botOpenId : false;
+          const isBot = this.botOpenId ? m.id?.open_id === this.botOpenId : false;
           if (!isBot && m.name) otherMentionNames.push(m.name);
         }
       }
@@ -270,6 +276,7 @@ export class FeishuAdapter implements ChannelAdapter {
         text,
         messageId: msgId,
         images: images.length > 0 ? images : undefined,
+        senderType,
         mentioned: chatType === 'group' ? isMentioned : undefined,
         mentionedOthers: otherMentionNames.length > 0 ? otherMentionNames : undefined,
         raw: data,
@@ -421,8 +428,13 @@ export class FeishuAdapter implements ChannelAdapter {
 
       for (const item of json.data?.items ?? []) {
         if (messages.length >= limit) break outer;
-        // Skip bot's own messages
-        if (item.sender?.sender_type === 'app') continue;
+
+        // Skip only THIS bot's own messages (by open_id match).
+        // Other bots' messages are preserved for multi-bot awareness.
+        const isSelf = this.botOpenId && item.sender?.id === this.botOpenId;
+        if (isSelf) continue;
+
+        const isBot = item.sender?.sender_type === 'app';
 
         const msgType = item.msg_type;
         if (msgType !== 'text' && msgType !== 'post') continue;
@@ -465,6 +477,7 @@ export class FeishuAdapter implements ChannelAdapter {
           chatType: 'group', // history is typically from group chats
           text,
           messageId: item.message_id,
+          senderType: isBot ? 'bot' : 'user',
           raw: { ...item, _fetchedAt: createTime },
         });
       }

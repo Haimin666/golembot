@@ -135,6 +135,54 @@ data: {"type":"error","message":"Agent invocation timed out"}
 }
 ```
 
+### `POST /api/send`
+
+向 IM 通道（群聊或私聊）主动发送消息。需要认证。
+
+**Body:**
+```json
+{
+  "channel": "feishu",
+  "chatId": "oc_xxxx",
+  "text": "会议改到下午 3 点"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `channel` | `string` | 是 | 通道名：`feishu`、`dingtalk`、`wecom`、`slack`、`telegram`、`discord` |
+| `chatId` | `string` | 是 | 目标平台上的群/用户 ID |
+| `text` | `string` | 是 | 消息内容（支持 Markdown） |
+
+**响应：**
+```json
+{ "ok": true }
+```
+
+**错误响应：**
+
+| 状态码 | 原因 |
+|--------|------|
+| `400` | 缺少必填字段 |
+| `404` | 通道未找到（响应中包含可用通道列表） |
+| `501` | 该通道适配器不支持主动发送 |
+| `503` | 无可用通道适配器 |
+
+### `GET /api/channels`
+
+列出可用 IM 通道及其是否支持主动发送。需要认证。
+
+**响应：**
+```json
+{
+  "channels": [
+    { "name": "feishu", "canSend": true },
+    { "name": "slack", "canSend": true },
+    { "name": "dingtalk", "canSend": false }
+  ]
+}
+```
+
 ### `GET /api/events`
 
 通过 Server-Sent Events 的实时活动流。Gateway 处理的每条消息都会广播为 SSE 事件。需要认证。

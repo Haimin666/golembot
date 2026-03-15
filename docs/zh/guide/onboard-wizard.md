@@ -51,7 +51,7 @@ golembot onboard --template customer-support
 
 - **飞书（Lark）** — WebSocket 长连接，无需公网 IP
 - **钉钉** — Stream 模式，无需公网 IP
-- **企业微信** — Webhook 回调，需要公网 URL
+- **企业微信** — WebSocket 模式，无需公网 IP
 - **Slack** — Socket Mode，无需公网 IP
 - **Telegram** — 轮询模式，无需公网 IP
 - **Discord** — Gateway API，无需公网 IP

@@ -10,6 +10,10 @@ skills/
 │   └── SKILL.md
 ├── im-adapter/           # Built-in: IM response conventions
 │   └── SKILL.md
+├── multi-bot/            # Built-in: multi-bot collaboration
+│   └── SKILL.md
+├── message-push/         # Built-in: proactive message sending
+│   └── SKILL.md
 └── my-custom-skill/      # Your own skill
     ├── SKILL.md          # Required: instructions + metadata
     ├── analyze.py        # Optional: supporting scripts
@@ -27,29 +31,38 @@ skills/
    - Codex: `.agents/skills/`
 4. The Coding Agent reads the skill instructions and gains the described capabilities
 
-## ClawHub Integration
+## Community Skill Registries
 
 GolemBot's `SKILL.md` format is 100% compatible with OpenClaw's ClawHub ecosystem.
 
-GolemBot integrates with [ClawHub](https://clawhub.ai), the largest community skill marketplace with 13,000+ skills. Search and install skills directly from the CLI:
+GolemBot integrates with multiple community skill registries. Search and install skills directly from the CLI:
+
+- **[ClawHub](https://clawhub.ai)** — the largest community skill marketplace with 13,000+ skills (default registry)
+- **[skills.sh](https://skills.sh)** — a community-driven skill registry with curated, high-quality skills
 
 ```bash
-# Search for skills
+# Search for skills (defaults to ClawHub)
 golembot skill search "data analysis"
+
+# Search a specific registry
+golembot skill search "data analysis" --registry skills.sh
 
 # Install from ClawHub
 golembot skill add clawhub:data-analysis
+
+# Install from skills.sh
+golembot skill add skills.sh:owner/repo/skill
 
 # All skill commands support --json for agent-friendly output
 golembot skill search "markdown" --json
 ```
 
-The pluggable registry interface allows future integration with other skill sources. Currently supported: `clawhub`.
+The pluggable registry interface makes it easy to add new skill sources. Currently supported: `clawhub` (default), `skills.sh`.
 
 ### Agent-Powered Skill Discovery
 
 ::: tip Agent-Friendly
-All skill commands support `--json` output. The built-in `general` skill teaches the agent to search and install skills autonomously — when a user asks for capabilities the agent doesn't have, it can proactively search ClawHub and suggest installing relevant skills.
+All skill commands support `--json` output. The built-in `general` skill teaches the agent to search and install skills autonomously — when a user asks for capabilities the agent doesn't have, it can proactively search registries and suggest installing relevant skills.
 :::
 
 ## SKILL.md Format
@@ -105,4 +118,5 @@ Or simply copy/delete directories manually — no CLI required.
 - [Create a Skill](/skills/create-skill) — write your own skill from scratch
 - [Built-in Skills](/skills/builtin) — what `general` and `im-adapter` do
 - [ClawHub](https://clawhub.ai) — browse 13,000+ community skills
+- [skills.sh](https://skills.sh) — curated community skill registry
 

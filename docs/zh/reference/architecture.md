@@ -184,7 +184,7 @@ golembot gateway --verbose    # 详细日志
 
 - **飞书（Lark）**：WebSocket 长连接模式（无需公网 IP）
 - **钉钉**：Stream 模式（WebSocket，无需公网 IP）
-- **企业微信**：Webhook 回调模式（需要公网 URL）
+- **企业微信**：WebSocket 模式，通过 `@wecom/aibot-node-sdk`（无需公网 IP）
 
 IM 频道和 HTTP API 并行工作。一个频道崩溃不影响其他的。
 
@@ -213,7 +213,7 @@ golembot onboard
 - **`channel.ts`** — `ChannelAdapter` 接口和 `ChannelMessage` 类型定义。`buildSessionKey()` 生成频道级会话 key，`stripMention()` 去除 @提及。
 - **`channels/feishu.ts`** — 飞书适配器（`@larksuiteoapi/node-sdk` WebSocket 长连接模式）。
 - **`channels/dingtalk.ts`** — 钉钉适配器（`dingtalk-stream` Stream 模式）。
-- **`channels/wecom.ts`** — 企业微信适配器（`@wecom/crypto` + `xml2js` Webhook 回调模式）。
+- **`channels/wecom.ts`** — 企业微信适配器（`@wecom/aibot-node-sdk` WebSocket 模式）。
 - **`gateway.ts`** — 网关常驻服务：读取 golem.yaml → 创建 Assistant → 启动 HTTP 服务 → 遍历频道配置启动适配器 → 将消息路由到 `assistant.chat()` → 回复。启动时自动注册到 Fleet 目录。
 - **`dashboard.ts`** — 网关 Dashboard：指标收集、SSE 广播、HTML 渲染（频道状态、统计、活动流、快速测试）。
 - **`ui-shared.ts`** — 共享 UI 常量（CSS、favicon、引擎配色、HTML 转义），供 Dashboard 和 Fleet 共用。
@@ -224,7 +224,7 @@ golembot onboard
 - **`cli.ts`** — 命令入口：`init`、`run`、`serve`、`gateway`、`onboard`、`status`、`skill`、`fleet`。自动加载 `.env` 文件。
 - **`onboard.ts`** — 引导式配置向导（7 步交互）。生成 golem.yaml、.env、.env.example、.gitignore，可选安装场景模板。
 
-**IM SDK 依赖策略**：`@larksuiteoapi/node-sdk`、`dingtalk-stream`、`@wecom/crypto` 和 `xml2js` 都是可选的 peerDependencies。网关启动时动态导入对应 SDK，缺少时给出安装提示。
+**IM SDK 依赖策略**：`@larksuiteoapi/node-sdk`、`dingtalk-stream`、`@wecom/aibot-node-sdk` 都是可选的 peerDependencies。网关启动时动态导入对应 SDK，缺少时给出安装提示。
 
 ### 核心 API
 
@@ -544,7 +544,7 @@ class OpenCodeEngine implements AgentEngine {
 - ~~`ChannelAdapter` 接口 + `ChannelMessage` 类型~~ ✅
 - ~~飞书适配器（WebSocket 长连接，`@larksuiteoapi/node-sdk`）~~ ✅
 - ~~钉钉适配器（Stream，`dingtalk-stream`）~~ ✅
-- ~~企业微信适配器（Webhook，`@wecom/crypto`）~~ ✅
+- ~~企业微信适配器（WebSocket，`@wecom/aibot-node-sdk`）~~ ✅
 - ~~网关常驻服务（`golembot gateway`）~~ ✅
 - ~~`golem.yaml` 扩展 `channels` + `gateway` 字段~~ ✅
 - ~~`${ENV_VAR}` 占位符解析~~ ✅
@@ -560,7 +560,7 @@ class OpenCodeEngine implements AgentEngine {
 
 **Phase 6 — 生态扩展**
 
-- ~~技能仓库（`golembot skill search/install`，社区技能发现和安装）~~ ✅（ClawHub 集成）
+- ~~技能仓库（`golembot skill search/install`，社区技能发现和安装）~~ ✅（ClawHub + skills.sh 集成）
 - ~~多 bot Fleet Dashboard（`golembot fleet ls` / `golembot fleet serve`）~~ ✅（文件系统注册表，零配置发现）
 - ~~单 bot Web Dashboard，实时指标和活动流~~ ✅
 - 权限集成（`golem.yaml` 项目级权限配置）

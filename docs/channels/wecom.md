@@ -1,21 +1,18 @@
 # WeCom (WeChat Work)
 
-Connect your GolemBot assistant to WeCom using webhook callback mode. **Requires a public URL** for WeCom to send events to.
+Connect your GolemBot assistant to WeCom using the official AI Bot SDK with WebSocket. **No public IP required.**
 
 ## Prerequisites
 
 ```bash
-pnpm add @wecom/crypto xml2js
+pnpm add @wecom/aibot-node-sdk
 ```
 
 ## WeCom Admin Setup
 
-1. Go to [WeCom Admin Console](https://work.weixin.qq.com/) → **App Management** → create a new app
-2. Note down the **Corp ID**, **Agent ID**, and **Secret**
-3. Under **Receive Messages** → **API Settings**:
-   - Set the callback URL to `http://<your-host>:<port>/wecom`
-   - Generate and note down the **Token** and **Encoding AES Key**
-4. Set the appropriate permissions for the app
+1. Go to [WeCom Admin Console](https://work.weixin.qq.com/) → **App Management** → create a new AI Bot
+2. Note down the **Bot ID** and **Secret**
+3. The SDK uses WebSocket — no callback URL configuration needed
 
 ## Configuration
 
@@ -23,34 +20,26 @@ pnpm add @wecom/crypto xml2js
 # golem.yaml
 channels:
   wecom:
-    corpId: ${WECOM_CORP_ID}
-    agentId: ${WECOM_AGENT_ID}
+    botId: ${WECOM_BOT_ID}
     secret: ${WECOM_SECRET}
-    token: ${WECOM_TOKEN}
-    encodingAESKey: ${WECOM_ENCODING_AES_KEY}
-    port: 9000    # optional, default: 9000
+    # websocketUrl: wss://custom-endpoint  # optional, for private deployments
 ```
 
 ```sh
 # .env
-WECOM_CORP_ID=wwxxxxxxxxxx
-WECOM_AGENT_ID=1000001
+WECOM_BOT_ID=xxxxxxxxxx
 WECOM_SECRET=xxxxxxxxxxxxxxxxxx
-WECOM_TOKEN=xxxxxxxxxx
-WECOM_ENCODING_AES_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ## How It Works
 
-- **Transport**: HTTP webhook server listening on `GET /wecom` (verification) and `POST /wecom` (messages)
-- **Verification**: `GET /wecom` handles WeCom's echo verification using signature check + AES decryption
-- **Messages**: `POST /wecom` decrypts XML payload → parses → emits `ChannelMessage` (text only)
-- **Reply**: Sends messages via `POST https://qyapi.weixin.qq.com/cgi-bin/message/send` with cached access token (auto-refreshed with 5-minute margin)
-- **Chat type**: Always `dm` (WeCom webhook messages are direct messages)
-
-## Port Configuration
-
-The WeCom adapter runs its own HTTP server (separate from the gateway's HTTP service) on the configured `port` (default: `9000`). Make sure this port is accessible from WeCom's servers.
+- **Transport**: WebSocket long-connection via `@wecom/aibot-node-sdk`
+- **Connection**: The SDK establishes and maintains a WebSocket connection to WeCom servers
+- **Reconnection**: Automatic reconnection and heartbeat are handled by the SDK
+- **Messages**: Incoming messages are received via WebSocket events and emitted as `ChannelMessage` (text only)
+- **Reply**: Sends messages via the SDK's built-in reply method
+- **Proactive messaging**: `send()` is supported — the adapter can proactively send messages to any chat
+- **Chat type**: Always `dm` (WeCom bot messages are direct messages)
 
 ## Start
 
@@ -58,11 +47,11 @@ The WeCom adapter runs its own HTTP server (separate from the gateway's HTTP ser
 golembot gateway --verbose
 ```
 
-The adapter starts an HTTP server on the configured port. WeCom sends webhook events to `http://<your-host>:9000/wecom`.
+The adapter connects to WeCom via WebSocket automatically. No port forwarding or public IP needed.
 
 ## Notes
 
-- Unlike Feishu and DingTalk, WeCom requires **inbound HTTP** — your server must be reachable from the internet
-- Use a reverse proxy (nginx, Caddy) or tunnel (ngrok, Cloudflare Tunnel) if running locally
+- Like Feishu and DingTalk, WeCom now uses **WebSocket** — no public IP or reverse proxy required
+- The `@wecom/aibot-node-sdk` handles reconnection and heartbeat automatically
 - The max message length is 2,048 characters; longer responses are automatically split
 - Only text messages are processed

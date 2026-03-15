@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { ClawHubRegistry, getRegistry, listRegistries } from '../registry.js';
+import { ClawHubRegistry, getRegistry, listRegistries, SkillsShRegistry } from '../registry.js';
 
 // ---------------------------------------------------------------------------
 // Registry factory (pure, no network)
@@ -23,6 +23,13 @@ describe('registry factory', () => {
   it('lists available registries', () => {
     const names = listRegistries();
     expect(names).toContain('clawhub');
+    expect(names).toContain('skills.sh');
+  });
+
+  it('returns SkillsShRegistry for "skills.sh"', () => {
+    const r = getRegistry('skills.sh');
+    expect(r).toBeDefined();
+    expect(r!.name).toBe('skills.sh');
   });
 });
 
@@ -39,6 +46,28 @@ describe('ClawHubRegistry', () => {
   it('name is "clawhub"', () => {
     const r = new ClawHubRegistry();
     expect(r.name).toBe('clawhub');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SkillsShRegistry (unit tests, no network)
+// ---------------------------------------------------------------------------
+
+describe('SkillsShRegistry', () => {
+  it('isAvailable returns boolean', () => {
+    const r = new SkillsShRegistry();
+    // npx should be available in any Node.js environment
+    expect(typeof r.isAvailable()).toBe('boolean');
+  });
+
+  it('name is "skills.sh"', () => {
+    const r = new SkillsShRegistry();
+    expect(r.name).toBe('skills.sh');
+  });
+
+  it('install rejects invalid slug without slash or @', async () => {
+    const r = new SkillsShRegistry();
+    await expect(r.install('invalid-slug', '/tmp/test')).rejects.toThrow('Invalid skills.sh slug');
   });
 });
 

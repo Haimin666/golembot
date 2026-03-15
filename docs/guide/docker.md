@@ -62,5 +62,5 @@ docker compose up -d
 
 - The Coding Agent CLI (e.g., `claude`) must be available inside the container. The base `node:22-slim` image does not include it — you may need to add an install step for your chosen engine.
 - Environment variables containing API keys and channel credentials should be passed via `-e` flags or `env_file`, not baked into the image.
-- WeCom requires the container to be reachable via a public URL for webhook callbacks. Feishu and DingTalk use outbound WebSocket connections and work behind NAT.
+- Feishu, DingTalk, and WeCom all use outbound WebSocket connections and work behind NAT — no public IP required.
 - The `EXPOSE 3000` matches the default gateway port. Override with `-e GOLEM_PORT=<port>` if needed.

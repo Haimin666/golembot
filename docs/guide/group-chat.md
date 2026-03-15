@@ -113,6 +113,48 @@ The group key is derived from the channel type and chat ID (e.g., `slack-C123`, 
 | `mention-only` | Only when @mentioned | Intermittent — memory only updates when the bot is invoked |
 | `always` | Every message | Continuous |
 
+## Multi-Bot Collaboration
+
+When multiple GolemBot instances run on the same machine (each with its own `golem.yaml` and gateway port), they automatically discover each other through the **fleet** mechanism and coordinate in shared group chats.
+
+### How it works
+
+1. Each gateway registers itself in `~/.golembot/fleet/` at startup
+2. The gateway periodically refreshes its peer list (every 60 seconds)
+3. In group chats, the prompt includes a `[Peers: BotName (role)]` header showing all peer bots
+4. Each bot's messages in group history are labeled `[bot:BotName]` for clear attribution
+
+### Setup
+
+```bash
+# Bot A: product analyst
+golembot init -n analyst-bot -e claude-code -r "product analyst"
+
+# Bot B: user researcher (in a different directory)
+golembot init -n research-bot -e claude-code -r "user researcher"
+```
+
+Start both gateways — they discover each other automatically. No additional configuration needed.
+
+### Coordination by policy
+
+| Policy | Multi-bot behavior |
+|--------|---|
+| `mention-only` | Each bot responds only when @mentioned. Lighter guidance helps bots defer out-of-domain questions to peers. |
+| `smart` | Full `[PASS]` coordination — bots self-select whether to respond based on domain expertise and peer roles. Most effective for multi-bot groups. |
+| `always` | All bots respond to every message. Lighter guidance for peer awareness, but no suppression. |
+
+### Cross-bot delegation
+
+Bots can call each other's HTTP API for explicit delegation:
+
+```
+POST http://127.0.0.1:<peer-port>/chat
+{"message": "Analyze the user research data", "sessionKey": "delegation-123"}
+```
+
+The `multi-bot` built-in skill teaches the agent when and how to use this capability.
+
 ## Session Routing
 
 **DM messages** use a per-user key: `${channelType}:${chatId}:${senderId}` — each user gets their own independent conversation.

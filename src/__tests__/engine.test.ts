@@ -1619,3 +1619,80 @@ describe('injectCodexSkills', () => {
     expect(entries).toContain('injected');
   });
 });
+
+// ═══════════════════════════════════════════════════════
+// ensureOpenCodeConfig — MCP passthrough
+// ═══════════════════════════════════════════════════════
+
+describe('ensureOpenCodeConfig mcp', () => {
+  let workspace: string;
+
+  beforeEach(async () => {
+    workspace = await mkdtemp(join(tmpdir(), 'golem-test-oc-mcp-'));
+  });
+
+  afterEach(async () => {
+    await rm(workspace, { recursive: true, force: true });
+  });
+
+  it('merges mcpConfig into opencode.json', async () => {
+    await ensureOpenCodeConfig(workspace, undefined, {
+      memory: { command: 'npx', args: ['-y', 'mcp-memory'], env: { DIR: '/tmp' } },
+    });
+
+    const raw = await readFile(join(workspace, 'opencode.json'), 'utf-8');
+    const config = JSON.parse(raw);
+    expect(config.mcp).toEqual({
+      memory: { command: 'npx', args: ['-y', 'mcp-memory'], env: { DIR: '/tmp' } },
+    });
+  });
+
+  it('preserves existing mcp entries in opencode.json', async () => {
+    await writeFile(
+      join(workspace, 'opencode.json'),
+      JSON.stringify({ mcp: { existing: { command: 'node', args: ['old.js'] } } }),
+      'utf-8',
+    );
+
+    await ensureOpenCodeConfig(workspace, undefined, {
+      newServer: { command: 'npx', args: ['new-server'] },
+    });
+
+    const raw = await readFile(join(workspace, 'opencode.json'), 'utf-8');
+    const config = JSON.parse(raw);
+    expect(config.mcp.existing).toEqual({ command: 'node', args: ['old.js'] });
+    expect(config.mcp.newServer).toEqual({ command: 'npx', args: ['new-server'] });
+  });
+
+  it('does not override existing mcp entry with same name', async () => {
+    await writeFile(
+      join(workspace, 'opencode.json'),
+      JSON.stringify({ mcp: { memory: { command: 'custom-cmd' } } }),
+      'utf-8',
+    );
+
+    await ensureOpenCodeConfig(workspace, undefined, {
+      memory: { command: 'npx', args: ['mcp-memory'] },
+    });
+
+    const raw = await readFile(join(workspace, 'opencode.json'), 'utf-8');
+    const config = JSON.parse(raw);
+    expect(config.mcp.memory).toEqual({ command: 'custom-cmd' });
+  });
+
+  it('skips mcp when mcpConfig is undefined', async () => {
+    await ensureOpenCodeConfig(workspace);
+
+    const raw = await readFile(join(workspace, 'opencode.json'), 'utf-8');
+    const config = JSON.parse(raw);
+    expect(config.mcp).toBeUndefined();
+  });
+
+  it('skips mcp when mcpConfig is empty', async () => {
+    await ensureOpenCodeConfig(workspace, undefined, {});
+
+    const raw = await readFile(join(workspace, 'opencode.json'), 'utf-8');
+    const config = JSON.parse(raw);
+    expect(config.mcp).toBeUndefined();
+  });
+});

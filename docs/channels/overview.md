@@ -8,14 +8,14 @@ GolemBot's gateway connects your assistant to IM platforms. Each platform is han
 |---------|-----------|-------------------|-----|
 | [Feishu (Lark)](/channels/feishu) | WebSocket | No | `@larksuiteoapi/node-sdk` |
 | [DingTalk](/channels/dingtalk) | Stream (WebSocket) | No | `dingtalk-stream` |
-| [WeCom](/channels/wecom) | Webhook HTTP | **Yes** | `@wecom/crypto` + `xml2js` |
+| [WeCom](/channels/wecom) | WebSocket | No | `@wecom/aibot-node-sdk` |
 | [Slack](/channels/slack) | Socket Mode (WebSocket) | No | `@slack/bolt` |
 | [Telegram](/channels/telegram) | Long-polling | No | `grammy` |
 | [Discord](/channels/discord) | Gateway WebSocket | No | `discord.js` |
 | Custom | Any | Depends | Your own adapter class |
 
-::: warning WeCom requires a public IP
-WeCom uses HTTP webhooks — your server must be reachable from the internet. All other channels use WebSocket or polling and work behind NAT / firewalls without port forwarding.
+::: tip All channels work behind NAT
+All 6 built-in channels use WebSocket, long-polling, or Socket Mode — no public IP or port forwarding required.
 :::
 
 ## Architecture
@@ -135,7 +135,7 @@ pnpm add @larksuiteoapi/node-sdk
 pnpm add dingtalk-stream
 
 # WeCom
-pnpm add @wecom/crypto xml2js
+pnpm add @wecom/aibot-node-sdk
 
 # Slack
 pnpm add @slack/bolt

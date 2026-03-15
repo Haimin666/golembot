@@ -1,6 +1,7 @@
 ---
 name: im-adapter
 description: IM channel response guidelines — adapted for instant messaging platforms like Lark, DingTalk, WeCom, etc.
+type: behavior
 ---
 
 # IM Channel Response Guidelines

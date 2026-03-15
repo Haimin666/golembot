@@ -101,7 +101,7 @@ GolemBot 内置支持以下 IM 平台：
 |------|---------|
 | [飞书（Lark）](/zh/channels/feishu) | WebSocket 长连接（无需公网 IP） |
 | [钉钉](/zh/channels/dingtalk) | Stream 模式（无需公网 IP） |
-| [企业微信](/zh/channels/wecom) | Webhook 回调（需要公网 URL） |
+| [企业微信](/zh/channels/wecom) | WebSocket 模式（无需公网 IP） |
 | [Slack](/zh/channels/slack) | Socket Mode（无需公网 IP） |
 | [Telegram](/zh/channels/telegram) | 轮询模式（无需公网 IP） |
 | [Discord](/zh/channels/discord) | Gateway API（无需公网 IP） |

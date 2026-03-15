@@ -184,7 +184,7 @@ Gateway is a **long-running service** that internally reuses `createAssistant()`
 
 - **Feishu (Lark)**: WebSocket long-connection mode (no public IP required)
 - **DingTalk**: Stream mode (WebSocket, no public IP required)
-- **WeCom (WeChat Work)**: Webhook callback mode (requires a public URL)
+- **WeCom (WeChat Work)**: WebSocket mode via `@wecom/aibot-node-sdk` (no public IP required)
 
 IM channels and HTTP API work in parallel. One channel crashing does not affect the others.
 
@@ -213,7 +213,7 @@ Core and CLI are separated:
 - **`channel.ts`** — `ChannelAdapter` interface and `ChannelMessage` type definitions. `buildSessionKey()` generates channel-level session keys, `stripMention()` removes @mentions.
 - **`channels/feishu.ts`** — Feishu (Lark) adapter (`@larksuiteoapi/node-sdk` WebSocket long-connection mode).
 - **`channels/dingtalk.ts`** — DingTalk adapter (`dingtalk-stream` Stream mode).
-- **`channels/wecom.ts`** — WeCom adapter (`@wecom/crypto` + `xml2js` Webhook callback mode).
+- **`channels/wecom.ts`** — WeCom adapter (`@wecom/aibot-node-sdk` WebSocket mode).
 - **`gateway.ts`** — Gateway long-running service: reads golem.yaml → creates Assistant → starts HTTP service → iterates channels config to start adapters → routes messages to `assistant.chat()` → replies. Auto-registers with Fleet directory on startup.
 - **`dashboard.ts`** — Gateway Dashboard: metrics collection, SSE broadcasting, HTML rendering (channel status, stats, activity feed, quick test).
 - **`ui-shared.ts`** — Shared UI constants (CSS, favicon, engine colors, HTML escape) used by both Dashboard and Fleet.
@@ -224,7 +224,7 @@ Core and CLI are separated:
 - **`cli.ts`** — Command entry points: `init`, `run`, `serve`, `gateway`, `onboard`, `status`, `skill`, `fleet`. Automatically loads `.env` files.
 - **`onboard.ts`** — Guided configuration wizard (7-step interactive). Generates golem.yaml, .env, .env.example, .gitignore, and optionally installs scenario templates.
 
-**IM SDK dependency strategy**: `@larksuiteoapi/node-sdk`, `dingtalk-stream`, `@wecom/crypto`, and `xml2js` are all optional peerDependencies. Gateway dynamically imports the corresponding SDK at startup, providing installation prompts if missing.
+**IM SDK dependency strategy**: `@larksuiteoapi/node-sdk`, `dingtalk-stream`, `@wecom/aibot-node-sdk` are all optional peerDependencies. Gateway dynamically imports the corresponding SDK at startup, providing installation prompts if missing.
 
 ### Core API
 
@@ -544,7 +544,7 @@ But the externally exposed `StreamEvent` is completely consistent.
 - ~~`ChannelAdapter` interface + `ChannelMessage` type~~ ✅
 - ~~Feishu adapter (WebSocket long-connection, `@larksuiteoapi/node-sdk`)~~ ✅
 - ~~DingTalk adapter (Stream, `dingtalk-stream`)~~ ✅
-- ~~WeCom adapter (Webhook, `@wecom/crypto`)~~ ✅
+- ~~WeCom adapter (WebSocket, `@wecom/aibot-node-sdk`)~~ ✅
 - ~~Gateway long-running service (`golembot gateway`)~~ ✅
 - ~~`golem.yaml` extended with `channels` + `gateway` fields~~ ✅
 - ~~`${ENV_VAR}` placeholder resolution~~ ✅
@@ -560,7 +560,7 @@ But the externally exposed `StreamEvent` is completely consistent.
 
 **Phase 6 — Ecosystem Expansion**
 
-- ~~Skill repository (`golembot skill search/install`, community skill discovery and installation)~~ ✅ (ClawHub integration)
+- ~~Skill repository (`golembot skill search/install`, community skill discovery and installation)~~ ✅ (ClawHub + skills.sh integration)
 - ~~Multi-bot Fleet Dashboard (`golembot fleet ls` / `golembot fleet serve`)~~ ✅ (filesystem-based registry, zero-config discovery)
 - ~~Per-bot web Dashboard with real-time metrics and activity feed~~ ✅
 - Permissions integration (`golem.yaml` project-level permission config)

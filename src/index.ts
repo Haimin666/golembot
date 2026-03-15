@@ -61,9 +61,11 @@ export type {
   ChannelsConfig,
   DingtalkChannelConfig,
   DiscordChannelConfig,
+  EscalationConfig,
   FeishuChannelConfig,
   GatewayConfig,
   GolemConfig,
+  McpServerConfig,
   ProviderConfig,
   SkillInfo,
   SlackChannelConfig,
@@ -149,7 +151,7 @@ export interface ChatOpts {
 
 export interface Assistant {
   chat(message: string, opts?: ChatOpts): AsyncIterable<StreamEvent>;
-  init(opts: { engine: string; name: string }): Promise<void>;
+  init(opts: { engine: string; name: string; role?: string }): Promise<void>;
   resetSession(sessionKey?: string): Promise<void>;
   /** Switch engine at runtime (takes effect on next chat call). When clearModel is true, also resets the model override. */
   setEngine(engine: string, clearModel?: boolean): void;
@@ -320,6 +322,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
         hasPermissionsConfig: !!config.permissions,
         provider,
         oauthToken: config.oauthToken,
+        mcpConfig: config.mcp,
       })) {
         if (event.type === 'done') {
           if (event.sessionId) lastSessionId = event.sessionId;
@@ -465,16 +468,16 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
       return chatImpl(message, key, chatOpts?.images);
     },
 
-    async init(initOpts: { engine: string; name: string }): Promise<void> {
+    async init(initOpts: { engine: string; name: string; role?: string }): Promise<void> {
       const builtinSkillsDir = resolve(new URL('.', import.meta.url).pathname, '..', 'skills');
-      await initWorkspace(
-        dir,
-        {
-          name: initOpts.name,
-          engine: initOpts.engine,
-        },
-        builtinSkillsDir,
-      );
+      const config: GolemConfig = {
+        name: initOpts.name,
+        engine: initOpts.engine,
+      };
+      if (initOpts.role) {
+        config.persona = { role: initOpts.role };
+      }
+      await initWorkspace(dir, config, builtinSkillsDir);
       engineOverride = initOpts.engine;
     },
 

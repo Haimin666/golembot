@@ -101,7 +101,7 @@ GolemBot supports the following IM platforms out of the box:
 |----------|----------------|
 | [Feishu (Lark)](/channels/feishu) | WebSocket (no public IP needed) |
 | [DingTalk](/channels/dingtalk) | Stream mode (no public IP needed) |
-| [WeCom](/channels/wecom) | Webhook (requires public URL) |
+| [WeCom](/channels/wecom) | WebSocket (no public IP needed) |
 | [Slack](/channels/slack) | Socket Mode (no public IP needed) |
 | [Telegram](/channels/telegram) | Polling (no public IP needed) |
 | [Discord](/channels/discord) | Gateway API (no public IP needed) |

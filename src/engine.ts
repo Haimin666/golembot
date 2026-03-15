@@ -1,4 +1,4 @@
-import type { ProviderConfig } from './workspace.js';
+import type { McpServerConfig, ProviderConfig } from './workspace.js';
 
 // ── Core types ───────────────────────────────────────────
 
@@ -26,6 +26,8 @@ export interface InvokeOpts {
   provider?: ProviderConfig;
   /** Claude Max OAuth token (from `claude setup-token`). Claude Code engine only. */
   oauthToken?: string;
+  /** MCP server configurations from golem.yaml, written to engine-native config format. */
+  mcpConfig?: Record<string, McpServerConfig>;
 }
 
 export interface ListModelsOpts {

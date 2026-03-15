@@ -151,6 +151,24 @@ export class DingtalkAdapter implements ChannelAdapter {
     });
   }
 
+  async send(chatId: string, text: string): Promise<void> {
+    const accessToken = await this.dwClient?.getAccessToken?.();
+    if (!accessToken) return;
+
+    await fetch('https://api.dingtalk.com/v1.0/robot/groupMessages/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-acs-dingtalk-access-token': accessToken,
+      },
+      body: JSON.stringify({
+        msgParam: JSON.stringify({ content: text }),
+        msgKey: 'sampleText',
+        openConversationId: chatId,
+      }),
+    });
+  }
+
   async stop(): Promise<void> {
     this.dwClient = null;
   }

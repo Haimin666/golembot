@@ -22,7 +22,9 @@ vi.mock('../engine.js', async (importOriginal) => {
 });
 
 import { createAssistant } from '../index.js';
-import { createGolemServer } from '../server.js';
+import { Scheduler } from '../scheduler.js';
+import { type CronContext, createGolemServer } from '../server.js';
+import { TaskStore } from '../task-store.js';
 
 function request(
   server: http.Server,
@@ -552,6 +554,263 @@ describe('Golem HTTP Server', () => {
       const body = JSON.parse(res.body);
       expect(body.type).toBe('command');
       expect(body.text).toContain('gateway mode');
+    });
+  });
+
+  // ── Task REST API ──────────────────────────────────────
+  describe('Task REST API', () => {
+    let taskStore: TaskStore;
+
+    function startServerWithCron(token?: string) {
+      const assistant = createAssistant({ dir });
+      taskStore = new TaskStore(dir);
+      const scheduler = new Scheduler();
+      const cronCtx: CronContext = {
+        taskStore,
+        scheduler,
+        runTask: async (id: string) => {
+          const task = await taskStore.getTask(id);
+          if (!task) throw new Error(`Task not found: ${id}`);
+          return `Executed: ${task.name}`;
+        },
+      };
+      server = createGolemServer(assistant, { token }, undefined, dir, () => cronCtx);
+      return new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+    }
+
+    describe('GET /api/tasks', () => {
+      it('returns empty array when no tasks', async () => {
+        await startServerWithCron();
+        const res = await request(server, 'GET', '/api/tasks');
+        expect(res.status).toBe(200);
+        expect(JSON.parse(res.body)).toEqual([]);
+      });
+
+      it('returns 503 when no cron context', async () => {
+        await startServer();
+        const res = await request(server, 'GET', '/api/tasks');
+        expect(res.status).toBe(503);
+      });
+    });
+
+    describe('POST /api/tasks', () => {
+      it('creates a new task', async () => {
+        await startServerWithCron();
+        const res = await request(server, 'POST', '/api/tasks', {
+          name: 'daily-summary',
+          schedule: '0 9 * * *',
+          prompt: 'Summarize updates',
+        });
+        expect(res.status).toBe(201);
+        const body = JSON.parse(res.body);
+        expect(body.name).toBe('daily-summary');
+        expect(body.schedule).toBe('0 9 * * *');
+        expect(body.createdBy).toBe('api');
+        expect(body.id).toBeTruthy();
+
+        // Verify persisted
+        const tasks = await taskStore.listTasks();
+        expect(tasks).toHaveLength(1);
+        expect(tasks[0].name).toBe('daily-summary');
+      });
+
+      it('returns 400 for missing required fields', async () => {
+        await startServerWithCron();
+        const res = await request(server, 'POST', '/api/tasks', { name: 'incomplete' });
+        expect(res.status).toBe(400);
+        expect(JSON.parse(res.body).error).toContain('required');
+      });
+    });
+
+    describe('PATCH /api/tasks/:id', () => {
+      it('updates an existing task', async () => {
+        await startServerWithCron();
+        await taskStore.addTask({
+          id: 'task-1',
+          name: 'old-name',
+          schedule: '0 9 * * *',
+          prompt: 'old prompt',
+          createdAt: new Date().toISOString(),
+          enabled: true,
+        });
+
+        const res = await request(server, 'PATCH', '/api/tasks/task-1', {
+          prompt: 'new prompt',
+          enabled: false,
+        });
+        expect(res.status).toBe(200);
+
+        const updated = await taskStore.getTask('task-1');
+        expect(updated!.prompt).toBe('new prompt');
+        expect(updated!.enabled).toBe(false);
+      });
+
+      it('returns 404 for nonexistent task', async () => {
+        await startServerWithCron();
+        const res = await request(server, 'PATCH', '/api/tasks/no-such', { prompt: 'x' });
+        expect(res.status).toBe(404);
+      });
+    });
+
+    describe('DELETE /api/tasks/:id', () => {
+      it('removes an existing task', async () => {
+        await startServerWithCron();
+        await taskStore.addTask({
+          id: 'task-del',
+          name: 'to-delete',
+          schedule: '0 9 * * *',
+          prompt: 'delete me',
+          createdAt: new Date().toISOString(),
+          enabled: true,
+        });
+
+        const res = await request(server, 'DELETE', '/api/tasks/task-del');
+        expect(res.status).toBe(200);
+
+        const tasks = await taskStore.listTasks();
+        expect(tasks).toHaveLength(0);
+      });
+
+      it('returns 404 for nonexistent task', async () => {
+        await startServerWithCron();
+        const res = await request(server, 'DELETE', '/api/tasks/no-such');
+        expect(res.status).toBe(404);
+      });
+    });
+
+    describe('POST /api/tasks/:id/run', () => {
+      it('executes a task immediately', async () => {
+        await startServerWithCron();
+        await taskStore.addTask({
+          id: 'task-run',
+          name: 'run-me',
+          schedule: '0 9 * * *',
+          prompt: 'do stuff',
+          createdAt: new Date().toISOString(),
+          enabled: true,
+        });
+
+        const res = await request(server, 'POST', '/api/tasks/task-run/run');
+        expect(res.status).toBe(200);
+        const body = JSON.parse(res.body);
+        expect(body.ok).toBe(true);
+        expect(body.reply).toBe('Executed: run-me');
+      });
+
+      it('returns 404 for nonexistent task', async () => {
+        await startServerWithCron();
+        const res = await request(server, 'POST', '/api/tasks/no-such/run');
+        expect(res.status).toBe(404);
+      });
+    });
+  });
+
+  // ── Send API ──────────────────────────────────────────
+
+  describe('POST /api/send', () => {
+    const sentMessages: Array<{ chatId: string; text: string }> = [];
+
+    function startServerWithAdapters() {
+      const assistant = createAssistant({ dir });
+      const adapters = new Map<string, import('../channel.js').ChannelAdapter>();
+      adapters.set('feishu', {
+        name: 'feishu',
+        maxMessageLength: 4000,
+        async start() {},
+        async stop() {},
+        async reply() {},
+        async send(chatId: string, text: string) {
+          sentMessages.push({ chatId, text });
+        },
+      } as any);
+      adapters.set('nosend', {
+        name: 'nosend',
+        maxMessageLength: 4000,
+        async start() {},
+        async stop() {},
+        async reply() {},
+        // no send() method
+      } as any);
+      server = createGolemServer(assistant, {}, undefined, dir, undefined, () => adapters);
+      sentMessages.length = 0;
+      return new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+    }
+
+    it('sends a message successfully', async () => {
+      await startServerWithAdapters();
+      const res = await request(server, 'POST', '/api/send', {
+        channel: 'feishu',
+        chatId: 'oc_test123',
+        text: 'Hello group!',
+      });
+      expect(res.status).toBe(200);
+      expect(JSON.parse(res.body).ok).toBe(true);
+      expect(sentMessages).toEqual([{ chatId: 'oc_test123', text: 'Hello group!' }]);
+    });
+
+    it('returns 400 for missing fields', async () => {
+      await startServerWithAdapters();
+      const res = await request(server, 'POST', '/api/send', { channel: 'feishu' });
+      expect(res.status).toBe(400);
+      expect(JSON.parse(res.body).error).toContain('Missing required fields');
+    });
+
+    it('returns 404 for unknown channel', async () => {
+      await startServerWithAdapters();
+      const res = await request(server, 'POST', '/api/send', {
+        channel: 'whatsapp',
+        chatId: 'x',
+        text: 'hi',
+      });
+      expect(res.status).toBe(404);
+      expect(JSON.parse(res.body).error).toContain('whatsapp');
+      expect(JSON.parse(res.body).error).toContain('feishu');
+    });
+
+    it('returns 501 when adapter has no send()', async () => {
+      await startServerWithAdapters();
+      const res = await request(server, 'POST', '/api/send', {
+        channel: 'nosend',
+        chatId: 'x',
+        text: 'hi',
+      });
+      expect(res.status).toBe(501);
+    });
+
+    it('returns 503 when no adapters available', async () => {
+      await startServer();
+      const res = await request(server, 'POST', '/api/send', {
+        channel: 'feishu',
+        chatId: 'x',
+        text: 'hi',
+      });
+      expect(res.status).toBe(503);
+    });
+  });
+
+  describe('GET /api/channels', () => {
+    it('lists available channels with send capability', async () => {
+      const assistant = createAssistant({ dir });
+      const adapters = new Map<string, import('../channel.js').ChannelAdapter>();
+      adapters.set('feishu', { name: 'feishu', send: async () => {} } as any);
+      adapters.set('dingtalk', { name: 'dingtalk' } as any);
+      server = createGolemServer(assistant, {}, undefined, dir, undefined, () => adapters);
+      await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+
+      const res = await request(server, 'GET', '/api/channels');
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.channels).toEqual([
+        { name: 'feishu', canSend: true },
+        { name: 'dingtalk', canSend: false },
+      ]);
+    });
+
+    it('returns empty array when no adapters', async () => {
+      await startServer();
+      const res = await request(server, 'GET', '/api/channels');
+      expect(res.status).toBe(200);
+      expect(JSON.parse(res.body).channels).toEqual([]);
     });
   });
 });

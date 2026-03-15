@@ -31,8 +31,8 @@ features:
     details: Slack、Telegram、Discord、飞书、钉钉、企微、HTTP — 开箱即用，无需公网地址。也可 5 行代码嵌入应用。
   - icon:
       src: /icons/clawhub.png
-    title: 13,000+ OpenClaw 技能
-    details: 一条命令从 ClawHub 搜索安装社区技能。Agent 甚至可以在对话中自主发现和安装。
+    title: 13,000+ 社区技能
+    details: 一条命令从 ClawHub 或 skills.sh 搜索安装社区技能。Agent 甚至可以在对话中自主发现和安装。
 ---
 
 <div class="home-content">
@@ -48,11 +48,11 @@ features:
   <p class="demo-caption">一条命令，将你的 Coding Agent 接入 Telegram 和 Discord</p>
 </div>
 
-## 13,000+ OpenClaw 社区技能
+## 13,000+ 社区技能
 
-GolemBot 的 SKILL.md 格式与 [OpenClaw](https://clawhub.ai) 生态 **100% 兼容**。从 [ClawHub](https://clawhub.ai) 搜索和安装 13,000+ 社区技能 —— 最大的 AI agent 技能市场。你的 Agent 甚至可以在对话中自主发现和安装技能。
+GolemBot 的 SKILL.md 格式与 [OpenClaw](https://clawhub.ai) 生态 **100% 兼容**。从 [ClawHub](https://clawhub.ai)（13,000+ 技能）或 [skills.sh](https://skills.sh)（精选仓库）搜索和安装社区技能。你的 Agent 甚至可以在对话中自主发现和安装技能。
 
-::: info 搜索和安装 13,000+ 社区技能
+::: info 从多个仓库搜索和安装技能
 ```bash
 $ golembot skill search "代码审查"
 
@@ -63,6 +63,15 @@ ClawHub results for "代码审查" (3):
   security-audit       代码库安全漏洞扫描
 
 Install: golembot skill add clawhub:<slug>
+
+$ golembot skill search "代码审查" --registry skills.sh
+
+skills.sh results for "代码审查" (2):
+
+  acme/tools/code-review    全面的代码审查助手
+  devkit/review/pr-check    PR 审查，集成 CI
+
+Install: golembot skill add skills.sh:<owner>/<repo>/<skill>
 ```
 :::
 
@@ -78,7 +87,7 @@ golembot onboard          # 引导式设置向导
 golembot run              # 交互式 REPL
 golembot gateway          # 启动 IM + HTTP 服务 + Dashboard
 golembot fleet ls         # 列出所有运行中的 bot
-golembot skill search "数据分析"  # 浏览 ClawHub 社区技能
+golembot skill search "数据分析"  # 浏览社区技能
 ```
 
 或作为库使用 — 5 行代码：

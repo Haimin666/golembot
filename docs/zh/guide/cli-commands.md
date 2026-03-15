@@ -7,13 +7,16 @@ GolemBot 提供一组 CLI 命令用于管理和运行助手。
 初始化新的助手目录。
 
 ```bash
-golembot init [-e <engine>] [-n <name>]
+golembot init [-e <engine>] [-n <name>] [-r <role>]
 ```
 
 | 选项 | 说明 | 默认值 |
 |------|------|--------|
 | `-e, --engine <engine>` | 引擎类型（`cursor`、`claude-code`、`opencode`、`codex`） | `cursor` |
 | `-n, --name <name>` | 助手名称 | 交互式提示 |
+| `-r, --role <role>` | 人设角色（如 `"产品分析师"`、`"客户支持"`） | — |
+
+创建 `golem.yaml`、`skills/`（含内置技能：`general`、`im-adapter`、`multi-bot`）、`AGENTS.md`、`.golem/` 和 `.gitignore`。指定 `--role` 时会将 `persona.role` 写入 `golem.yaml`——该角色会传播到 Fleet 注册，让同一 Fleet 中的其他 Bot 看到彼此的专长。
 
 ## `golembot run`
 
@@ -197,10 +200,15 @@ golembot status [-d <dir>] [--json]
 管理助手目录中的技能。
 
 ```bash
-golembot skill list [-d <dir>]          # 列出已安装技能
-golembot skill add <source> [-d <dir>]  # 从路径添加技能
-golembot skill remove <name> [-d <dir>] # 移除技能
+golembot skill list [-d <dir>]                            # 列出已安装技能
+golembot skill search <query> [--registry <name>] [--json] # 搜索社区技能
+golembot skill add <source> [-d <dir>]                    # 添加技能
+golembot skill remove <name> [-d <dir>]                   # 移除技能
 ```
+
+`search` 支持 `--registry` 标志指定搜索的仓库（`clawhub`（默认）或 `skills.sh`）。
+
+`add` 的 `<source>` 可以是本地路径，也可以是仓库引用：`clawhub:<slug>` 或 `skills.sh:<owner>/<repo>/<skill>`。
 
 ## `golembot doctor`
 

@@ -145,10 +145,12 @@ program
   .description('Initialize a new GolemBot assistant in the current directory')
   .option('-e, --engine <engine>', 'engine type (cursor | claude-code | opencode | codex)', 'cursor')
   .option('-n, --name <name>', 'assistant name')
+  .option('-r, --role <role>', 'persona role (e.g. "product analyst", "customer support")')
   .action(async (opts) => {
     const dir = resolve('.');
     let engine: string = opts.engine;
     let name: string = opts.name;
+    const role: string | undefined = opts.role;
 
     if (!name) {
       const inquirer = await import('inquirer');
@@ -178,11 +180,12 @@ program
 
     const assistant = createAssistant({ dir });
     try {
-      await assistant.init({ engine, name });
+      await assistant.init({ engine, name, role });
       console.log(`\n✅ GolemBot assistant created!`);
       console.log(`   Directory: ${dir}`);
       console.log(`   Engine: ${engine}`);
       console.log(`   Name: ${name}`);
+      if (role) console.log(`   Role: ${role}`);
       console.log(`\nRun golembot run to start chatting.`);
     } catch (e: unknown) {
       console.error(`❌ Initialization failed: ${(e as Error).message}`);
@@ -481,7 +484,7 @@ skill
     const { scanSkills } = await import('./workspace.js');
     const skills = await scanSkills(dir);
     if (opts.json) {
-      console.log(JSON.stringify(skills.map((s) => ({ name: s.name, description: s.description }))));
+      console.log(JSON.stringify(skills.map((s) => ({ name: s.name, description: s.description, type: s.type }))));
       return;
     }
     if (skills.length === 0) {
@@ -489,27 +492,54 @@ skill
       return;
     }
     console.log(`\nInstalled skills (${skills.length}):\n`);
-    for (const s of skills) {
-      console.log(`  ${s.name.padEnd(20)} ${DIM}${s.description}${RESET}`);
+    if (skills.some((s) => s.type)) {
+      const grouped = new Map<string, typeof skills>();
+      for (const s of skills) {
+        const key = s.type || 'other';
+        const list = grouped.get(key) || [];
+        list.push(s);
+        grouped.set(key, list);
+      }
+      for (const [type, items] of grouped) {
+        console.log(`  ${type}:`);
+        for (const s of items) {
+          console.log(`    ${s.name.padEnd(18)} ${DIM}${s.description}${RESET}`);
+        }
+      }
+    } else {
+      for (const s of skills) {
+        console.log(`  ${s.name.padEnd(20)} ${DIM}${s.description}${RESET}`);
+      }
     }
     console.log();
   });
 
 skill
   .command('search <query...>')
-  .description('Search for skills on ClawHub')
+  .description('Search for skills on a registry (default: clawhub)')
   .option('-l, --limit <n>', 'max results', '10')
+  .option('-r, --registry <name>', 'registry to search', 'clawhub')
   .option('--json', 'output JSON (agent-friendly)')
-  .action(async (queryWords: string[], opts: { limit: string; json?: boolean }) => {
-    const { getRegistry } = await import('./registry.js');
-    const registry = getRegistry('clawhub');
+  .action(async (queryWords: string[], opts: { limit: string; registry: string; json?: boolean }) => {
+    const { getRegistry, listRegistries } = await import('./registry.js');
+    const registry = getRegistry(opts.registry);
     if (!registry) {
-      console.error('No registry available');
+      const msg = `Unknown registry: ${opts.registry}. Available: ${listRegistries().join(', ')}`;
+      if (opts.json) {
+        console.log(JSON.stringify({ ok: false, error: msg }));
+      } else {
+        console.error(`❌ ${msg}`);
+      }
       process.exit(1);
     }
 
     if (!registry.isAvailable()) {
-      console.error('clawhub CLI not found. Install it: npm i -g clawhub');
+      const msg = `${opts.registry} CLI not found.`;
+      if (opts.json) {
+        console.log(JSON.stringify({ ok: false, error: msg }));
+      } else {
+        console.error(`❌ ${msg}`);
+      }
       process.exit(1);
     }
 
@@ -526,7 +556,7 @@ skill
       return;
     }
 
-    console.log(`\nClawHub results for "${query}" (${results.length}):\n`);
+    console.log(`\n${registry.name} results for "${query}" (${results.length}):\n`);
     for (const s of results) {
       const meta = [
         s.version ? `v${s.version}` : '',
@@ -538,12 +568,12 @@ skill
       console.log(`  ${s.slug.padEnd(30)} ${s.description ? s.description.slice(0, 60) : ''}`);
       if (meta) console.log(`  ${' '.repeat(30)} ${DIM}${meta}${RESET}`);
     }
-    console.log(`\nInstall: golembot skill add clawhub:<slug>\n`);
+    console.log(`\nInstall: golembot skill add ${opts.registry}:<slug>\n`);
   });
 
 skill
   .command('add <source>')
-  .description('Add a skill from a local path or registry (clawhub:<slug>)')
+  .description('Add a skill from a local path or registry (clawhub:<slug>, skills.sh:<owner>/<repo>@<skill>)')
   .option('-d, --dir <dir>', 'assistant directory', '.')
   .option('--json', 'output JSON (agent-friendly)')
   .action(async (source: string, opts: { dir: string; json?: boolean }) => {
@@ -552,7 +582,7 @@ skill
     const dir = resolve(opts.dir);
 
     // ── Registry remote install (prefix:slug) ──
-    const registryMatch = source.match(/^(\w+):(.+)$/);
+    const registryMatch = source.match(/^([\w.]+):(.+)$/);
     if (registryMatch) {
       const [, registryName, slug] = registryMatch;
       const { getRegistry, listRegistries } = await import('./registry.js');
@@ -578,7 +608,13 @@ skill
         process.exit(1);
       }
 
-      const skillName = slug.includes('/') ? slug.split('/').pop()! : slug;
+      // Extract skill name: "owner/repo@skill" → "skill", "owner/repo/skill" → "skill"
+      let skillName: string;
+      if (slug.includes('@')) {
+        skillName = slug.slice(slug.indexOf('@') + 1);
+      } else {
+        skillName = slug.includes('/') ? slug.split('/').pop()! : slug;
+      }
       const destPath = join(dir, 'skills', skillName);
 
       try {

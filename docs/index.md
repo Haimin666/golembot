@@ -31,8 +31,8 @@ features:
     details: Slack, Telegram, Discord, Feishu, DingTalk, WeCom, HTTP — out of the box, no public URL. Or embed as a library in 5 lines.
   - icon:
       src: /icons/clawhub.png
-    title: 13,000+ OpenClaw Skills
-    details: Search and install community skills from ClawHub with one command. Your agent can even discover and install skills autonomously.
+    title: 13,000+ Community Skills
+    details: Search and install skills from ClawHub or skills.sh with one command. Your agent can even discover and install skills autonomously.
 ---
 
 <div class="home-content">
@@ -48,11 +48,11 @@ features:
   <p class="demo-caption">One command to connect your Coding Agent to Telegram & Discord</p>
 </div>
 
-## 13,000+ OpenClaw Community Skills
+## 13,000+ Community Skills
 
-GolemBot's SKILL.md format is **100% compatible** with the [OpenClaw](https://clawhub.ai) ecosystem. Search and install any of the 13,000+ community skills from [ClawHub](https://clawhub.ai) — the largest AI agent skill marketplace. Your agent can even discover and install skills autonomously during conversations.
+GolemBot's SKILL.md format is **100% compatible** with the [OpenClaw](https://clawhub.ai) ecosystem. Search and install community skills from [ClawHub](https://clawhub.ai) (13,000+ skills) or [skills.sh](https://skills.sh) (curated registry). Your agent can even discover and install skills autonomously during conversations.
 
-::: info Search and install 13,000+ skills
+::: info Search and install from multiple registries
 ```bash
 $ golembot skill search "code review"
 
@@ -63,6 +63,15 @@ ClawHub results for "code review" (3):
   security-audit       Security vulnerability scanner for codebases
 
 Install: golembot skill add clawhub:<slug>
+
+$ golembot skill search "code review" --registry skills.sh
+
+skills.sh results for "code review" (2):
+
+  acme/tools/code-review    Comprehensive code review assistant
+  devkit/review/pr-check    PR review with CI integration
+
+Install: golembot skill add skills.sh:<owner>/<repo>/<skill>
 ```
 :::
 
@@ -78,7 +87,7 @@ golembot onboard          # guided setup wizard
 golembot run              # interactive REPL
 golembot gateway          # start IM + HTTP service + Dashboard
 golembot fleet ls         # list all running bots
-golembot skill search "data analysis"  # browse ClawHub skills
+golembot skill search "data analysis"  # browse community skills
 ```
 
 Or use as a library — 5 lines of code:

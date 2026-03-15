@@ -162,10 +162,22 @@ export class CodexEngine implements AgentEngine {
     if (codexProviderId && opts.provider?.codexWireApi === 'responses') {
       sharedFlags.push('-c', `model_providers.${codexProviderId}.wire_api="responses"`);
     }
+    // Codex does not natively support MCP; inject available servers as a prompt hint
+    let finalPrompt = prompt;
+    if (opts.mcpConfig && Object.keys(opts.mcpConfig).length > 0) {
+      const serverList = Object.entries(opts.mcpConfig)
+        .map(
+          ([name, cfg]) =>
+            `- ${name}: command="${cfg.command}"${cfg.args?.length ? ` args=${JSON.stringify(cfg.args)}` : ''}`,
+        )
+        .join('\n');
+      finalPrompt = `[Available MCP servers — these are configured but not directly accessible in this engine:\n${serverList}]\n\n${prompt}`;
+    }
+
     const modelFlag = opts.model ? ['--model', opts.model] : [];
     const args = opts.sessionId
-      ? ['exec', 'resume', ...sharedFlags, ...modelFlag, opts.sessionId, prompt]
-      : ['exec', ...sharedFlags, ...modelFlag, prompt];
+      ? ['exec', 'resume', ...sharedFlags, ...modelFlag, opts.sessionId, finalPrompt]
+      : ['exec', ...sharedFlags, ...modelFlag, finalPrompt];
 
     const env: Record<string, string> = { ...(process.env as Record<string, string>) };
     // If a Codex profile is provided, let Codex load provider/base_url/model
