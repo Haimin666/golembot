@@ -315,4 +315,198 @@ describe('renderDashboard', () => {
     const memoryMatches = html.match(/🧠.*Memory/g);
     expect(memoryMatches).toBeNull();
   });
+
+  // ── Configuration panel tests ─────────────────────────────
+
+  it('renders configuration panel with engine & runtime settings', async () => {
+    const ctx = makeDashboardCtx({
+      config: {
+        name: 'test-bot',
+        engine: 'cursor',
+        model: 'sonnet-4.6',
+        timeout: 600,
+        maxConcurrent: 5,
+        sessionTtlDays: 14,
+        gateway: { port: 3000, host: '0.0.0.0', token: 'secret-token-123' },
+      },
+    });
+    const data = await buildDashboardData(ctx);
+    const html = renderDashboard(data);
+    expect(html).toContain('Configuration');
+    expect(html).toContain('Engine');
+    expect(html).toContain('cursor');
+    expect(html).toContain('600');
+    expect(html).toContain('14');
+    expect(html).toContain('Gateway');
+    // Token must be masked
+    expect(html).not.toContain('secret-token-123');
+    expect(html).toContain('secr');
+    expect(html).toContain('****');
+  });
+
+  it('renders provider section with masked API key', async () => {
+    const ctx = makeDashboardCtx({
+      config: {
+        name: 'test-bot',
+        engine: 'claude-code',
+        provider: {
+          baseUrl: 'https://api.example.com/v1',
+          apiKey: 'sk-abcdefghijklmnop',
+          model: 'custom-model',
+          failoverThreshold: 5,
+          fallback: {
+            baseUrl: 'https://backup.example.com',
+            apiKey: 'sk-backup12345678',
+          },
+        },
+      },
+    });
+    const data = await buildDashboardData(ctx);
+    const html = renderDashboard(data);
+    expect(html).toContain('Provider');
+    expect(html).toContain('api.example.com');
+    // API key must be masked
+    expect(html).not.toContain('sk-abcdefghijklmnop');
+    expect(html).toContain('sk-a');
+    expect(html).toContain('****');
+    expect(html).toContain('custom-model');
+    expect(html).toContain('Fallback');
+    expect(html).not.toContain('sk-backup12345678');
+  });
+
+  it('renders group chat and streaming config', async () => {
+    const ctx = makeDashboardCtx({
+      config: {
+        name: 'test-bot',
+        engine: 'cursor',
+        groupChat: { groupPolicy: 'smart', historyLimit: 30, maxTurns: 5 },
+        streaming: { mode: 'streaming', showToolCalls: true },
+      },
+    });
+    const data = await buildDashboardData(ctx);
+    const html = renderDashboard(data);
+    expect(html).toContain('Group Chat');
+    expect(html).toContain('smart');
+    expect(html).toContain('30');
+    expect(html).toContain('Streaming');
+    expect(html).toContain('Enabled');
+  });
+
+  it('renders permissions config', async () => {
+    const ctx = makeDashboardCtx({
+      config: {
+        name: 'test-bot',
+        engine: 'cursor',
+        permissions: {
+          allowedPaths: ['src/', 'docs/'],
+          deniedPaths: ['.env', 'secrets/'],
+          allowedCommands: ['npm test'],
+          deniedCommands: ['rm -rf'],
+        },
+      },
+    });
+    const data = await buildDashboardData(ctx);
+    const html = renderDashboard(data);
+    expect(html).toContain('Permissions');
+    expect(html).toContain('src/');
+    expect(html).toContain('.env');
+    expect(html).toContain('npm test');
+    expect(html).toContain('rm -rf');
+  });
+
+  it('renders advanced section with MCP servers and system prompt', async () => {
+    const ctx = makeDashboardCtx({
+      config: {
+        name: 'test-bot',
+        engine: 'cursor',
+        systemPrompt: 'You are a helpful coding assistant.',
+        mcp: {
+          'my-db': { command: 'npx', args: ['-y', 'mcp-db'] },
+          'my-search': { command: 'node', args: ['search.js'] },
+        },
+      },
+    });
+    const data = await buildDashboardData(ctx);
+    const html = renderDashboard(data);
+    expect(html).toContain('Advanced');
+    expect(html).toContain('System Prompt');
+    expect(html).toContain('helpful coding assistant');
+    expect(html).toContain('MCP Servers');
+    expect(html).toContain('my-db');
+    expect(html).toContain('my-search');
+  });
+
+  // ── Skills deduplication tests ─────────────────────────────
+
+  it('does not render skills inside Monitoring section', async () => {
+    const ctx = makeDashboardCtx({
+      skills: [
+        { name: 'general', path: '/skills/general', description: 'General', type: 'behavior' },
+        { name: 'im-adapter', path: '/skills/im-adapter', description: 'IM', type: 'behavior' },
+      ],
+    });
+    const data = await buildDashboardData(ctx);
+    const html = renderDashboard(data);
+    // Monitoring section should contain Statistics but NOT Skills
+    const monitoringStart = html.indexOf('Monitoring');
+    const skillInventoryStart = html.indexOf('Skill Inventory');
+    expect(monitoringStart).toBeGreaterThan(-1);
+    expect(skillInventoryStart).toBeGreaterThan(-1);
+    // Between "Monitoring" and the stat-grid, there should be no skill-row
+    const monitoringSlice = html.slice(monitoringStart, monitoringStart + 500);
+    expect(monitoringSlice).toContain('stat-grid');
+    expect(monitoringSlice).not.toContain('skill-row');
+  });
+
+  it('renders skill inventory for skills without types', async () => {
+    const ctx = makeDashboardCtx({
+      skills: [
+        { name: 'general', path: '/skills/general', description: 'General assistant' },
+        { name: 'im-adapter', path: '/skills/im-adapter', description: 'IM guidelines' },
+      ],
+    });
+    const data = await buildDashboardData(ctx);
+    const html = renderDashboard(data);
+    expect(html).toContain('Skills');
+    expect(html).toContain('general');
+    expect(html).toContain('im-adapter');
+  });
+
+  // ── Escalation panel style tests ─────────────────────────────
+
+  it('renders escalation panel with div-based layout (not table)', async () => {
+    const data = await buildDashboardData(makeDashboardCtx());
+    data.escalations = [{ ts: '2026-03-15T10:00:00Z', reason: 'Cannot answer', sessionKey: 'sess-1', status: 'open' }];
+    const html = renderDashboard(data);
+    expect(html).toContain('Escalations');
+    expect(html).toContain('escalation-row');
+    expect(html).toContain('Cannot answer');
+    // Should NOT use table elements
+    expect(html).not.toContain('<table');
+    expect(html).not.toContain('<thead');
+    expect(html).not.toContain('<tbody');
+  });
+
+  // ── Fleet peers panel tests ─────────────────────────────
+
+  it('renders fleet peers panel when peers exist', async () => {
+    const data = await buildDashboardData(makeDashboardCtx());
+    data.fleetPeers = [
+      { name: 'bot-a', url: 'http://127.0.0.1:3001', engine: 'cursor', role: 'support', alive: true },
+      { name: 'bot-b', url: 'http://127.0.0.1:3002', engine: 'claude-code', alive: false },
+    ];
+    const html = renderDashboard(data);
+    expect(html).toContain('Fleet Peers');
+    expect(html).toContain('bot-a');
+    expect(html).toContain('bot-b');
+    expect(html).toContain('support');
+    expect(html).toContain('Dashboard');
+  });
+
+  it('omits fleet peers panel when no peers', async () => {
+    const data = await buildDashboardData(makeDashboardCtx());
+    data.fleetPeers = [];
+    const html = renderDashboard(data);
+    expect(html).not.toContain('Fleet Peers');
+  });
 });

@@ -375,6 +375,12 @@ gateway:
   token: ${GOLEM_TOKEN}
 ```
 
+## Dashboard Configuration Panel
+
+When running `golembot gateway`, the web dashboard includes a **Configuration Panel** that displays all `golem.yaml` settings and supports **inline editing** — hover over a value, click the pencil button (✎), modify, and save. Changes are written to `golem.yaml` immediately.
+
+For full details on the dashboard, inline editing workflow, and hot-reload vs restart behavior, see [Dashboard](/guide/dashboard).
+
 ## Skills Are Not Configured
 
 Skills are **not** declared in `golem.yaml`. The `skills/` directory is the single source of truth — whatever skill directories exist, those capabilities are loaded. See [Skills](/skills/overview).

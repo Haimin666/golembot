@@ -363,6 +363,11 @@ export async function writeConfig(dir: string, config: GolemConfig): Promise<voi
   if (typeof config.skipPermissions === 'boolean') content.skipPermissions = config.skipPermissions;
   if (config.channels) content.channels = config.channels;
   if (config.gateway) content.gateway = config.gateway;
+  if (typeof config.timeout === 'number') content.timeout = config.timeout;
+  if (typeof config.maxConcurrent === 'number') content.maxConcurrent = config.maxConcurrent;
+  if (typeof config.maxQueuePerSession === 'number') content.maxQueuePerSession = config.maxQueuePerSession;
+  if (typeof config.sessionTtlDays === 'number') content.sessionTtlDays = config.sessionTtlDays;
+  if (config.systemPrompt) content.systemPrompt = config.systemPrompt;
   if (config.groupChat) content.groupChat = config.groupChat;
   if (config.streaming) content.streaming = config.streaming;
   if (config.permissions) content.permissions = config.permissions;
@@ -374,6 +379,60 @@ export async function writeConfig(dir: string, config: GolemConfig): Promise<voi
   if (config.mcp) content.mcp = config.mcp;
   if (config.escalation) content.escalation = config.escalation;
   await writeFile(configPath, yaml.dump(content, { lineWidth: -1 }), 'utf-8');
+}
+
+// Fields that require a gateway restart when changed
+const RESTART_REQUIRED_KEYS = new Set(['engine', 'model', 'channels', 'gateway', 'mcp']);
+
+function needsRestart(patch: Record<string, unknown>): boolean {
+  for (const key of Object.keys(patch)) {
+    if (RESTART_REQUIRED_KEYS.has(key)) return true;
+    // provider.baseUrl, provider.apiKey, provider.fallback require restart
+    if (key === 'provider' && typeof patch[key] === 'object' && patch[key]) {
+      const provPatch = patch[key] as Record<string, unknown>;
+      if ('baseUrl' in provPatch || 'apiKey' in provPatch || 'fallback' in provPatch) return true;
+    }
+  }
+  return false;
+}
+
+function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...target };
+  for (const [key, val] of Object.entries(source)) {
+    if (
+      val !== undefined &&
+      val !== null &&
+      typeof val === 'object' &&
+      !Array.isArray(val) &&
+      typeof result[key] === 'object' &&
+      result[key] &&
+      !Array.isArray(result[key])
+    ) {
+      result[key] = deepMerge(result[key] as Record<string, unknown>, val as Record<string, unknown>);
+    } else {
+      result[key] = val;
+    }
+  }
+  return result;
+}
+
+/**
+ * Deep-merge a partial config patch into the existing golem.yaml and write it back.
+ * Returns the new config and whether a restart is needed for the changes to take effect.
+ */
+export async function patchConfigFull(
+  dir: string,
+  patch: Record<string, unknown>,
+): Promise<{ config: GolemConfig; needsRestart: boolean }> {
+  const existing = await loadConfig(dir);
+  const merged = deepMerge(existing as unknown as Record<string, unknown>, patch) as unknown as GolemConfig;
+
+  // Validate required fields
+  if (!merged.name) throw new Error('Config validation failed: "name" is required');
+  if (!merged.engine) throw new Error('Config validation failed: "engine" is required');
+
+  await writeConfig(dir, merged);
+  return { config: merged, needsRestart: needsRestart(patch) };
 }
 
 function extractFrontMatter(content: string): Record<string, string> {

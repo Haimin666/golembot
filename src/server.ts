@@ -5,6 +5,7 @@ import { buildDashboardData, type DashboardContext, recordMessage, renderDashboa
 import type { Assistant } from './index.js';
 import type { Scheduler } from './scheduler.js';
 import type { TaskStore } from './task-store.js';
+import { patchConfigFull } from './workspace.js';
 
 export interface CronContext {
   taskStore: TaskStore;
@@ -248,6 +249,35 @@ export function createGolemServer(
         json(res, 200, await buildDashboardData(dashboard));
       } else {
         json(res, 200, { hint: 'Dashboard not available (gateway mode only)' });
+      }
+      return;
+    }
+
+    // ── PATCH /api/config — update golem.yaml ──────────────
+    if (path === '/api/config' && req.method === 'PATCH') {
+      if (!dir) {
+        json(res, 503, { error: 'Config editing not available (no working directory)' });
+        return;
+      }
+      const raw = await readBody(req);
+      let patch: Record<string, unknown>;
+      try {
+        patch = JSON.parse(raw);
+      } catch {
+        json(res, 400, { error: 'Invalid JSON body' });
+        return;
+      }
+      if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) {
+        json(res, 400, { error: 'Body must be a JSON object' });
+        return;
+      }
+      try {
+        const result = await patchConfigFull(dir, patch);
+        // Update in-memory config so dashboard reflects changes immediately
+        if (dashboard) dashboard.config = result.config;
+        json(res, 200, { ok: true, config: result.config, needsRestart: result.needsRestart });
+      } catch (e) {
+        json(res, 400, { error: (e as Error).message });
       }
       return;
     }

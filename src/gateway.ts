@@ -815,6 +815,23 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
     },
     taskStore,
     dir,
+    getFleetPeers: async () => {
+      try {
+        const instances = await listInstances();
+        return instances
+          .filter((i) => i.name !== config.name)
+          .map((i) => ({
+            name: i.name,
+            url: i.url,
+            engine: i.engine,
+            model: i.model,
+            role: i.role,
+            alive: i.alive,
+          }));
+      } catch {
+        return [];
+      }
+    },
   };
 
   // shutdown is assigned later after httpServer is created — use a wrapper

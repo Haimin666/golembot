@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type GolemConfig, loadConfig, resolveEnvPlaceholders, writeConfig } from '../workspace.js';
+import { type GolemConfig, loadConfig, patchConfigFull, resolveEnvPlaceholders, writeConfig } from '../workspace.js';
 
 describe('resolveEnvPlaceholders', () => {
   const ORIGINAL_ENV = process.env;
@@ -191,5 +191,62 @@ describe('writeConfig with channels + gateway', () => {
     expect(loaded.groupChat?.groupPolicy).toBe('smart');
     expect(loaded.groupChat?.historyLimit).toBe(25);
     expect(loaded.groupChat?.maxTurns).toBe(8);
+  });
+});
+
+describe('patchConfigFull', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'golem-patch-'));
+    await writeFile(
+      join(tmpDir, 'golem.yaml'),
+      'name: patch-bot\nengine: cursor\ntimeout: 300\ngroupChat:\n  groupPolicy: mention-only\n  historyLimit: 20\n',
+      'utf-8',
+    );
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('deep-merges nested objects preserving unpatched fields', async () => {
+    const result = await patchConfigFull(tmpDir, { groupChat: { maxTurns: 5 } });
+    expect(result.config.groupChat?.groupPolicy).toBe('mention-only');
+    expect(result.config.groupChat?.historyLimit).toBe(20);
+    expect(result.config.groupChat?.maxTurns).toBe(5);
+    expect(result.config.name).toBe('patch-bot');
+  });
+
+  it('preserves fields not in the patch', async () => {
+    const result = await patchConfigFull(tmpDir, { timeout: 600 });
+    expect(result.config.timeout).toBe(600);
+    expect(result.config.engine).toBe('cursor');
+    expect(result.config.groupChat?.groupPolicy).toBe('mention-only');
+  });
+
+  it('returns needsRestart=true for engine change', async () => {
+    const result = await patchConfigFull(tmpDir, { engine: 'opencode' });
+    expect(result.needsRestart).toBe(true);
+  });
+
+  it('returns needsRestart=false for hot-reloadable fields', async () => {
+    const result = await patchConfigFull(tmpDir, { timeout: 600, sessionTtlDays: 7 });
+    expect(result.needsRestart).toBe(false);
+  });
+
+  it('throws when name is removed', async () => {
+    await expect(patchConfigFull(tmpDir, { name: '' })).rejects.toThrow('name');
+  });
+
+  it('throws when engine is removed', async () => {
+    await expect(patchConfigFull(tmpDir, { engine: '' })).rejects.toThrow('engine');
+  });
+
+  it('persists changes to golem.yaml', async () => {
+    await patchConfigFull(tmpDir, { model: 'gpt-4o', timeout: 120 });
+    const loaded = await loadConfig(tmpDir);
+    expect(loaded.model).toBe('gpt-4o');
+    expect(loaded.timeout).toBe(120);
   });
 });

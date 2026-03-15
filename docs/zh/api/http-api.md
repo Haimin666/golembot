@@ -111,9 +111,13 @@ data: {"type":"error","message":"Agent invocation timed out"}
 
 在 gateway 模式（`golembot gateway`）下，根路径提供 HTML Dashboard，包含：
 - Bot 状态、引擎、模型和运行时间
+- **配置面板** — 一览所有 `golem.yaml` 设置（引擎、模型、超时、网关、供应商、群聊、流式、权限、MCP 服务器、系统提示词、消息队列、升级）
+- **Fleet 节点** — 多 Bot 部署时的实例互相感知
 - 通道连接状态（已连接 / 失败 / 未配置）
 - 实时消息统计和费用追踪
 - 通过 SSE 的实时活动流
+- 技能清单
+- 升级面板（卡片式设计）
 - 快速测试面板（可直接在浏览器中发送消息）
 - HTTP API 和 embed SDK 代码示例（带复制按钮）
 
@@ -167,6 +171,43 @@ data: {"type":"error","message":"Agent invocation timed out"}
 | `404` | 通道未找到（响应中包含可用通道列表） |
 | `501` | 该通道适配器不支持主动发送 |
 | `503` | 无可用通道适配器 |
+
+### `PATCH /api/config`
+
+远程更新 `golem.yaml` 配置。需要认证。
+
+**请求体：** 部分 `GolemConfig` JSON — 只传需要修改的字段。
+
+```json
+{
+  "timeout": 180,
+  "groupChat": { "groupPolicy": "smart" }
+}
+```
+
+**响应：**
+```json
+{
+  "ok": true,
+  "config": { /* 合并后的完整 GolemConfig */ },
+  "needsRestart": false
+}
+```
+
+`needsRestart` 标识修改是否需要重启 Gateway 才能生效：
+
+| 热更新（立即生效） | 需要重启 |
+|---|---|
+| `timeout`、`maxConcurrent`、`sessionTtlDays`、`groupChat`、`streaming`、`persona`、`permissions`、`systemPrompt` | `engine`、`model`、`channels`、`gateway`、`mcp`、`provider.baseUrl`、`provider.apiKey`、`provider.fallback` |
+
+**示例：**
+
+```bash
+curl -X PATCH http://localhost:3000/api/config \
+  -H "Authorization: Bearer my-secret" \
+  -H "Content-Type: application/json" \
+  -d '{"timeout": 180, "streaming": {"mode": "streaming"}}'
+```
 
 ### `GET /api/channels`
 
