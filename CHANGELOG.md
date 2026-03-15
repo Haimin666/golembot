@@ -1,3 +1,15 @@
+# [0.30.0](https://github.com/0xranx/golembot/compare/v0.29.0...v0.30.0) (2026-03-15)
+
+
+### Bug Fixes
+
+* sync pnpm-lock.yaml with package.json after wecom SDK migration ([ae68237](https://github.com/0xranx/golembot/commit/ae68237156df764788f9a593acc3c664602a1852))
+
+
+### Features
+
+* multi-bot collaboration, message push API, and digital employee infrastructure ([e56102c](https://github.com/0xranx/golembot/commit/e56102c57478c468f509029405fe92e19fadb885))
+
 # [0.29.0](https://github.com/0xranx/golembot/compare/v0.28.0...v0.29.0) (2026-03-14)
 
 
