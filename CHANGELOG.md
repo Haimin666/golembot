@@ -1,3 +1,15 @@
+# [0.31.0](https://github.com/0xranx/golembot/compare/v0.30.0...v0.31.0) (2026-03-15)
+
+
+### Bug Fixes
+
+* restore PersonaConfig import and add type annotation for CI strict mode ([e48683f](https://github.com/0xranx/golembot/commit/e48683fb77199dcc9634e2710bb4a658abd7333a))
+
+
+### Features
+
+* comprehensive dashboard enhancement with config panel and inline editing ([a82c4aa](https://github.com/0xranx/golembot/commit/a82c4aa972c3ad89993c28dcc62abf69582e5500))
+
 # [0.30.0](https://github.com/0xranx/golembot/compare/v0.29.0...v0.30.0) (2026-03-15)
 
 
