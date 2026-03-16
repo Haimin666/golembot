@@ -1,3 +1,10 @@
+## [0.34.2](https://github.com/0xranx/golembot/compare/v0.34.1...v0.34.2) (2026-03-16)
+
+
+### Bug Fixes
+
+* skip crash-recovered inbox entries already in seen store ([7200be5](https://github.com/0xranx/golembot/commit/7200be554fd14f63356283fc25b0aa0a3455f6d4))
+
 ## [0.34.1](https://github.com/0xranx/golembot/compare/v0.34.0...v0.34.1) (2026-03-16)
 
 
