@@ -1,3 +1,10 @@
+# [0.33.0](https://github.com/0xranx/golembot/compare/v0.32.0...v0.33.0) (2026-03-16)
+
+
+### Features
+
+* change default streaming mode from buffered to streaming ([55e21e6](https://github.com/0xranx/golembot/commit/55e21e61bab0ad0f75fc0d73821bd8b6bac70203))
+
 # [0.32.0](https://github.com/0xranx/golembot/compare/v0.31.1...v0.32.0) (2026-03-16)
 
 
