@@ -1,3 +1,10 @@
+# [0.32.0](https://github.com/0xranx/golembot/compare/v0.31.1...v0.32.0) (2026-03-16)
+
+
+### Features
+
+* file attachment support for Feishu (documents + audio) ([afd61a0](https://github.com/0xranx/golembot/commit/afd61a04d85edfa81d4340fa9dce0681898ae24c))
+
 ## [0.31.1](https://github.com/0xranx/golembot/compare/v0.31.0...v0.31.1) (2026-03-16)
 
 
