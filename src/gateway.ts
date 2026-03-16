@@ -368,10 +368,14 @@ export async function handleMessage(
     }
     groupLastActivity.set(groupKey, Date.now());
 
-    // Always update history buffer, regardless of policy
+    // Always update history buffer, regardless of policy.
+    // Skip history-fetch triage prompts — they are system messages, not real group conversation.
+    const isTriage = userText.startsWith('[System: You have been offline');
     const hist = groupHistories.get(groupKey) ?? [];
     const isBotSender = msg.senderType === 'bot';
-    hist.push({ senderName: msg.senderName ?? msg.senderId, text: userText, isBot: isBotSender });
+    if (!isTriage) {
+      hist.push({ senderName: msg.senderName ?? msg.senderId, text: userText, isBot: isBotSender });
+    }
     if (hist.length > gc.historyLimit) hist.shift();
     groupHistories.set(groupKey, hist);
 
