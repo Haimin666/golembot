@@ -1,3 +1,10 @@
+# [0.34.0](https://github.com/0xranx/golembot/compare/v0.33.1...v0.34.0) (2026-03-16)
+
+
+### Features
+
+* persistent SeenMessageStore for cross-path message dedup ([238cc6c](https://github.com/0xranx/golembot/commit/238cc6cc0620f02284bae5d52d092f9a984e49ee))
+
 ## [0.33.1](https://github.com/0xranx/golembot/compare/v0.33.0...v0.33.1) (2026-03-16)
 
 
