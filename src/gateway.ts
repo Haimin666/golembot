@@ -25,6 +25,7 @@ import { type Assistant, type CommandContext, createAssistant, executeCommand, p
 import { setPeerBase } from './peer-require.js';
 import { createProactiveCoordinator, type ProactiveCoordinator } from './proactive.js';
 import { Scheduler } from './scheduler.js';
+import { SeenMessageStore } from './seen-messages.js';
 import { createGolemServer, type GolemServer, type ServerOpts } from './server.js';
 import { TaskStore } from './task-store.js';
 import {
@@ -879,6 +880,10 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
   const inboxStore = inboxEnabled ? new InboxStore(dir) : undefined;
   let inboxConsumer: { stop: () => void } | undefined;
 
+  // Persistent dedup store — shared between real-time and history-fetch paths
+  const seenMessages = new SeenMessageStore(dir);
+  await seenMessages.load();
+
   if (channels) {
     for (const [type, channelConfig] of Object.entries(channels)) {
       if (!channelConfig) continue;
@@ -894,10 +899,14 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
         if (inboxStore) {
           // Inbox mode: enqueue messages for sequential consumption
           await adapter.start((msg: ChannelMessage) => {
-            // Dedup by messageId
-            if (msg.messageId && inboxStore.has(type, msg.messageId)) {
-              log(verbose, `[${type}] duplicate message ${msg.messageId}, skipping`);
-              return;
+            // Dedup by persistent seen store + inbox seen set
+            if (msg.messageId) {
+              if (seenMessages.has(type, msg.messageId) || inboxStore.has(type, msg.messageId)) {
+                log(verbose, `[${type}] duplicate message ${msg.messageId}, skipping`);
+                return;
+              }
+              // Mark as seen persistently — survives restart
+              seenMessages.mark(type, msg.messageId);
             }
 
             // Build sessionKey + fullText the same way handleMessage does,
@@ -1049,6 +1058,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
       dir,
       adapters: adapterMap,
       inbox: inboxStore,
+      seenMessages,
       config: config.historyFetch,
       verbose,
     });
@@ -1120,6 +1130,8 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
     if (historyPoller) historyPoller.stop();
     if (inboxConsumer) inboxConsumer.stop();
     if (coordinator) coordinator.stop();
+    seenMessages.stop();
+    await seenMessages.save().catch(() => {});
     for (const adapter of adapters) {
       try {
         await adapter.stop();

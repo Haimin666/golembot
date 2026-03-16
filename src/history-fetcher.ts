@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ChannelAdapter, ChannelMessage } from './channel.js';
 import { type InboxChannelMsg, type InboxStore } from './inbox.js';
+import type { SeenMessageStore } from './seen-messages.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -102,6 +103,8 @@ export interface HistoryFetcherOpts {
   dir: string;
   adapters: Map<string, ChannelAdapter>;
   inbox: InboxStore;
+  /** Persistent dedup store shared with real-time path. */
+  seenMessages?: SeenMessageStore;
   config: HistoryFetchConfig;
   verbose: boolean;
 }
@@ -115,7 +118,7 @@ function log(verbose: boolean, ...args: unknown[]): void {
  * Groups messages by chat and enqueues triage prompts into the inbox.
  */
 export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: WatermarkStore): Promise<number> {
-  const { adapters, inbox, config, verbose } = opts;
+  const { adapters, inbox, seenMessages, config, verbose } = opts;
   const lookbackMs = (config.initialLookbackMinutes ?? 60) * 60 * 1000;
   let totalEnqueued = 0;
 
@@ -145,10 +148,11 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
       }
 
       // Filter out bot messages (other bots' replies don't need triage)
-      // and messages already in inbox (dedup)
+      // and messages already processed (check persistent store + inbox)
       const newMessages = messages.filter((m) => {
         if (m.senderType === 'bot') return false;
         if (!m.messageId) return true;
+        if (seenMessages?.has(type, m.messageId)) return false;
         return !inbox.has(type, m.messageId);
       });
 
@@ -189,10 +193,13 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
         messageId: lastMsg.messageId,
       };
 
-      // Mark each individual message's ID as seen, so real-time messages
-      // that were already processed won't be re-triaged by history-fetch.
+      // Mark each individual message's ID as seen in both stores,
+      // so real-time messages won't be re-triaged by history-fetch.
       for (const m of newMessages) {
-        if (m.messageId) inbox.markSeen(type, m.messageId);
+        if (m.messageId) {
+          inbox.markSeen(type, m.messageId);
+          seenMessages?.mark(type, m.messageId);
+        }
       }
 
       await inbox.enqueue({
