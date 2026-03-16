@@ -1,3 +1,10 @@
+## [0.33.1](https://github.com/0xranx/golembot/compare/v0.33.0...v0.33.1) (2026-03-16)
+
+
+### Bug Fixes
+
+* prevent history-fetch re-triage and default to streaming mode ([20ec552](https://github.com/0xranx/golembot/commit/20ec55210fc0e0f83bffa28ae8b3b9de22b18f22))
+
 # [0.33.0](https://github.com/0xranx/golembot/compare/v0.32.0...v0.33.0) (2026-03-16)
 
 
