@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChannelAdapter, ChannelMessage } from '../channel.js';
 import { buildTriagePrompt, fetchMissedMessages, type TriageMessage, WatermarkStore } from '../history-fetcher.js';
 import { InboxStore } from '../inbox.js';
+import { SeenMessageStore } from '../seen-messages.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -285,6 +286,60 @@ describe('fetchMissedMessages', () => {
 
     // But watermark should still advance past the bot messages
     expect(watermarks.get('feishu:chat1')?.toISOString()).toBe('2026-03-11T15:05:00.001Z');
+  });
+
+  it('skips messages already in persistent SeenMessageStore', async () => {
+    // Simulate: real-time path already marked msg1 as seen
+    const seenMessages = new SeenMessageStore(dir);
+    await seenMessages.load();
+    seenMessages.mark('feishu', 'msg1');
+
+    const adapter = makeMockAdapter({
+      listChats: vi.fn().mockResolvedValue([{ chatId: 'chat1', chatType: 'group' as const }]),
+      fetchHistory: vi
+        .fn()
+        .mockResolvedValue([
+          makeMsg({ messageId: 'msg1', text: 'already processed via realtime', senderName: 'Alice' }),
+          makeMsg({ messageId: 'msg2', text: 'new missed message', senderName: 'Bob' }),
+        ]),
+    });
+
+    const adapters = new Map<string, ChannelAdapter>([['feishu', adapter]]);
+    const watermarks = new WatermarkStore(dir);
+    await watermarks.load();
+
+    const count = await fetchMissedMessages(
+      { dir, adapters, inbox, seenMessages, config: {}, verbose: false },
+      watermarks,
+    );
+
+    expect(count).toBe(1);
+    const pending = await inbox.getPending();
+    expect(pending).toHaveLength(1);
+    // Only msg2 should be in triage, msg1 was already seen
+    expect(pending[0].message).toContain('Bob: new missed message');
+    expect(pending[0].message).not.toContain('already processed via realtime');
+    seenMessages.stop();
+  });
+
+  it('marks triaged messages in persistent store to prevent re-triage', async () => {
+    const seenMessages = new SeenMessageStore(dir);
+    await seenMessages.load();
+
+    const adapter = makeMockAdapter({
+      listChats: vi.fn().mockResolvedValue([{ chatId: 'chat1', chatType: 'group' as const }]),
+      fetchHistory: vi.fn().mockResolvedValue([makeMsg({ messageId: 'msg1', text: 'hello', senderName: 'Alice' })]),
+    });
+
+    const adapters = new Map<string, ChannelAdapter>([['feishu', adapter]]);
+    const watermarks = new WatermarkStore(dir);
+    await watermarks.load();
+
+    await fetchMissedMessages({ dir, adapters, inbox, seenMessages, config: {}, verbose: false }, watermarks);
+
+    // msg1 should now be in the persistent seen store
+    expect(seenMessages.has('feishu', 'msg1')).toBe(true);
+    seenMessages.stop();
   });
 
   it('handles listChats errors gracefully', async () => {
