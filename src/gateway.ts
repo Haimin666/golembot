@@ -970,10 +970,21 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
 
   // ── Start inbox consumer ───────────────────────────────────────────────────
   if (inboxStore) {
-    // Recover any messages left in 'processing' state from a previous crash
+    // Recover any messages left in 'processing' state from a previous crash.
+    // Skip entries whose messageId is already in the persistent seen store —
+    // they were already processed (and likely replied to) before the crash.
     const recovered = await inboxStore.getPending();
-    if (recovered.length > 0) {
-      log(verbose, `[inbox] Recovered ${recovered.length} pending message(s) from previous session`);
+    for (const entry of recovered) {
+      const mid = entry.channelMsg?.messageId;
+      const ct = entry.channelMsg?.channelType;
+      if (mid && ct && seenMessages.has(ct, mid)) {
+        log(verbose, `[inbox] Skipping recovered entry ${entry.id} — already seen (${mid})`);
+        await inboxStore.updateStatus(entry.id, 'done');
+      }
+    }
+    const stillPending = recovered.filter((e) => e.status === 'pending');
+    if (stillPending.length > 0) {
+      log(verbose, `[inbox] Recovered ${stillPending.length} pending message(s) from previous session`);
     }
 
     inboxConsumer = startInboxConsumer(
