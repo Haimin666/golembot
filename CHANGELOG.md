@@ -1,3 +1,10 @@
+## [0.31.1](https://github.com/0xranx/golembot/compare/v0.31.0...v0.31.1) (2026-03-16)
+
+
+### Bug Fixes
+
+* prevent duplicate triage on restart and block PASS/SKIP leaking to IM ([3c32e8f](https://github.com/0xranx/golembot/commit/3c32e8fc89f611d9cf89031d091e29cc7c781783))
+
 # [0.31.0](https://github.com/0xranx/golembot/compare/v0.30.0...v0.31.0) (2026-03-15)
 
 
