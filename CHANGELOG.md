@@ -1,3 +1,10 @@
+## [0.34.1](https://github.com/0xranx/golembot/compare/v0.34.0...v0.34.1) (2026-03-16)
+
+
+### Bug Fixes
+
+* exclude triage prompts from group chat history buffer ([daab0f5](https://github.com/0xranx/golembot/commit/daab0f5decae1d125d899e0541c1e46e352127ee))
+
 # [0.34.0](https://github.com/0xranx/golembot/compare/v0.33.1...v0.34.0) (2026-03-16)
 
 
