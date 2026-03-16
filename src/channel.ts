@@ -8,6 +8,16 @@ export interface ImageAttachment {
   fileName?: string;
 }
 
+/** A file (non-image) attached to an incoming IM message. */
+export interface FileAttachment {
+  /** MIME type, e.g. "application/pdf", "audio/ogg". */
+  mimeType: string;
+  /** Raw file bytes. */
+  data: Buffer;
+  /** Original filename. */
+  fileName: string;
+}
+
 export interface ChannelMessage {
   channelType: string;
   senderId: string;
@@ -19,6 +29,8 @@ export interface ChannelMessage {
   messageId?: string;
   /** Images attached to the message (downloaded by the adapter). */
   images?: ImageAttachment[];
+  /** Files (non-image) attached to the message (downloaded by the adapter). */
+  files?: FileAttachment[];
   raw: unknown;
   /**
    * Indicates whether the sender is a human user or a bot/app.

@@ -1,4 +1,11 @@
-import type { ChannelAdapter, ChannelMessage, ImageAttachment, ReadReceipt, ReplyOptions } from '../channel.js';
+import type {
+  ChannelAdapter,
+  ChannelMessage,
+  FileAttachment,
+  ImageAttachment,
+  ReadReceipt,
+  ReplyOptions,
+} from '../channel.js';
 import { importPeer } from '../peer-require.js';
 import type { FeishuChannelConfig } from '../workspace.js';
 import { hasMarkdown, markdownToCard } from './feishu-format.js';
@@ -71,6 +78,25 @@ export class FeishuAdapter implements ChannelAdapter {
     const contentType = resp.headers.get('content-type') || '';
     const mimeType = contentType.startsWith('image/') ? contentType.split(';')[0] : detectImageMime(data);
     return { mimeType, data, fileName: `${imageKey}.${mimeType === 'image/png' ? 'png' : 'jpg'}` };
+  }
+
+  /**
+   * Download a file resource (document, audio, etc.) from a Feishu message.
+   * Uses the same IM v1 message resource API with type=file.
+   */
+  private async downloadFile(messageId: string, fileKey: string, fileName: string): Promise<FileAttachment> {
+    const token = await this.client.tokenManager.getTenantAccessToken();
+    const resp = await fetch(
+      `https://open.feishu.cn/open-apis/im/v1/messages/${messageId}/resources/${fileKey}?type=file`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!resp.ok) {
+      throw new Error(`Feishu file download failed: ${resp.status} ${resp.statusText}`);
+    }
+    const data = Buffer.from(await resp.arrayBuffer());
+    const contentType = resp.headers.get('content-type') || 'application/octet-stream';
+    const mimeType = contentType.split(';')[0];
+    return { mimeType, data, fileName };
   }
 
   async start(onMessage: (msg: ChannelMessage) => void): Promise<void> {
@@ -168,7 +194,8 @@ export class FeishuAdapter implements ChannelAdapter {
 
       // Parse message content based on type
       const msgType = message.message_type;
-      if (msgType !== 'text' && msgType !== 'image' && msgType !== 'post') return;
+      if (msgType !== 'text' && msgType !== 'image' && msgType !== 'post' && msgType !== 'file' && msgType !== 'audio')
+        return;
 
       let parsedContent: Record<string, any>;
       try {
@@ -239,6 +266,36 @@ export class FeishuAdapter implements ChannelAdapter {
         if (!text && images.length > 0) text = '(image)';
       }
 
+      // File attachment handling
+      const files: FileAttachment[] = [];
+
+      if (msgType === 'file') {
+        const fileKey = parsedContent.file_key;
+        const fileName = parsedContent.file_name || 'attachment';
+        if (fileKey) {
+          try {
+            const file = await this.downloadFile(message.message_id, fileKey, fileName);
+            files.push(file);
+            text = `(file: ${fileName})`;
+          } catch (e) {
+            console.error('[feishu] Failed to download file:', (e as Error).message);
+            return;
+          }
+        }
+      } else if (msgType === 'audio') {
+        const fileKey = parsedContent.file_key;
+        if (fileKey) {
+          try {
+            const file = await this.downloadFile(message.message_id, fileKey, 'voice.opus');
+            files.push(file);
+            text = '(audio)';
+          } catch (e) {
+            console.error('[feishu] Failed to download audio:', (e as Error).message);
+            return;
+          }
+        }
+      }
+
       // Process @mentions in text:
       // - Strip the bot's own @mention key entirely
       // - Replace other users' @mention keys with readable @Name format
@@ -253,7 +310,7 @@ export class FeishuAdapter implements ChannelAdapter {
         }
       }
 
-      if (!text && images.length === 0) return;
+      if (!text && images.length === 0 && files.length === 0) return;
 
       const senderId = sender.sender_id?.open_id || sender.sender_id?.user_id || '';
       const senderName = await this.resolveUserName(senderId);
@@ -276,6 +333,7 @@ export class FeishuAdapter implements ChannelAdapter {
         text,
         messageId: msgId,
         images: images.length > 0 ? images : undefined,
+        files: files.length > 0 ? files : undefined,
         senderType,
         mentioned: chatType === 'group' ? isMentioned : undefined,
         mentionedOthers: otherMentionNames.length > 0 ? otherMentionNames : undefined,

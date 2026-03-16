@@ -319,7 +319,7 @@ export async function handleMessage(
   peers?: PeerBot[],
 ): Promise<void> {
   const userText = msg.chatType === 'group' ? stripMention(msg.text) : msg.text;
-  if (!userText && (!msg.images || msg.images.length === 0)) return;
+  if (!userText && (!msg.images || msg.images.length === 0) && (!msg.files || msg.files.length === 0)) return;
 
   // ── Slash command interception ──
   const parsed = parseCommand(userText);
@@ -493,7 +493,7 @@ export async function handleMessage(
         buffer = '';
       };
 
-      for await (const event of assistant.chat(fullText, { sessionKey, images: msg.images })) {
+      for await (const event of assistant.chat(fullText, { sessionKey, images: msg.images, files: msg.files })) {
         if (event.type === 'text') {
           fullReply += event.content;
           buffer += event.content;
@@ -558,7 +558,7 @@ export async function handleMessage(
       }
     } else {
       // ── Buffered mode (default): accumulate all text, send at end ──
-      for await (const event of assistant.chat(fullText, { sessionKey, images: msg.images })) {
+      for await (const event of assistant.chat(fullText, { sessionKey, images: msg.images, files: msg.files })) {
         if (event.type === 'text') {
           fullReply += event.content;
         } else if (event.type === 'warning') {

@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import type { ImageAttachment } from './channel.js';
+import type { FileAttachment, ImageAttachment } from './channel.js';
 import { type AgentEngine, createEngine, type DiscoveredEngine, discoverEngines, type StreamEvent } from './engine.js';
 import {
   appendHistory,
@@ -147,6 +147,8 @@ export interface ChatOpts {
   sessionKey?: string;
   /** Images attached to the user message. Saved to disk and referenced in the prompt. */
   images?: ImageAttachment[];
+  /** Files (non-image) attached to the user message. Saved to disk and referenced in the prompt. */
+  files?: FileAttachment[];
 }
 
 export interface Assistant {
@@ -221,6 +223,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     sessionKey: string,
     isRetry: boolean,
     images?: ImageAttachment[],
+    files?: FileAttachment[],
   ): AsyncIterable<StreamEvent> {
     const { config, skills } = await ensureReady(dir);
 
@@ -278,10 +281,28 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
       }
     }
 
+    // Save attached files to workspace temp dir so the agent can read them
+    const filePaths: string[] = [];
+    const fileDir = join(dir, '.golem', 'files');
+    if (files && files.length > 0) {
+      await mkdir(fileDir, { recursive: true });
+      for (const file of files) {
+        const filePath = join(fileDir, file.fileName);
+        await writeFile(filePath, file.data);
+        filePaths.push(filePath);
+      }
+    }
+
     // Append image file paths to the message so the agent can read/view them
     if (imagePaths.length > 0) {
       const imageRefs = imagePaths.map((p) => p).join('\n');
       finalMessage += `\n\n[User attached ${imagePaths.length} image(s). File paths:\n${imageRefs}\nPlease read/view these files to see the images.]`;
+    }
+
+    // Append file paths to the message so the agent can read them
+    if (filePaths.length > 0) {
+      const fileRefs = filePaths.map((p) => p).join('\n');
+      finalMessage += `\n\n[User attached ${filePaths.length} file(s). File paths:\n${fileRefs}\nPlease read these files to see the content.]`;
     }
 
     // Prune once per process
@@ -339,8 +360,8 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
       }
     } finally {
       clearTimeout(timer);
-      // Clean up temp image files
-      for (const p of imagePaths) {
+      // Clean up temp image and file attachments
+      for (const p of [...imagePaths, ...filePaths]) {
         rm(p).catch(() => {});
       }
     }
@@ -416,7 +437,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
       if (isResumeFail) {
         await clearSession(dir, sessionKey);
         yield { type: 'warning' as const, message: 'Session could not be resumed. Starting fresh conversation.' };
-        yield* doChat(message, sessionKey, true, images);
+        yield* doChat(message, sessionKey, true, images, files);
       }
     }
   }
@@ -425,6 +446,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     message: string,
     sessionKey: string,
     images?: ImageAttachment[],
+    files?: FileAttachment[],
   ): AsyncIterable<StreamEvent> {
     // Rate limits use opts values directly — no file I/O before acquiring the mutex,
     // so same-key serialization order is preserved (first caller wins the lock).
@@ -455,7 +477,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     }
 
     try {
-      yield* doChat(message, sessionKey, false, images);
+      yield* doChat(message, sessionKey, false, images, files);
     } finally {
       activeChatCount--;
       mutex.release(sessionKey);
@@ -465,7 +487,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
   return {
     chat(message: string, chatOpts?: ChatOpts): AsyncIterable<StreamEvent> {
       const key = chatOpts?.sessionKey || DEFAULT_SESSION_KEY;
-      return chatImpl(message, key, chatOpts?.images);
+      return chatImpl(message, key, chatOpts?.images, chatOpts?.files);
     },
 
     async init(initOpts: { engine: string; name: string; role?: string }): Promise<void> {

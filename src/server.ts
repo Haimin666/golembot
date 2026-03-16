@@ -121,6 +121,7 @@ export function createGolemServer(
         message?: string;
         sessionKey?: string;
         images?: Array<{ mimeType?: string; data?: string; fileName?: string }>;
+        files?: Array<{ mimeType?: string; data?: string; fileName?: string }>;
       };
       try {
         body = JSON.parse(await readBody(req));
@@ -129,9 +130,10 @@ export function createGolemServer(
         return;
       }
 
-      // Allow image-only messages (no text required when images are present)
+      // Allow image/file-only messages (no text required when attachments are present)
       const hasImages = Array.isArray(body.images) && body.images.length > 0;
-      if ((!body.message || typeof body.message !== 'string') && !hasImages) {
+      const hasFiles = Array.isArray(body.files) && body.files.length > 0;
+      if ((!body.message || typeof body.message !== 'string') && !hasImages && !hasFiles) {
         json(res, 400, { error: 'Missing "message" field' });
         return;
       }
@@ -153,7 +155,24 @@ export function createGolemServer(
         }
       }
 
-      const chatMessage = body.message || '(image)';
+      // Convert base64-encoded files to FileAttachment[]
+      const files: Array<{ mimeType: string; data: Buffer; fileName: string }> = [];
+      if (hasFiles) {
+        for (const f of body.files!) {
+          if (!f.data || !f.fileName) continue;
+          try {
+            files.push({
+              mimeType: f.mimeType || 'application/octet-stream',
+              data: Buffer.from(f.data, 'base64'),
+              fileName: f.fileName,
+            });
+          } catch {
+            /* skip malformed entries */
+          }
+        }
+      }
+
+      const chatMessage = body.message || (hasImages ? '(image)' : '(file)');
 
       // ── Slash command interception ──
       if (dir) {
@@ -197,6 +216,7 @@ export function createGolemServer(
         for await (const event of assistant.chat(chatMessage, {
           sessionKey: body.sessionKey,
           images: images.length > 0 ? images : undefined,
+          files: files.length > 0 ? files : undefined,
         })) {
           res.write(`data: ${JSON.stringify(event)}\n\n`);
           if (event.type === 'text') replyText += event.content;
