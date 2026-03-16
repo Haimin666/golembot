@@ -132,7 +132,7 @@ export function resolveGroupChatConfig(config: GolemConfig): Required<GroupChatC
 export function resolveStreamingConfig(config: GolemConfig): Required<StreamingConfig> {
   const sc = config.streaming ?? {};
   return {
-    mode: sc.mode ?? 'buffered',
+    mode: sc.mode ?? 'streaming',
     showToolCalls: sc.showToolCalls ?? false,
   };
 }

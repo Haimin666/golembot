@@ -245,7 +245,7 @@ describe('resolveStreamingConfig', () => {
   it('fills in default values when streaming is absent', () => {
     const config = { name: 'bot', engine: 'cursor' };
     const sc = resolveStreamingConfig(config as any);
-    expect(sc.mode).toBe('buffered');
+    expect(sc.mode).toBe('streaming');
     expect(sc.showToolCalls).toBe(false);
   });
 

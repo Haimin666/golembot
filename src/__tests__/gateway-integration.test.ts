@@ -1156,7 +1156,7 @@ describe('handleMessage — full gateway pipeline', () => {
       return obj;
     }
 
-    it('buffered mode (default) sends single reply', async () => {
+    it('buffered mode sends single reply', async () => {
       const assistant = makeStreamingAssistant([
         { type: 'text', content: 'Part 1.' },
         { type: 'text', content: '\n\nPart 2.' },
@@ -1164,8 +1164,9 @@ describe('handleMessage — full gateway pipeline', () => {
       ]);
       const adapter = makeMockAdapter();
       const msg = makeDmMsg();
-      await handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
-      // Default is buffered — everything in one reply
+      const config = makeConfig({ streaming: { mode: 'buffered' } } as any);
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      // Explicit buffered — everything in one reply
       expect(adapter.replies).toHaveLength(1);
       expect(adapter.replies[0].text).toBe('Part 1.\n\nPart 2.');
     });
