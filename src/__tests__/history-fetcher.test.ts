@@ -225,6 +225,68 @@ describe('fetchMissedMessages', () => {
     expect(count).toBe(0);
   });
 
+  it('filters out bot messages from triage', async () => {
+    const adapter = makeMockAdapter({
+      listChats: vi.fn().mockResolvedValue([{ chatId: 'chat1', chatType: 'group' as const }]),
+      fetchHistory: vi
+        .fn()
+        .mockResolvedValue([
+          makeMsg({ messageId: 'msg1', text: 'user question', senderName: 'Alice', senderType: 'user' }),
+          makeMsg({ messageId: 'msg2', text: 'bot reply', senderName: 'MyBot', senderType: 'bot' }),
+          makeMsg({ messageId: 'msg3', text: 'another bot reply', senderName: 'OtherBot', senderType: 'bot' }),
+        ]),
+    });
+
+    const adapters = new Map<string, ChannelAdapter>([['feishu', adapter]]);
+    const watermarks = new WatermarkStore(dir);
+    await watermarks.load();
+
+    const count = await fetchMissedMessages({ dir, adapters, inbox, config: {}, verbose: false }, watermarks);
+
+    expect(count).toBe(1);
+    const pending = await inbox.getPending();
+    expect(pending).toHaveLength(1);
+    // Only user message should be in triage, not bot messages
+    expect(pending[0].message).toContain('Alice: user question');
+    expect(pending[0].message).not.toContain('bot reply');
+  });
+
+  it('skips triage but still advances watermark when only bot messages exist', async () => {
+    const adapter = makeMockAdapter({
+      listChats: vi.fn().mockResolvedValue([{ chatId: 'chat1', chatType: 'group' as const }]),
+      fetchHistory: vi.fn().mockResolvedValue([
+        makeMsg({
+          messageId: 'bot1',
+          text: 'bot reply',
+          senderName: 'MyBot',
+          senderType: 'bot',
+          raw: { _fetchedAt: '2026-03-11T15:00:00Z' },
+        }),
+        makeMsg({
+          messageId: 'bot2',
+          text: 'other bot',
+          senderName: 'OtherBot',
+          senderType: 'bot',
+          raw: { _fetchedAt: '2026-03-11T15:05:00Z' },
+        }),
+      ]),
+    });
+
+    const adapters = new Map<string, ChannelAdapter>([['feishu', adapter]]);
+    const watermarks = new WatermarkStore(dir);
+    await watermarks.load();
+
+    const count = await fetchMissedMessages({ dir, adapters, inbox, config: {}, verbose: false }, watermarks);
+
+    // No triage enqueued (all bot messages)
+    expect(count).toBe(0);
+    const pending = await inbox.getPending();
+    expect(pending).toHaveLength(0);
+
+    // But watermark should still advance past the bot messages
+    expect(watermarks.get('feishu:chat1')?.toISOString()).toBe('2026-03-11T15:05:00.001Z');
+  });
+
   it('handles listChats errors gracefully', async () => {
     const adapter = makeMockAdapter({
       listChats: vi.fn().mockRejectedValue(new Error('Network error')),

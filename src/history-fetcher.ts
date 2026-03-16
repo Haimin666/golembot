@@ -144,14 +144,25 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
         continue;
       }
 
-      // Filter out messages already in inbox (dedup)
+      // Filter out bot messages (other bots' replies don't need triage)
+      // and messages already in inbox (dedup)
       const newMessages = messages.filter((m) => {
+        if (m.senderType === 'bot') return false;
         if (!m.messageId) return true;
         return !inbox.has(type, m.messageId);
       });
 
+      // Always advance watermark using ALL fetched messages (including bot messages),
+      // so filtered-out messages are never re-fetched on restart.
+      if (messages.length > 0) {
+        const allLatest = messages[messages.length - 1];
+        const allRaw = allLatest.raw as any;
+        const allLatestMs = allRaw?._fetchedAt ? new Date(allRaw._fetchedAt).getTime() : Date.now();
+        watermarks.set(wmKey, new Date(allLatestMs + 1));
+      }
+
       if (newMessages.length === 0) {
-        log(verbose, `[history-fetch] ${wmKey}: no new messages`);
+        log(verbose, `[history-fetch] ${wmKey}: no new messages (${messages.length} filtered)`);
         continue;
       }
 
@@ -186,12 +197,6 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
       });
 
       totalEnqueued++;
-
-      // Update watermark to 1ms after the latest message's time,
-      // so the next fetch excludes this message (APIs typically use >= for start_time).
-      const rawData = lastMsg.raw as any;
-      const latestMs = rawData?._fetchedAt ? new Date(rawData._fetchedAt).getTime() : Date.now();
-      watermarks.set(wmKey, new Date(latestMs + 1));
     }
   }
 

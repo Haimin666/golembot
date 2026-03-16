@@ -444,6 +444,12 @@ export async function handleMessage(
   // Helper: send a text chunk to the IM channel (handles splitMessage + mentions).
   const sendChunk = async (text: string): Promise<void> => {
     if (!text.trim()) return;
+    // Final safety net: never send [PASS]/[SKIP] sentinel values to IM
+    const sentinel = text.trim();
+    if (sentinel === '[PASS]' || sentinel === '[SKIP]') {
+      log(verbose, `[${channelType}] sendChunk blocked sentinel: ${sentinel}`);
+      return;
+    }
     const chunks = splitMessage(text.trim(), maxLen);
     let mentions: MentionTarget[] = [];
     if (msg.chatType === 'group' && adapter.getGroupMembers) {
