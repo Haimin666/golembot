@@ -69,6 +69,11 @@ export class InboxStore {
     return this.seen.has(`${channelType}:${messageId}`);
   }
 
+  /** Mark a messageId as seen without enqueuing an entry. Used by history-fetch to register individual message IDs. */
+  markSeen(channelType: string, messageId: string): void {
+    this.seen.add(`${channelType}:${messageId}`);
+  }
+
   /** Append a new entry to the JSONL file. */
   async enqueue(partial: Omit<InboxEntry, 'id' | 'ts' | 'status'>): Promise<InboxEntry> {
     const entry: InboxEntry = {

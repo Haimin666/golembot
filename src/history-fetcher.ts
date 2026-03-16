@@ -189,6 +189,12 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
         messageId: lastMsg.messageId,
       };
 
+      // Mark each individual message's ID as seen, so real-time messages
+      // that were already processed won't be re-triaged by history-fetch.
+      for (const m of newMessages) {
+        if (m.messageId) inbox.markSeen(type, m.messageId);
+      }
+
       await inbox.enqueue({
         sessionKey,
         message: triagePrompt,
