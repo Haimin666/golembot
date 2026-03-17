@@ -385,7 +385,7 @@ describe('fetchMissedMessages', () => {
     expect(pending[0].channelMsg?.mentioned).toBeUndefined();
   });
 
-  it('suppresses triage when session has recent real-time activity', async () => {
+  it('suppresses triage when session has RT activity within poll window', async () => {
     // Simulate recent real-time activity
     await inbox.enqueue({
       sessionKey: 'feishu:chat1',
@@ -409,14 +409,43 @@ describe('fetchMissedMessages', () => {
     const watermarks = new WatermarkStore(dir);
     await watermarks.load();
 
-    const count = await fetchMissedMessages({ dir, adapters, inbox, config: {}, verbose: false }, watermarks);
+    const count = await fetchMissedMessages(
+      { dir, adapters, inbox, config: { pollIntervalMinutes: 15 }, verbose: false },
+      watermarks,
+    );
 
-    // Suppressed: session has recent real-time activity
+    // Suppressed: session has RT activity within the 15-min poll window
     expect(count).toBe(0);
     const pending = await inbox.getPending();
     // Only the original real-time entry, no triage added
     expect(pending).toHaveLength(1);
     expect(pending[0].source).toBe('feishu');
+  });
+
+  it('creates triage when session has NO RT activity (bot offline)', async () => {
+    // No real-time entries — simulates bot being offline
+    const adapter = makeMockAdapter({
+      listChats: vi.fn().mockResolvedValue([{ chatId: 'chat1', chatType: 'group' as const }]),
+      fetchHistory: vi
+        .fn()
+        .mockResolvedValue([makeMsg({ messageId: 'msg1', text: 'missed while offline', senderName: 'Alice' })]),
+    });
+
+    const adapters = new Map<string, ChannelAdapter>([['feishu', adapter]]);
+    const watermarks = new WatermarkStore(dir);
+    await watermarks.load();
+
+    const count = await fetchMissedMessages(
+      { dir, adapters, inbox, config: { pollIntervalMinutes: 15 }, verbose: false },
+      watermarks,
+    );
+
+    // No RT activity → triage should be created
+    expect(count).toBe(1);
+    const pending = await inbox.getPending();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].source).toBe('history-fetch');
+    expect(pending[0].message).toContain('missed while offline');
   });
 
   it('handles listChats errors gracefully', async () => {

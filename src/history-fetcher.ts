@@ -184,14 +184,15 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
 
       const sessionKey = `${type}:${chat.chatId}`;
 
-      // Suppress triage if the real-time path already has recent activity for
-      // this session.  This avoids double-replies when the WebSocket drops a
-      // single message but is otherwise functioning — the user is actively
-      // chatting, so the missed message doesn't need a separate triage.
-      const suppressWindowMs = 5 * 60 * 1000; // 5 minutes
-      if (inbox.hasRecentActivity(sessionKey, suppressWindowMs)) {
-        log(verbose, `[history-fetch] ${wmKey}: suppressed — session has recent real-time activity`);
-        // Still mark individual messages as seen so they won't be re-triaged
+      // Session-level suppression: if WebSocket delivered any real-time message
+      // for this session within the current poll cycle, skip the triage entirely.
+      // The real-time path is working — missed messages are part of the same
+      // conversation that was already addressed.  Only create triage when the
+      // session had NO real-time activity (bot was truly offline).
+      const pollMs = (config.pollIntervalMinutes ?? 15) * 60 * 1000;
+      if (inbox.hasRecentActivity(sessionKey, pollMs)) {
+        log(verbose, `[history-fetch] ${wmKey}: suppressed — session has RT activity within poll window`);
+        // Mark all messages as seen so they won't be re-triaged next cycle
         for (const m of newMessages) {
           if (m.messageId) {
             inbox.markSeen(type, m.messageId);
@@ -201,7 +202,15 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
         continue;
       }
 
-      // Build triage prompt with all new messages
+      // No RT activity — bot was offline for this session.  Build triage.
+      // Mark all messages as seen first.
+      for (const m of newMessages) {
+        if (m.messageId) {
+          inbox.markSeen(type, m.messageId);
+          seenMessages?.mark(type, m.messageId);
+        }
+      }
+
       const triageMessages: TriageMessage[] = newMessages.map((m) => ({
         ts: (m.raw as any)?._fetchedAt || new Date().toISOString(),
         senderName: m.senderName || m.senderId,
@@ -223,15 +232,6 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
         messageId: lastMsg.messageId,
         mentioned: anyMentioned || undefined,
       };
-
-      // Mark each individual message's ID as seen in both stores,
-      // so real-time messages won't be re-triaged by history-fetch.
-      for (const m of newMessages) {
-        if (m.messageId) {
-          inbox.markSeen(type, m.messageId);
-          seenMessages?.mark(type, m.messageId);
-        }
-      }
 
       await inbox.enqueue({
         sessionKey,
