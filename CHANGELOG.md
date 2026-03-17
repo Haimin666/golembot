@@ -1,3 +1,10 @@
+## [0.34.4](https://github.com/0xranx/golembot/compare/v0.34.3...v0.34.4) (2026-03-17)
+
+
+### Bug Fixes
+
+* suppress history-fetch triage when session has real-time activity ([dd2d1dd](https://github.com/0xranx/golembot/commit/dd2d1dd94b0dc70326b56501b5e8d9ee3e90d64f))
+
 ## [0.34.3](https://github.com/0xranx/golembot/compare/v0.34.2...v0.34.3) (2026-03-17)
 
 
