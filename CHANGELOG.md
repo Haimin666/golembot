@@ -1,3 +1,10 @@
+## [0.34.3](https://github.com/0xranx/golembot/compare/v0.34.2...v0.34.3) (2026-03-17)
+
+
+### Bug Fixes
+
+* resolve history-fetch duplicate replies and mention-only bypass ([5b70831](https://github.com/0xranx/golembot/commit/5b70831794c3860b93f20e3d2a602a6f6a84cfd1))
+
 ## [0.34.2](https://github.com/0xranx/golembot/compare/v0.34.1...v0.34.2) (2026-03-16)
 
 
