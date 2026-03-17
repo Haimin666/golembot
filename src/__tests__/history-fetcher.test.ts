@@ -201,13 +201,13 @@ describe('fetchMissedMessages', () => {
 
     await fetchMissedMessages({ dir, adapters, inbox, config: {}, verbose: false }, watermarks);
 
-    // Watermark should be updated to 1ms after the latest message time
-    expect(watermarks.get('feishu:chat1')?.toISOString()).toBe('2026-03-11T12:00:00.001Z');
+    // Watermark advances to the next full second (Feishu API uses seconds)
+    expect(watermarks.get('feishu:chat1')?.toISOString()).toBe('2026-03-11T12:00:01.000Z');
 
     // Verify persisted to disk
     const raw = await readFile(join(dir, '.golem', 'watermarks.json'), 'utf-8');
     const parsed = JSON.parse(raw);
-    expect(parsed['feishu:chat1']).toBe('2026-03-11T12:00:00.001Z');
+    expect(parsed['feishu:chat1']).toBe('2026-03-11T12:00:01.000Z');
   });
 
   it('handles fetchHistory errors gracefully', async () => {
@@ -284,8 +284,8 @@ describe('fetchMissedMessages', () => {
     const pending = await inbox.getPending();
     expect(pending).toHaveLength(0);
 
-    // But watermark should still advance past the bot messages
-    expect(watermarks.get('feishu:chat1')?.toISOString()).toBe('2026-03-11T15:05:00.001Z');
+    // But watermark should still advance past the bot messages (next full second)
+    expect(watermarks.get('feishu:chat1')?.toISOString()).toBe('2026-03-11T15:05:01.000Z');
   });
 
   it('skips messages already in persistent SeenMessageStore', async () => {
@@ -340,6 +340,83 @@ describe('fetchMissedMessages', () => {
     // msg1 should now be in the persistent seen store
     expect(seenMessages.has('feishu', 'msg1')).toBe(true);
     seenMessages.stop();
+  });
+
+  it('propagates mentioned flag to triage channelMsg', async () => {
+    const adapter = makeMockAdapter({
+      listChats: vi.fn().mockResolvedValue([{ chatId: 'chat1', chatType: 'group' as const }]),
+      fetchHistory: vi
+        .fn()
+        .mockResolvedValue([
+          makeMsg({ messageId: 'msg1', text: '@bot hello', senderName: 'Alice', mentioned: true }),
+          makeMsg({ messageId: 'msg2', text: 'not for bot', senderName: 'Bob', mentioned: false }),
+        ]),
+    });
+
+    const adapters = new Map<string, ChannelAdapter>([['feishu', adapter]]);
+    const watermarks = new WatermarkStore(dir);
+    await watermarks.load();
+
+    await fetchMissedMessages({ dir, adapters, inbox, config: {}, verbose: false }, watermarks);
+
+    const pending = await inbox.getPending();
+    expect(pending).toHaveLength(1);
+    // mentioned should be true because at least one message was @this-bot
+    expect(pending[0].channelMsg?.mentioned).toBe(true);
+  });
+
+  it('sets mentioned=undefined when no messages mention the bot', async () => {
+    const adapter = makeMockAdapter({
+      listChats: vi.fn().mockResolvedValue([{ chatId: 'chat1', chatType: 'group' as const }]),
+      fetchHistory: vi
+        .fn()
+        .mockResolvedValue([makeMsg({ messageId: 'msg1', text: 'hello', senderName: 'Alice', mentioned: false })]),
+    });
+
+    const adapters = new Map<string, ChannelAdapter>([['feishu', adapter]]);
+    const watermarks = new WatermarkStore(dir);
+    await watermarks.load();
+
+    await fetchMissedMessages({ dir, adapters, inbox, config: {}, verbose: false }, watermarks);
+
+    const pending = await inbox.getPending();
+    expect(pending).toHaveLength(1);
+    // mentioned should be undefined (falsy) since no message was @this-bot
+    expect(pending[0].channelMsg?.mentioned).toBeUndefined();
+  });
+
+  it('suppresses triage when session has recent real-time activity', async () => {
+    // Simulate recent real-time activity
+    await inbox.enqueue({
+      sessionKey: 'feishu:chat1',
+      message: 'recent real-time msg',
+      source: 'feishu',
+      channelMsg: {
+        channelType: 'feishu',
+        senderId: 'u1',
+        chatId: 'chat1',
+        chatType: 'group',
+        messageId: 'rt-msg1',
+      },
+    });
+
+    const adapter = makeMockAdapter({
+      listChats: vi.fn().mockResolvedValue([{ chatId: 'chat1', chatType: 'group' as const }]),
+      fetchHistory: vi.fn().mockResolvedValue([makeMsg({ messageId: 'hf-msg1', text: 'missed', senderName: 'Alice' })]),
+    });
+
+    const adapters = new Map<string, ChannelAdapter>([['feishu', adapter]]);
+    const watermarks = new WatermarkStore(dir);
+    await watermarks.load();
+
+    const count = await fetchMissedMessages({ dir, adapters, inbox, config: {}, verbose: false }, watermarks);
+
+    // Suppressed: session has recent real-time activity
+    expect(count).toBe(0);
+    const pending = await inbox.getPending();
+    // Only the original real-time entry, no triage added
+    expect(pending).toHaveLength(1);
+    expect(pending[0].source).toBe('feishu');
   });
 
   it('handles listChats errors gracefully', async () => {

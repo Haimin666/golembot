@@ -152,17 +152,27 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
       const newMessages = messages.filter((m) => {
         if (m.senderType === 'bot') return false;
         if (!m.messageId) return true;
-        if (seenMessages?.has(type, m.messageId)) return false;
-        return !inbox.has(type, m.messageId);
+        if (seenMessages?.has(type, m.messageId)) {
+          log(verbose, `[history-fetch] ${wmKey}: skip ${m.messageId} (seen-store)`);
+          return false;
+        }
+        if (inbox.has(type, m.messageId)) {
+          log(verbose, `[history-fetch] ${wmKey}: skip ${m.messageId} (inbox)`);
+          return false;
+        }
+        return true;
       });
 
       // Always advance watermark using ALL fetched messages (including bot messages),
       // so filtered-out messages are never re-fetched on restart.
+      // NOTE: Feishu start_time is in seconds, so we must advance to the next
+      // full second to avoid re-fetching the last message every poll cycle.
       if (messages.length > 0) {
         const allLatest = messages[messages.length - 1];
         const allRaw = allLatest.raw as any;
         const allLatestMs = allRaw?._fetchedAt ? new Date(allRaw._fetchedAt).getTime() : Date.now();
-        watermarks.set(wmKey, new Date(allLatestMs + 1));
+        const nextSecondMs = (Math.floor(allLatestMs / 1000) + 1) * 1000;
+        watermarks.set(wmKey, new Date(nextSecondMs));
       }
 
       if (newMessages.length === 0) {
@@ -172,6 +182,25 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
 
       log(verbose, `[history-fetch] ${wmKey}: ${newMessages.length} new message(s)`);
 
+      const sessionKey = `${type}:${chat.chatId}`;
+
+      // Suppress triage if the real-time path already has recent activity for
+      // this session.  This avoids double-replies when the WebSocket drops a
+      // single message but is otherwise functioning — the user is actively
+      // chatting, so the missed message doesn't need a separate triage.
+      const suppressWindowMs = 5 * 60 * 1000; // 5 minutes
+      if (inbox.hasRecentActivity(sessionKey, suppressWindowMs)) {
+        log(verbose, `[history-fetch] ${wmKey}: suppressed — session has recent real-time activity`);
+        // Still mark individual messages as seen so they won't be re-triaged
+        for (const m of newMessages) {
+          if (m.messageId) {
+            inbox.markSeen(type, m.messageId);
+            seenMessages?.mark(type, m.messageId);
+          }
+        }
+        continue;
+      }
+
       // Build triage prompt with all new messages
       const triageMessages: TriageMessage[] = newMessages.map((m) => ({
         ts: (m.raw as any)?._fetchedAt || new Date().toISOString(),
@@ -179,11 +208,12 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
         text: m.text,
       }));
 
-      const sessionKey = `${type}:${chat.chatId}`;
       const triagePrompt = buildTriagePrompt(triageMessages, sessionKey);
 
-      // Use the last message's info for reply routing
+      // Use the last message's info for reply routing.
+      // mentioned is true if ANY message in the batch was @this-bot.
       const lastMsg = newMessages[newMessages.length - 1];
+      const anyMentioned = newMessages.some((m) => m.mentioned === true);
       const channelMsg: InboxChannelMsg = {
         channelType: type,
         senderId: lastMsg.senderId,
@@ -191,6 +221,7 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
         chatId: chat.chatId,
         chatType: chat.chatType,
         messageId: lastMsg.messageId,
+        mentioned: anyMentioned || undefined,
       };
 
       // Mark each individual message's ID as seen in both stores,
@@ -214,6 +245,10 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
   }
 
   await watermarks.save();
+  // Flush seenMessages immediately — do not rely on the 5s debounce timer,
+  // because a restart before the timer fires would lose the marks and cause
+  // the next poll to re-triage already-processed messages.
+  await seenMessages?.save();
   return totalEnqueued;
 }
 

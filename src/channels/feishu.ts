@@ -458,6 +458,24 @@ export class FeishuAdapter implements ChannelAdapter {
     }
   }
 
+  /**
+   * Fetch single-message detail to resolve @mentions.
+   * Returns true if this bot is @mentioned, false if not, undefined on error.
+   */
+  private async resolveMentioned(token: string, messageId: string): Promise<boolean | undefined> {
+    try {
+      const resp = await fetch(`https://open.feishu.cn/open-apis/im/v1/messages/${messageId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = (await resp.json()) as any;
+      if (json.code !== 0) return undefined;
+      const mentions: any[] = json.data?.items?.[0]?.mentions ?? [];
+      return mentions.some((m: any) => (m.id?.open_id ?? m.id) === this.botOpenId);
+    } catch {
+      return undefined;
+    }
+  }
+
   async fetchHistory(chatId: string, since: Date, limit = 50): Promise<ChannelMessage[]> {
     if (!this.client) return [];
     const token = await this.client.tokenManager.getTenantAccessToken();
@@ -527,6 +545,14 @@ export class FeishuAdapter implements ChannelAdapter {
         const senderName = senderId ? await this.resolveUserName(senderId) : undefined;
         const createTime = item.create_time ? new Date(Number(item.create_time)).toISOString() : undefined;
 
+        // The list-messages API doesn't return `mentions`.  For messages
+        // containing @_user_N patterns, fetch the single-message detail API
+        // to resolve whether THIS bot is @mentioned.
+        let isMentioned: boolean | undefined;
+        if (this.botOpenId && text.includes('@_user_')) {
+          isMentioned = await this.resolveMentioned(token, item.message_id);
+        }
+
         messages.push({
           channelType: 'feishu',
           senderId: senderId || 'unknown',
@@ -536,6 +562,7 @@ export class FeishuAdapter implements ChannelAdapter {
           text,
           messageId: item.message_id,
           senderType: isBot ? 'bot' : 'user',
+          mentioned: isMentioned,
           raw: { ...item, _fetchedAt: createTime },
         });
       }

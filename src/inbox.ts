@@ -59,9 +59,21 @@ export class InboxStore {
   private dir: string;
   /** In-memory dedup set: `${source}:${messageId}` */
   private seen = new Set<string>();
+  /** Tracks latest real-time (non-history-fetch) enqueue per session. */
+  private realtimeTs = new Map<string, number>();
 
   constructor(dir: string) {
     this.dir = dir;
+  }
+
+  /**
+   * Returns true if the session had a real-time (non-history-fetch) message
+   * enqueued within the last `withinMs` milliseconds.
+   */
+  hasRecentActivity(sessionKey: string, withinMs: number): boolean {
+    const ts = this.realtimeTs.get(sessionKey);
+    if (!ts) return false;
+    return Date.now() - ts < withinMs;
   }
 
   /** Check if a message has already been enqueued (by channelType + messageId). */
@@ -86,6 +98,11 @@ export class InboxStore {
     // Track in dedup set — use channelType (not source) for consistent keying
     if (entry.channelMsg?.messageId) {
       this.seen.add(`${entry.channelMsg.channelType}:${entry.channelMsg.messageId}`);
+    }
+
+    // Track real-time activity per session (non-history-fetch entries)
+    if (entry.source !== 'history-fetch') {
+      this.realtimeTs.set(entry.sessionKey, Date.now());
     }
 
     const line = `${JSON.stringify(entry)}\n`;
@@ -120,6 +137,12 @@ export class InboxStore {
       // Populate dedup set — use channelType for consistent keying
       if (entry.channelMsg?.messageId) {
         this.seen.add(`${entry.channelMsg.channelType}:${entry.channelMsg.messageId}`);
+      }
+      // Populate real-time activity from recent non-history-fetch entries
+      if (entry.source !== 'history-fetch') {
+        const entryTs = new Date(entry.ts).getTime();
+        const prev = this.realtimeTs.get(entry.sessionKey) ?? 0;
+        if (entryTs > prev) this.realtimeTs.set(entry.sessionKey, entryTs);
       }
     }
 

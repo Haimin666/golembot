@@ -306,4 +306,68 @@ describe('InboxStore', () => {
       expect(pending[0].id).toBe('a1');
     });
   });
+
+  // -----------------------------------------------------------------------
+  // hasRecentActivity
+  // -----------------------------------------------------------------------
+
+  describe('hasRecentActivity', () => {
+    it('returns false when no entries exist', () => {
+      expect(store.hasRecentActivity('feishu:chat1', 60_000)).toBe(false);
+    });
+
+    it('returns true after a real-time enqueue', async () => {
+      await store.enqueue({
+        sessionKey: 'feishu:chat1',
+        message: 'hello',
+        source: 'feishu',
+        channelMsg: { channelType: 'feishu', senderId: 'u1', chatId: 'chat1', chatType: 'group' },
+      });
+      expect(store.hasRecentActivity('feishu:chat1', 60_000)).toBe(true);
+    });
+
+    it('returns false for history-fetch entries', async () => {
+      await store.enqueue({
+        sessionKey: 'feishu:chat1',
+        message: 'triage',
+        source: 'history-fetch',
+        channelMsg: { channelType: 'feishu', senderId: 'u1', chatId: 'chat1', chatType: 'group' },
+      });
+      expect(store.hasRecentActivity('feishu:chat1', 60_000)).toBe(false);
+    });
+
+    it('returns false after the window expires', async () => {
+      await store.enqueue({
+        sessionKey: 'feishu:chat1',
+        message: 'hello',
+        source: 'feishu',
+        channelMsg: { channelType: 'feishu', senderId: 'u1', chatId: 'chat1', chatType: 'group' },
+      });
+      // With a 0ms window, should immediately be "expired"
+      expect(store.hasRecentActivity('feishu:chat1', 0)).toBe(false);
+    });
+
+    it('hydrates from JSONL on getPending', async () => {
+      // Write a recent real-time entry directly to JSONL
+      const entry = JSON.stringify({
+        id: 'x1',
+        ts: new Date().toISOString(),
+        status: 'done',
+        sessionKey: 'feishu:chat1',
+        message: 'hello',
+        source: 'feishu',
+        channelMsg: { channelType: 'feishu', senderId: 'u1', chatId: 'chat1', chatType: 'group' },
+      });
+      await mkdir(join(dir, '.golem'), { recursive: true });
+      await writeFile(join(dir, '.golem', 'inbox.jsonl'), `${entry}\n`, 'utf-8');
+
+      // New store — hasRecentActivity is empty before getPending
+      const store2 = new InboxStore(dir);
+      expect(store2.hasRecentActivity('feishu:chat1', 60_000)).toBe(false);
+
+      // After getPending, it should be hydrated
+      await store2.getPending();
+      expect(store2.hasRecentActivity('feishu:chat1', 60_000)).toBe(true);
+    });
+  });
 });

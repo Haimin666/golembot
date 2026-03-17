@@ -1012,8 +1012,9 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
           messageId: chMsg.messageId,
           text: entry.message,
           raw: {},
-          // Restore mentioned state: use stored value, or force true for history-fetch triage
-          mentioned: entry.source === 'history-fetch' ? true : chMsg.mentioned,
+          // For history-fetch triage, mentioned is set from the adapter's
+          // per-message mention resolution (e.g. Feishu single-message API).
+          mentioned: chMsg.mentioned,
         };
 
         // For inbox entries (especially history-fetch), the raw object is empty,
@@ -1078,17 +1079,25 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
       verbose,
     });
 
-    // Fetch missed messages immediately on startup
-    try {
-      const count = await fetcher.fetchNow();
-      if (count > 0) {
-        log(verbose, `[history-fetch] Startup: enqueued triage for ${count} chat(s) with missed messages`);
-      } else {
-        log(verbose, '[history-fetch] Startup: no missed messages');
+    // Delay the initial history-fetch to give WebSocket connections time to
+    // deliver catch-up events.  Without this delay, fetchNow() races with the
+    // WebSocket reconnection: the REST API may return messages *before* the
+    // real-time path has marked them in seenMessages, causing duplicate triage.
+    const startupDelayMs = 15_000; // 15 seconds
+    log(verbose, `[history-fetch] Waiting ${startupDelayMs / 1000}s for WebSocket catch-up before first poll…`);
+    const startupTimer = setTimeout(async () => {
+      try {
+        const count = await fetcher.fetchNow();
+        if (count > 0) {
+          log(verbose, `[history-fetch] Startup: enqueued triage for ${count} chat(s) with missed messages`);
+        } else {
+          log(verbose, '[history-fetch] Startup: no missed messages');
+        }
+      } catch (e) {
+        console.error('[history-fetch] Startup fetch failed:', (e as Error).message);
       }
-    } catch (e) {
-      console.error('[history-fetch] Startup fetch failed:', (e as Error).message);
-    }
+    }, startupDelayMs);
+    if (startupTimer.unref) startupTimer.unref();
 
     // Start periodic polling
     historyPoller = fetcher.startPolling();
