@@ -44,7 +44,7 @@ export class SeenMessageStore {
     }
   }
 
-  /** Check if a message has been seen. */
+  /** Check if a message has been seen (by messageId or content fingerprint). */
   has(channelType: string, messageId: string): boolean {
     const key = `${channelType}:${messageId}`;
     const ts = this.entries.get(key);
@@ -57,9 +57,41 @@ export class SeenMessageStore {
     return true;
   }
 
+  /**
+   * Normalize text for content fingerprinting.
+   * Strips @_user_N mention placeholders so the same message matches
+   * regardless of whether the WebSocket path stripped them or not.
+   */
+  private static normalizeText(text: string): string {
+    return text
+      .replace(/@_user_\d+/g, '')
+      .trim()
+      .slice(0, 100);
+  }
+
+  /** Check by content fingerprint (senderId + normalized text). */
+  hasContent(channelType: string, senderId: string, text: string): boolean {
+    const key = `${channelType}:c:${senderId}:${SeenMessageStore.normalizeText(text)}`;
+    const ts = this.entries.get(key);
+    if (!ts) return false;
+    if (Date.now() - ts >= this.ttlMs) {
+      this.entries.delete(key);
+      return false;
+    }
+    return true;
+  }
+
   /** Mark a message as seen. Schedules a debounced save. */
   mark(channelType: string, messageId: string): void {
     this.entries.set(`${channelType}:${messageId}`, Date.now());
+    this.dirty = true;
+    this.scheduleSave();
+  }
+
+  /** Mark by content fingerprint (senderId + normalized text). */
+  markContent(channelType: string, senderId: string, text: string): void {
+    const key = `${channelType}:c:${senderId}:${SeenMessageStore.normalizeText(text)}`;
+    this.entries.set(key, Date.now());
     this.dirty = true;
     this.scheduleSave();
   }

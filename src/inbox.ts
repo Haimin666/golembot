@@ -76,6 +76,16 @@ export class InboxStore {
     return Date.now() - ts < withinMs;
   }
 
+  /** Returns the timestamp (ms) of the latest real-time enqueue for a session, or 0. */
+  getLastRealtimeTs(sessionKey: string): number {
+    return this.realtimeTs.get(sessionKey) ?? 0;
+  }
+
+  /** Update session activity to current time (called after Agent finishes responding). */
+  touchRealtimeTs(sessionKey: string): void {
+    this.realtimeTs.set(sessionKey, Date.now());
+  }
+
   /** Check if a message has already been enqueued (by channelType + messageId). */
   has(channelType: string, messageId: string): boolean {
     return this.seen.has(`${channelType}:${messageId}`);

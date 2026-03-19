@@ -487,13 +487,18 @@ export async function handleMessage(
     if (effectiveMode === 'streaming') {
       // ── Streaming mode: send text at logical boundaries ──
       let buffer = '';
+      let chunkIdx = 0;
 
       // Flush the buffer to IM. Called at paragraph breaks, tool_call, and done.
-      const flush = async (): Promise<void> => {
+      const flush = async (reason: string): Promise<void> => {
         if (!buffer.trim()) {
           buffer = '';
           return;
         }
+        chunkIdx++;
+        console.log(
+          `[stream-debug] chunk #${chunkIdx} (${reason}): "${buffer.trim().slice(0, 80)}…" [${buffer.length} chars]`,
+        );
         await sendChunk(buffer);
         buffer = '';
       };
@@ -510,11 +515,15 @@ export async function handleMessage(
             // Everything except the last part is complete paragraphs — send them
             const complete = parts.slice(0, -1).join('\n\n');
             buffer = parts[parts.length - 1];
+            chunkIdx++;
+            console.log(
+              `[stream-debug] chunk #${chunkIdx} (paragraph): "${complete.trim().slice(0, 80)}…" [${complete.length} chars]`,
+            );
             await sendChunk(complete);
           }
         } else if (event.type === 'tool_call') {
           // Agent switches to tool use — flush accumulated text first
-          await flush();
+          await flush('tool_call');
           if (streamingConfig.showToolCalls) {
             // Extract a short tool label from the tool name.
             // Codex: "/bin/bash -lc 'cd ... && ls -la'" → "bash"
@@ -540,7 +549,8 @@ export async function handleMessage(
       }
 
       // Flush remaining buffer
-      await flush();
+      await flush('done');
+      console.log(`[stream-debug] finished: ${chunkIdx} chunk(s) sent, fullReply=${fullReply.length} chars`);
 
       // [PASS] sentinel — in streaming mode (which is now only used when injectPass=false),
       // this check handles the rare case where a non-smart-mode agent outputs [PASS].
@@ -903,7 +913,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
         if (inboxStore) {
           // Inbox mode: enqueue messages for sequential consumption
           await adapter.start((msg: ChannelMessage) => {
-            // Dedup by persistent seen store + inbox seen set
+            // Dedup by persistent seen store + inbox seen set (messageId + content fingerprint)
             if (msg.messageId) {
               if (seenMessages.has(type, msg.messageId) || inboxStore.has(type, msg.messageId)) {
                 log(verbose, `[${type}] duplicate message ${msg.messageId}, skipping`);
@@ -911,6 +921,14 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
               }
               // Mark as seen persistently — survives restart
               seenMessages.mark(type, msg.messageId);
+            }
+            // Content-based dedup: same sender + same text = same message
+            if (msg.senderId && msg.text && seenMessages.hasContent(type, msg.senderId, msg.text)) {
+              log(verbose, `[${type}] duplicate content from ${msg.senderId}, skipping`);
+              return;
+            }
+            if (msg.senderId && msg.text) {
+              seenMessages.markContent(type, msg.senderId, msg.text);
             }
 
             // Build sessionKey + fullText the same way handleMessage does,
@@ -1050,6 +1068,13 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
           coordinator ? { taskStore, scheduler, runTask: (id) => coordinator!.runTask(id) } : undefined,
           fleetPeers,
         );
+
+        // Update session activity timestamp AFTER the Agent finishes responding,
+        // not just at enqueue time.  This extends the history-fetch suppression
+        // window to cover the full Agent processing duration.
+        if (entry.source !== 'history-fetch') {
+          inboxStore.touchRealtimeTs(entry.sessionKey);
+        }
       },
       verbose,
     );

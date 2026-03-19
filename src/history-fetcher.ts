@@ -147,10 +147,13 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
         continue;
       }
 
-      // Filter out bot messages (other bots' replies don't need triage)
-      // and messages already processed (check persistent store + inbox)
+      // Filter out bot messages, messages @other-bots (not this one),
+      // and messages already processed (check persistent store + inbox + content fingerprint)
       const newMessages = messages.filter((m) => {
         if (m.senderType === 'bot') return false;
+        // mentioned===false means the message explicitly @'s a different bot — skip it.
+        // mentioned===true means @this-bot; undefined means no @mention or unknown.
+        if (m.mentioned === false) return false;
         if (!m.messageId) return true;
         if (seenMessages?.has(type, m.messageId)) {
           log(verbose, `[history-fetch] ${wmKey}: skip ${m.messageId} (seen-store)`);
@@ -158,6 +161,11 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
         }
         if (inbox.has(type, m.messageId)) {
           log(verbose, `[history-fetch] ${wmKey}: skip ${m.messageId} (inbox)`);
+          return false;
+        }
+        // Content-based dedup: catches same message with different messageId
+        if (m.senderId && m.text && seenMessages?.hasContent(type, m.senderId, m.text)) {
+          log(verbose, `[history-fetch] ${wmKey}: skip ${m.messageId} (content-dedup)`);
           return false;
         }
         return true;
@@ -189,26 +197,35 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
       // The real-time path is working — missed messages are part of the same
       // conversation that was already addressed.  Only create triage when the
       // session had NO real-time activity (bot was truly offline).
-      const pollMs = (config.pollIntervalMinutes ?? 15) * 60 * 1000;
-      if (inbox.hasRecentActivity(sessionKey, pollMs)) {
-        log(verbose, `[history-fetch] ${wmKey}: suppressed — session has RT activity within poll window`);
+      // Use poll interval + 5 min buffer to account for long Agent processing times.
+      const pollMs = ((config.pollIntervalMinutes ?? 15) + 5) * 60 * 1000;
+      const lastRt = inbox.getLastRealtimeTs ? inbox.getLastRealtimeTs(sessionKey) : 0;
+      const hasRt = inbox.hasRecentActivity(sessionKey, pollMs);
+      console.log(
+        `[history-fetch] ${wmKey}: RT check — hasRecentActivity=${hasRt}, lastRtTs=${lastRt ? new Date(lastRt).toISOString() : 'none'}, pollMs=${pollMs}, now=${new Date().toISOString()}`,
+      );
+      if (hasRt) {
+        console.log(`[history-fetch] ${wmKey}: SUPPRESSED — ${newMessages.length} msg(s) marked seen only`);
         // Mark all messages as seen so they won't be re-triaged next cycle
         for (const m of newMessages) {
           if (m.messageId) {
             inbox.markSeen(type, m.messageId);
             seenMessages?.mark(type, m.messageId);
           }
+          if (m.senderId && m.text) seenMessages?.markContent(type, m.senderId, m.text);
         }
         continue;
       }
 
       // No RT activity — bot was offline for this session.  Build triage.
-      // Mark all messages as seen first.
+      console.log(`[history-fetch] ${wmKey}: TRIAGE — creating for ${newMessages.length} msg(s)`);
+      // Mark all messages as seen first (messageId + content fingerprint).
       for (const m of newMessages) {
         if (m.messageId) {
           inbox.markSeen(type, m.messageId);
           seenMessages?.mark(type, m.messageId);
         }
+        if (m.senderId && m.text) seenMessages?.markContent(type, m.senderId, m.text);
       }
 
       const triageMessages: TriageMessage[] = newMessages.map((m) => ({

@@ -365,7 +365,7 @@ describe('fetchMissedMessages', () => {
     expect(pending[0].channelMsg?.mentioned).toBe(true);
   });
 
-  it('sets mentioned=undefined when no messages mention the bot', async () => {
+  it('skips messages explicitly @other-bot (mentioned=false)', async () => {
     const adapter = makeMockAdapter({
       listChats: vi.fn().mockResolvedValue([{ chatId: 'chat1', chatType: 'group' as const }]),
       fetchHistory: vi
@@ -380,9 +380,8 @@ describe('fetchMissedMessages', () => {
     await fetchMissedMessages({ dir, adapters, inbox, config: {}, verbose: false }, watermarks);
 
     const pending = await inbox.getPending();
-    expect(pending).toHaveLength(1);
-    // mentioned should be undefined (falsy) since no message was @this-bot
-    expect(pending[0].channelMsg?.mentioned).toBeUndefined();
+    // mentioned=false means @other-bot — should be filtered out, no triage
+    expect(pending).toHaveLength(0);
   });
 
   it('suppresses triage when session has RT activity within poll window', async () => {
