@@ -1,3 +1,10 @@
+## [0.34.5](https://github.com/0xranx/golembot/compare/v0.34.4...v0.34.5) (2026-03-19)
+
+
+### Bug Fixes
+
+* content-based dedup, mention filtering, and session activity tracking ([6b0e786](https://github.com/0xranx/golembot/commit/6b0e786f19cfd729df32df8a29f0372945a70ba9))
+
 ## [0.34.4](https://github.com/0xranx/golembot/compare/v0.34.3...v0.34.4) (2026-03-17)
 
 
