@@ -1,3 +1,10 @@
+## [0.34.6](https://github.com/0xranx/golembot/compare/v0.34.5...v0.34.6) (2026-03-21)
+
+
+### Bug Fixes
+
+* auto-compress large images before passing to engine ([#19](https://github.com/0xranx/golembot/issues/19)) ([6a87fe2](https://github.com/0xranx/golembot/commit/6a87fe2dfd7403eaef36fc3d0296ecf8e2dd336f))
+
 ## [0.34.5](https://github.com/0xranx/golembot/compare/v0.34.4...v0.34.5) (2026-03-19)
 
 
