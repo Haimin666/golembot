@@ -63,7 +63,8 @@
   "dependencies": {
     "commander": "^13.0.0",
     "inquirer": "^12.0.0",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "sharp": "^0.34.5"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -105,6 +106,7 @@
     "@slack/bolt": "^4.6.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
+    "@types/sharp": "^0.32.0",
     "grammy": "^1.41.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.3.2",

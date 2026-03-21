@@ -3,6 +3,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { FileAttachment, ImageAttachment } from './channel.js';
 import { type AgentEngine, createEngine, type DiscoveredEngine, discoverEngines, type StreamEvent } from './engine.js';
+import { compressImages } from './image-compress.js';
 import {
   appendHistory,
   clearSession,
@@ -251,14 +252,18 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
     const sessionId = await loadSession(dir, sessionKey, engineType);
     const skillPaths = skills.map((s) => s.path);
 
+    // Compress large images so they fit within engine tool limits (e.g. Claude
+    // Code's Read tool has a ~15000 token cap).  Small images pass through unchanged.
+    const compressedImages = images && images.length > 0 ? await compressImages(images) : undefined;
+
     // Save attached images to workspace temp dir so the agent can read them
     const imagePaths: string[] = [];
     const imageDir = join(dir, '.golem', 'images');
-    if (images && images.length > 0) {
+    if (compressedImages && compressedImages.length > 0) {
       await mkdir(imageDir, { recursive: true });
       const ts = Date.now();
-      for (let i = 0; i < images.length; i++) {
-        const img = images[i];
+      for (let i = 0; i < compressedImages.length; i++) {
+        const img = compressedImages[i];
         const ext = mimeToExt(img.mimeType);
         const fileName = img.fileName || `img_${ts}_${i}${ext}`;
         const filePath = join(imageDir, fileName);
