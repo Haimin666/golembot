@@ -1,3 +1,10 @@
+# [0.38.0](https://github.com/0xranx/golembot/compare/v0.37.0...v0.38.0) (2026-03-22)
+
+
+### Features
+
+* **weixin:** add proactive send() using cached context_token ([f275c19](https://github.com/0xranx/golembot/commit/f275c19c54467c4df4eabdc0be6c53d08d2cf5f9))
+
 # [0.37.0](https://github.com/0xranx/golembot/compare/v0.36.0...v0.37.0) (2026-03-22)
 
 
