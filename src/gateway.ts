@@ -41,6 +41,7 @@ import {
   scanSkills,
   type TelegramChannelConfig,
   type WecomChannelConfig,
+  type WeixinChannelConfig,
 } from './workspace.js';
 
 export function splitMessage(text: string, maxLen: number): string[] {
@@ -279,6 +280,11 @@ async function createChannelAdapter(
       requireFields(type, channelConfig, ['botToken']);
       const { DiscordAdapter } = await import('./channels/discord.js');
       return new DiscordAdapter(channelConfig as unknown as DiscordChannelConfig);
+    }
+    case 'weixin': {
+      requireFields(type, channelConfig, ['token']);
+      const { WeixinAdapter } = await import('./channels/weixin.js');
+      return new WeixinAdapter(channelConfig as unknown as WeixinChannelConfig);
     }
     default: {
       const adapterPath = channelConfig._adapter;

@@ -42,6 +42,13 @@ export interface DiscordChannelConfig {
   botName?: string;
 }
 
+export interface WeixinChannelConfig {
+  /** Bearer token from iLink Bot QR login. Supports ${ENV_VAR} placeholders. */
+  token: string;
+  /** Optional: iLink API base URL override. */
+  baseUrl?: string;
+}
+
 export interface ChannelsConfig {
   feishu?: FeishuChannelConfig;
   dingtalk?: DingtalkChannelConfig;
@@ -49,6 +56,7 @@ export interface ChannelsConfig {
   slack?: SlackChannelConfig;
   telegram?: TelegramChannelConfig;
   discord?: DiscordChannelConfig;
+  weixin?: WeixinChannelConfig;
   /** Custom channel adapters: any key with `_adapter: <path>` in config. */
   [key: string]: unknown;
 }

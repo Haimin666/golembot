@@ -93,7 +93,7 @@ export function recordMessage(metrics: GatewayMetrics, msg: RecentMessage): void
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-export const KNOWN_CHANNELS = ['feishu', 'dingtalk', 'wecom', 'slack', 'telegram', 'discord'];
+export const KNOWN_CHANNELS = ['feishu', 'dingtalk', 'wecom', 'slack', 'telegram', 'discord', 'weixin'];
 
 const CHANNEL_LABELS: Record<string, string> = {
   feishu: 'Feishu (Lark)',
@@ -102,6 +102,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   slack: 'Slack',
   telegram: 'Telegram',
   discord: 'Discord',
+  weixin: 'WeChat',
 };
 
 // ── Dashboard data ───────────────────────────────────────────────────────────

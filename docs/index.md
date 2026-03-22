@@ -28,7 +28,7 @@ features:
   - icon:
       src: /icons/plug.svg
     title: Connect Anywhere
-    details: Slack, Telegram, Discord, Feishu, DingTalk, WeCom, HTTP — out of the box, no public URL. Or embed as a library in 5 lines.
+    details: Slack, Telegram, Discord, Feishu, DingTalk, WeCom, WeChat, HTTP — out of the box, no public URL. Or embed as a library in 5 lines.
   - icon:
       src: /icons/clawhub.png
     title: 13,000+ Community Skills
@@ -45,7 +45,7 @@ features:
     </div>
     <video src="/assets/demo.mp4" autoplay muted loop playsinline></video>
   </div>
-  <p class="demo-caption">One command to connect your Coding Agent to Telegram & Discord</p>
+  <p class="demo-caption">One command to connect your Coding Agent to Telegram, Discord & WeChat</p>
 </div>
 
 ## 13,000+ Community Skills
@@ -175,6 +175,12 @@ Connect to any message source. Built-in adapters need no public URL. Add `_adapt
     <img class="channel-icon" src="/icons/wecom.svg" alt="WeCom" />
     <div class="channel-name">WeCom</div>
     <div class="channel-transport">Webhook</div>
+  </div>
+  <div class="channel-card">
+    <a class="card-link" href="channels/weixin" aria-label="WeChat"></a>
+    <img class="channel-icon" src="/icons/weixin.svg" alt="WeChat" />
+    <div class="channel-name">WeChat</div>
+    <div class="channel-transport">Long-Polling (iLink Bot)</div>
   </div>
   <div class="channel-card">
     <a class="card-link" href="api/http-api" aria-label="HTTP API"></a>

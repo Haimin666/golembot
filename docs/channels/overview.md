@@ -12,10 +12,11 @@ GolemBot's gateway connects your assistant to IM platforms. Each platform is han
 | [Slack](/channels/slack) | Socket Mode (WebSocket) | No | `@slack/bolt` |
 | [Telegram](/channels/telegram) | Long-polling | No | `grammy` |
 | [Discord](/channels/discord) | Gateway WebSocket | No | `discord.js` |
+| [WeChat (微信)](/channels/weixin) | Long-Polling | No | None (built-in fetch) |
 | Custom | Any | Depends | Your own adapter class |
 
 ::: tip All channels work behind NAT
-All 6 built-in channels use WebSocket, long-polling, or Socket Mode — no public IP or port forwarding required.
+All 7 built-in channels use WebSocket, long-polling, or Socket Mode — no public IP or port forwarding required.
 :::
 
 ## Architecture
@@ -44,6 +45,7 @@ Each platform has a maximum message length. GolemBot automatically splits long r
 | Slack | 4,000 chars | Multi-message |
 | Telegram | 4,096 chars | Multi-message |
 | Discord | 2,000 chars | Multi-message |
+| WeChat | 2,000 chars | Multi-message |
 | Custom | Configurable via `maxMessageLength` | Multi-message |
 
 ## Message Format Conversion
@@ -58,6 +60,7 @@ GolemBot automatically converts standard Markdown to each platform's native form
 | Discord | Markdown (native) | No conversion needed — Discord renders Markdown natively |
 | DingTalk | Markdown (native) | Passed through as-is |
 | WeCom | Plain text | Markdown stripped (WeCom text API has limited formatting) |
+| WeChat | Plain text | Passed through as-is (WeChat text API) |
 
 The AI agent is encouraged to use standard Markdown syntax (headings, lists, bold, code blocks, etc.) — each adapter handles the platform-specific conversion automatically.
 
@@ -88,7 +91,7 @@ See [Channel Adapter API](/api/channel-adapter) for the full interface, implemen
 
 ## Image Support (Multimodal)
 
-GolemBot supports **image messages** across all 6 built-in channels. When a user sends an image (photo, screenshot, file attachment), the adapter downloads it and passes it through the full pipeline:
+GolemBot supports **image messages** across all 7 built-in channels. When a user sends an image (photo, screenshot, file attachment), the adapter downloads it and passes it through the full pipeline:
 
 ```
 User sends image → Adapter downloads to Buffer → gateway passes to assistant.chat()
@@ -104,6 +107,7 @@ User sends image → Adapter downloads to Buffer → gateway passes to assistant
 | Discord | `message.attachments` with image content type | Message text preserved |
 | DingTalk | `picture` messages + images in `richText` | Rich text content extracted |
 | WeCom | `image` messages via media API | Text set to `(image)` |
+| WeChat | Not yet supported | Text set to `(image)` |
 
 **How it works:** Images are saved as temporary files in `.golem/images/` and referenced by absolute path in the prompt. This works universally with all engines (Cursor, Claude Code, OpenCode, Codex) since every coding CLI can read local files. Files are automatically cleaned up after the agent responds.
 
@@ -145,13 +149,16 @@ pnpm add grammy
 
 # Discord
 pnpm add discord.js
+
+# WeChat (no SDK needed — uses built-in fetch)
+# Just add the token to golem.yaml
 ```
 
 If a configured channel's SDK is not installed, the gateway will print an error with installation instructions.
 
 ## What's Next
 
-- [Feishu](/channels/feishu), [DingTalk](/channels/dingtalk), [WeCom](/channels/wecom), [Slack](/channels/slack), [Telegram](/channels/telegram), [Discord](/channels/discord) — per-channel setup guides
+- [Feishu](/channels/feishu), [DingTalk](/channels/dingtalk), [WeCom](/channels/wecom), [WeChat](/channels/weixin), [Slack](/channels/slack), [Telegram](/channels/telegram), [Discord](/channels/discord) — per-channel setup guides
 - [Group Chat](/guide/group-chat) — response policies, @mention, quote reply
 - [Inbox & History Fetch](/guide/inbox) — crash-safe queue, offline catch-up
 - [Channel Adapter API](/api/channel-adapter) — build custom adapters

@@ -42,6 +42,7 @@ const sidebarEn = [
       { text: 'Slack', link: '/channels/slack' },
       { text: 'Telegram', link: '/channels/telegram' },
       { text: 'Discord', link: '/channels/discord' },
+      { text: 'WeChat (微信)', link: '/channels/weixin' },
     ],
   },
   {
@@ -124,6 +125,7 @@ const sidebarZh = [
       { text: 'Slack', link: '/zh/channels/slack' },
       { text: 'Telegram', link: '/zh/channels/telegram' },
       { text: 'Discord', link: '/zh/channels/discord' },
+      { text: '微信', link: '/zh/channels/weixin' },
     ],
   },
   {
