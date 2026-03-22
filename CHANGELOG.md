@@ -1,3 +1,10 @@
+# [0.37.0](https://github.com/0xranx/golembot/compare/v0.36.0...v0.37.0) (2026-03-22)
+
+
+### Features
+
+* **weixin:** add image receive support with CDN download and AES decrypt ([a6679db](https://github.com/0xranx/golembot/commit/a6679db22aa7f2f19e0adc001587ffafb3c9b4dc))
+
 # [0.36.0](https://github.com/0xranx/golembot/compare/v0.35.0...v0.36.0) (2026-03-22)
 
 
