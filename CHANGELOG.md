@@ -1,3 +1,10 @@
+# [0.35.0](https://github.com/0xranx/golembot/compare/v0.34.6...v0.35.0) (2026-03-22)
+
+
+### Features
+
+* add WeChat (微信) channel adapter via iLink Bot API ([3abf159](https://github.com/0xranx/golembot/commit/3abf1594ce6d11192d92ee79f824d56399e75255))
+
 ## [0.34.6](https://github.com/0xranx/golembot/compare/v0.34.5...v0.34.6) (2026-03-21)
 
 
