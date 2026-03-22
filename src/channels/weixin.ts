@@ -1,6 +1,8 @@
-import { randomUUID } from 'node:crypto';
-import type { ChannelAdapter, ChannelMessage, ReplyOptions } from '../channel.js';
+import { createDecipheriv, randomUUID } from 'node:crypto';
+import type { ChannelAdapter, ChannelMessage, ImageAttachment, ReplyOptions } from '../channel.js';
 import type { WeixinChannelConfig } from '../workspace.js';
+
+const CDN_BASE = 'https://novac2c.cdn.weixin.qq.com/c2c';
 
 /**
  * WeChat (个人微信) adapter using Tencent iLink Bot API.
@@ -125,7 +127,7 @@ export class WeixinAdapter implements ChannelAdapter {
 
         const msgs = data.msgs || [];
         for (const update of msgs) {
-          const parsed = this.parseMessage(update);
+          const parsed = await this.parseMessage(update);
           if (!parsed) continue;
 
           // Dedup
@@ -161,7 +163,7 @@ export class WeixinAdapter implements ChannelAdapter {
     }
   }
 
-  private parseMessage(update: unknown): ChannelMessage | null {
+  private async parseMessage(update: unknown): Promise<ChannelMessage | null> {
     const raw = update as Record<string, unknown>;
 
     // Only process user messages (message_type 1); skip bot messages (2+)
@@ -173,8 +175,9 @@ export class WeixinAdapter implements ChannelAdapter {
     const messageId = (raw.client_id as string) || '';
     const itemList = (raw.item_list as Array<Record<string, unknown>>) || [];
 
-    // Extract text from item_list
+    // Extract text and images from item_list
     let text = '';
+    const images: ImageAttachment[] = [];
     for (const item of itemList) {
       switch (item.type) {
         case 1: {
@@ -182,9 +185,19 @@ export class WeixinAdapter implements ChannelAdapter {
           text += (textItem?.text as string) || '';
           break;
         }
-        case 2:
-          text += '(image)';
+        case 2: {
+          const imageItem = item.image_item as Record<string, unknown> | undefined;
+          if (imageItem) {
+            try {
+              const img = await this.downloadImage(imageItem);
+              if (img) images.push(img);
+            } catch (e) {
+              console.error('[weixin] Failed to download image:', (e as Error).message);
+            }
+          }
+          if (images.length === 0) text += '(image)';
           break;
+        }
         case 3: {
           const voiceItem = item.voice_item as Record<string, unknown> | undefined;
           text += (voiceItem?.text as string) || '(voice)';
@@ -204,7 +217,8 @@ export class WeixinAdapter implements ChannelAdapter {
       }
     }
 
-    if (!text) return null;
+    if (!text && images.length === 0) return null;
+    if (!text && images.length > 0) text = '(image)';
 
     return {
       channelType: 'weixin',
@@ -213,7 +227,53 @@ export class WeixinAdapter implements ChannelAdapter {
       chatType: 'dm',
       text,
       messageId,
+      images: images.length > 0 ? images : undefined,
       raw: update,
     };
+  }
+
+  /**
+   * Download and decrypt an image from WeChat CDN.
+   * Images are AES-128-ECB encrypted on the CDN.
+   */
+  private async downloadImage(imageItem: Record<string, unknown>): Promise<ImageAttachment | null> {
+    const media = imageItem.media as Record<string, unknown> | undefined;
+    const encryptQueryParam = media?.encrypt_query_param as string | undefined;
+    if (!encryptQueryParam) return null;
+
+    // 1. Download encrypted bytes from CDN (no auth needed)
+    const cdnUrl = `${CDN_BASE}/download?encrypted_query_param=${encodeURIComponent(encryptQueryParam)}`;
+    const resp = await fetch(cdnUrl);
+    if (!resp.ok) throw new Error(`CDN download failed: HTTP ${resp.status}`);
+    const encrypted = Buffer.from(await resp.arrayBuffer());
+    if (encrypted.length === 0) return null;
+
+    // 2. Parse AES key
+    const aesKeyHex = imageItem.aeskey as string | undefined;
+    let key: Buffer;
+    if (aesKeyHex && aesKeyHex.length === 32) {
+      key = Buffer.from(aesKeyHex, 'hex');
+    } else {
+      const aesKeyB64 = media?.aes_key as string | undefined;
+      if (!aesKeyB64) return null;
+      const decoded = Buffer.from(aesKeyB64, 'base64');
+      if (decoded.length === 16) {
+        key = decoded;
+      } else if (decoded.length === 32 && /^[0-9a-fA-F]{32}$/.test(decoded.toString('ascii'))) {
+        key = Buffer.from(decoded.toString('ascii'), 'hex');
+      } else {
+        return null;
+      }
+    }
+
+    // 3. Decrypt AES-128-ECB
+    const decipher = createDecipheriv('aes-128-ecb', key, null);
+    const data = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+
+    // 4. Detect format from magic bytes
+    const isPng = data[0] === 0x89 && data[1] === 0x50;
+    const mimeType = isPng ? 'image/png' : 'image/jpeg';
+    const ext = isPng ? 'png' : 'jpg';
+    return { mimeType, data, fileName: `weixin-image.${ext}` };
   }
 }

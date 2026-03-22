@@ -1,3 +1,4 @@
+import { createCipheriv } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChannelMessage } from '../channel.js';
 
@@ -103,7 +104,7 @@ describe('WeixinAdapter', () => {
       expect(received[0].messageId).toBe('msg-001');
     });
 
-    it('parses image messages (item type 2) with placeholder text', async () => {
+    it('parses image messages (item type 2) with placeholder when no URL', async () => {
       fetchMock
         .mockResolvedValueOnce(mockPollResponse([makeILinkMsg({ item_list: [{ type: 2, image_item: {} }] })]))
         .mockImplementation(() => hangForever());
@@ -118,6 +119,99 @@ describe('WeixinAdapter', () => {
 
       expect(received).toHaveLength(1);
       expect(received[0].text).toBe('(image)');
+      expect(received[0].images).toBeUndefined();
+    });
+
+    it('downloads and decrypts image from CDN when media fields are present', async () => {
+      // Prepare AES-128-ECB encrypted JPEG test data
+      const jpegHeader = Buffer.from([
+        0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01,
+      ]);
+      const aesKeyHex = 'da26a2f303bb76e63c2f298208890018';
+      const key = Buffer.from(aesKeyHex, 'hex');
+      const cipher = createCipheriv('aes-128-ecb', key, null);
+      const encrypted = Buffer.concat([cipher.update(jpegHeader), cipher.final()]);
+
+      const imageItem = {
+        url: 'deadbeef',
+        aeskey: aesKeyHex,
+        media: {
+          encrypt_query_param: 'dGVzdC1wYXJhbQ==',
+          aes_key: Buffer.from(aesKeyHex).toString('base64'),
+          mid_size: encrypted.length,
+        },
+      };
+
+      fetchMock.mockImplementation((url: string) => {
+        if (url.includes('getupdates')) {
+          const msg = makeILinkMsg({ item_list: [{ type: 2, image_item: imageItem }] });
+          fetchMock.mockImplementation((u: string) => {
+            if (u.includes('novac2c.cdn.weixin.qq.com')) {
+              return Promise.resolve(new Response(encrypted, { status: 200 }));
+            }
+            return hangForever();
+          });
+          return Promise.resolve(mockPollResponse([msg]));
+        }
+        if (url.includes('novac2c.cdn.weixin.qq.com')) {
+          return Promise.resolve(new Response(encrypted, { status: 200 }));
+        }
+        return hangForever();
+      });
+
+      const received: ChannelMessage[] = [];
+      const adapter = await createAdapter();
+      await adapter.start((msg) => {
+        received.push(msg);
+      });
+      await new Promise((r) => setTimeout(r, 100));
+      await adapter.stop();
+
+      expect(received).toHaveLength(1);
+      expect(received[0].images).toBeDefined();
+      expect(received[0].images!.length).toBe(1);
+      expect(received[0].images![0].mimeType).toBe('image/jpeg');
+      // Verify decrypted data matches original
+      expect(received[0].images![0].data).toEqual(jpegHeader);
+    });
+
+    it('falls back to placeholder when CDN download fails', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const imageItem = {
+        url: 'deadbeef',
+        aeskey: 'da26a2f303bb76e63c2f298208890018',
+        media: { encrypt_query_param: 'dGVzdA==', aes_key: 'dGVzdA==' },
+      };
+
+      fetchMock.mockImplementation((url: string) => {
+        if (url.includes('getupdates')) {
+          const msg = makeILinkMsg({ item_list: [{ type: 2, image_item: imageItem }] });
+          fetchMock.mockImplementation((u: string) => {
+            if (u.includes('novac2c.cdn.weixin.qq.com')) {
+              return Promise.resolve(new Response('Not Found', { status: 404 }));
+            }
+            return hangForever();
+          });
+          return Promise.resolve(mockPollResponse([msg]));
+        }
+        if (url.includes('novac2c.cdn.weixin.qq.com')) {
+          return Promise.resolve(new Response('Not Found', { status: 404 }));
+        }
+        return hangForever();
+      });
+
+      const received: ChannelMessage[] = [];
+      const adapter = await createAdapter();
+      await adapter.start((msg) => {
+        received.push(msg);
+      });
+      await new Promise((r) => setTimeout(r, 100));
+      await adapter.stop();
+
+      expect(received).toHaveLength(1);
+      expect(received[0].text).toBe('(image)');
+      expect(received[0].images).toBeUndefined();
     });
 
     it('parses voice messages (item type 3) with transcription fallback', async () => {
