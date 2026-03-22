@@ -69,6 +69,37 @@ export class WeixinAdapter implements ChannelAdapter {
     }
   }
 
+  async send(chatId: string, text: string): Promise<void> {
+    const contextToken = this.contextTokens.get(chatId);
+    if (!contextToken) {
+      console.error(`[weixin] Cannot send to ${chatId}: no context_token cached (user must message the bot first)`);
+      return;
+    }
+
+    const body = {
+      msg: {
+        from_user_id: '',
+        to_user_id: chatId,
+        client_id: randomUUID(),
+        message_type: 2,
+        message_state: 2,
+        context_token: contextToken,
+        item_list: [{ type: 1, text_item: { text } }],
+      },
+      base_info: { channel_version: '0.1.0' },
+    };
+
+    const resp = await fetch(`${this.baseUrl}/ilink/bot/sendmessage`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify(body),
+    });
+
+    if (!resp.ok) {
+      console.error(`[weixin] proactive send failed: HTTP ${resp.status} (context_token may have expired)`);
+    }
+  }
+
   async stop(): Promise<void> {
     this.running = false;
     this.pollAbortController?.abort();
