@@ -1,3 +1,10 @@
+# [0.36.0](https://github.com/0xranx/golembot/compare/v0.35.0...v0.36.0) (2026-03-22)
+
+
+### Features
+
+* add `golembot weixin-login` CLI command ([4766e4f](https://github.com/0xranx/golembot/commit/4766e4f21f0f32da64b045c5799f2676bd2e0c4c))
+
 # [0.35.0](https://github.com/0xranx/golembot/compare/v0.34.6...v0.35.0) (2026-03-22)
 
 
