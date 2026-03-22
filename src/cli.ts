@@ -854,4 +854,13 @@ program
     await runDoctor(resolve(opts.dir));
   });
 
+program
+  .command('weixin-login')
+  .description('Obtain a WeChat bearer token via iLink Bot QR code login')
+  .option('--base-url <url>', 'iLink API base URL', 'https://ilinkai.weixin.qq.com')
+  .action(async (opts) => {
+    const { runWeixinLogin } = await import('./weixin-login.js');
+    await runWeixinLogin(opts.baseUrl);
+  });
+
 program.parse();

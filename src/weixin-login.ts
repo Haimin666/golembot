@@ -1,20 +1,12 @@
-#!/usr/bin/env node
 /**
  * WeChat iLink Bot QR Login — obtain a bearer token for the WeChat adapter.
  *
- * Usage:
- *   npx tsx src/weixin-login.ts
- *
- * Steps:
- *   1. Fetches a QR code from iLink Bot API
- *   2. Displays it in the terminal (scan with WeChat)
- *   3. Polls until login is confirmed
- *   4. Prints the bearer token
+ * Called from CLI: `golembot weixin-login`
  */
 
-const BASE_URL = process.argv[2] || 'https://ilinkai.weixin.qq.com';
+export async function runWeixinLogin(baseUrl?: string): Promise<void> {
+  const BASE_URL = (baseUrl || 'https://ilinkai.weixin.qq.com').replace(/\/$/, '');
 
-async function main() {
   // Step 1: Get QR code
   console.log('Fetching QR code from iLink Bot...\n');
 
@@ -40,15 +32,14 @@ async function main() {
   // Step 2: Display QR code in terminal
   if (qrcodeUrl) {
     try {
-      // qrcode-terminal is CJS — use createRequire for reliable import
       const { createRequire } = await import('node:module');
       const require = createRequire(import.meta.url);
       const qrTerminal = require('qrcode-terminal');
       qrTerminal.generate(qrcodeUrl, { small: true });
     } catch {
-      console.log('(Install qrcode-terminal for inline QR display: pnpm add qrcode-terminal)');
+      // qrcode-terminal not available — show URL only
     }
-    console.log(`\nOr open this URL in browser to scan:\n  ${qrcodeUrl}\n`);
+    console.log(`\nScan the QR code above with WeChat, or open this URL in your browser:\n  ${qrcodeUrl}\n`);
   }
 
   console.log('Waiting for WeChat scan...\n');
@@ -111,8 +102,7 @@ async function main() {
           console.log('\nOr set environment variable:\n');
           console.log(`  export WEIXIN_BOT_TOKEN="${statusData.bot_token}"`);
           console.log('');
-          process.exit(0);
-          break;
+          return;
         }
         default:
           console.log(`Unknown status: ${statusData.status}`);
@@ -136,8 +126,3 @@ async function main() {
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
-
-main().catch((e) => {
-  console.error('Fatal error:', e);
-  process.exit(1);
-});

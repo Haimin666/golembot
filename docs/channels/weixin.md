@@ -13,10 +13,10 @@ Unlike other channels, the WeChat adapter uses only the built-in `fetch` API to 
 
 ## Get Your Token
 
-Run the built-in login helper to authenticate via QR code:
+Run the built-in login command to authenticate via QR code:
 
 ```bash
-npx tsx src/weixin-login.ts
+golembot weixin-login
 ```
 
 1. A QR code will appear in your terminal

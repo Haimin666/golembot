@@ -13,10 +13,10 @@
 
 ## 获取 Token
 
-运行内置的登录辅助脚本，通过扫码认证：
+运行内置的登录命令，通过扫码认证：
 
 ```bash
-npx tsx src/weixin-login.ts
+golembot weixin-login
 ```
 
 1. 终端中会显示一个二维码
