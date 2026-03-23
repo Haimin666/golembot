@@ -43,7 +43,7 @@ curl -X POST http://localhost:$PORT/api/tasks \
 Before creating a task, verify:
 - The `schedule` field is a valid 5-field cron expression
 - The `prompt` is non-empty and specific enough to produce useful output when run unattended
-- If a `target` is provided, both `channel` and `chatId` must be present
+- If a `target` is provided, `channel` is required; `chatId` is optional (if omitted, the result is sent to all known chats on that channel)
 
 If the API returns an error (non-2xx status), report the failure to the user with the error message rather than assuming success.
 
@@ -56,8 +56,8 @@ If the API returns an error (non-2xx status), report the failure to the user wit
 | `prompt` | string | yes | The prompt sent to the agent when the task fires |
 | `enabled` | boolean | no | Default: true |
 | `target` | object | no | Where to deliver the result |
-| `target.channel` | string | yes* | Channel name: feishu, dingtalk, wecom, slack, telegram, discord |
-| `target.chatId` | string | yes* | Chat/conversation ID to send the result to |
+| `target.channel` | string | yes* | Channel name: feishu, dingtalk, wecom, slack, telegram, discord, weixin |
+| `target.chatId` | string | no | Chat/conversation ID. If omitted, sends to all known chats on the channel |
 
 ## Common Cron Expressions
 
