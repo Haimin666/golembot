@@ -1,3 +1,15 @@
+# [0.40.0](https://github.com/0xranx/golembot/compare/v0.39.0...v0.40.0) (2026-03-23)
+
+
+### Bug Fixes
+
+* **skill:** correct task-manager chatId to be optional, add weixin channel ([7380c6f](https://github.com/0xranx/golembot/commit/7380c6fc21e0326a24b0b37e30a8227c0f2dcc26))
+
+
+### Features
+
+* improve skill scores across all 15 GolemBot skills ([#20](https://github.com/0xranx/golembot/issues/20)) ([56eefc2](https://github.com/0xranx/golembot/commit/56eefc2aeade1bf9ff512bb0893620420919bbc0))
+
 # [0.39.0](https://github.com/0xranx/golembot/compare/v0.38.0...v0.39.0) (2026-03-23)
 
 
