@@ -107,7 +107,7 @@ User sends image → Adapter downloads to Buffer → gateway passes to assistant
 | Discord | `message.attachments` with image content type | Message text preserved |
 | DingTalk | `picture` messages + images in `richText` | Rich text content extracted |
 | WeCom | `image` messages via media API | Text set to `(image)` |
-| WeChat | Not yet supported | Text set to `(image)` |
+| WeChat | CDN download + AES-128-ECB decrypt | Text set to `(image)` |
 
 **How it works:** Images are saved as temporary files in `.golem/images/` and referenced by absolute path in the prompt. This works universally with all engines (Cursor, Claude Code, OpenCode, Codex) since every coding CLI can read local files. Files are automatically cleaned up after the agent responds.
 

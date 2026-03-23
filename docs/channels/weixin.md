@@ -48,8 +48,10 @@ export WEIXIN_BOT_TOKEN="your-token-from-qr-login"
 - **Transport**: HTTP long-polling against Tencent's iLink Bot API (`ilinkai.weixin.qq.com`)
 - **Connection**: The adapter polls `POST /ilink/bot/getupdates` in a loop; each poll blocks for up to 35 seconds waiting for new messages
 - **Reconnection**: Automatic retry with exponential backoff (1s → 2s → 4s → ... → 30s cap). On HTTP 401 (token expired), polling stops with a clear error
-- **Messages**: Supports text, image (placeholder), voice (with transcription), file, and video message types
+- **Messages**: Supports text, image (CDN download + AES decrypt), voice (with transcription), file, and video message types
+- **Images**: Photos are downloaded from Tencent's CDN and decrypted with AES-128-ECB, then passed to the agent for visual analysis
 - **Reply**: Sends messages via `POST /ilink/bot/sendmessage` with the required `context_token` from each inbound message
+- **Proactive send**: Supported for users who have previously messaged the bot (their `context_token` is cached)
 - **Chat type**: Currently `dm` only (direct messages)
 
 ## Start
@@ -69,13 +71,30 @@ Channels (1 connected)
 
 Send a message to the bot's WeChat account from another WeChat user — you'll see the response arrive in WeChat.
 
+## Scheduled Tasks
+
+WeChat supports scheduled tasks. Since WeChat only has DMs, you can omit `chatId` — the task result will be sent to all users who have previously messaged the bot:
+
+```yaml
+scheduledTasks:
+  - name: daily-report
+    cron: "0 9 * * *"
+    prompt: "Generate a daily status report"
+    target:
+      channel: weixin
+```
+
+::: info User must message first
+The bot can only send to users whose `context_token` is cached from a previous message. If the bot has restarted and no one has messaged yet, scheduled tasks will have no recipients.
+:::
+
 ## Limitations
 
-- **No proactive messaging** — the iLink Bot API requires a `context_token` from an inbound message to reply. The bot cannot initiate conversations (scheduled tasks targeting WeChat are not supported)
 - **No typing indicator** — the iLink API does not support "typing..." status
 - **No group chat** — currently DM only
 - **No history fetch** — the iLink API does not provide message history
-- **Token expiry** — the bearer token may expire after some time; re-run the QR login to obtain a new one
+- **Proactive send requires prior contact** — the bot can only send to users who have previously messaged it (context_token is cached in memory and lost on restart)
+- **Token expiry** — the bearer token may expire after some time; re-run `golembot weixin-login` to obtain a new one
 - **Message length** — WeChat limits messages to 2,000 characters; longer responses are automatically split by GolemBot
 
 ## Notes
@@ -83,3 +102,4 @@ Send a message to the bot's WeChat account from another WeChat user — you'll s
 - The iLink Bot API is a Tencent service — it is not part of the official WeChat Open Platform
 - No npm SDK is needed; the adapter uses native `fetch()`
 - The `context_token` is automatically managed per sender — you don't need to handle it manually
+- Images are downloaded from Tencent's CDN and decrypted locally with AES-128-ECB — no image data passes through GolemBot's servers
