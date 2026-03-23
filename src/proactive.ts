@@ -92,7 +92,15 @@ export class ProactiveCoordinator {
       if (task.target) {
         const adapter = this.adapters.get(task.target.channel);
         if (adapter?.send) {
-          await adapter.send(task.target.chatId, reply.trim());
+          if (task.target.chatId) {
+            await adapter.send(task.target.chatId, reply.trim());
+          } else if (adapter.listChats) {
+            // No chatId specified — broadcast to all known chats
+            const chats = await adapter.listChats();
+            for (const chat of chats) {
+              await adapter.send(chat.chatId, reply.trim());
+            }
+          }
         }
       }
     } catch (err: unknown) {

@@ -22,7 +22,8 @@ export interface ScheduledTaskDef {
 
 export interface TaskTarget {
   channel: string;
-  chatId: string;
+  /** Target chat ID. If omitted, sends to all known chats on the channel. */
+  chatId?: string;
 }
 
 export type TaskHandler = (task: ScheduledTaskDef) => Promise<void>;

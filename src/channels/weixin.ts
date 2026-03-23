@@ -69,6 +69,10 @@ export class WeixinAdapter implements ChannelAdapter {
     }
   }
 
+  async listChats(): Promise<Array<{ chatId: string; chatType: 'dm' | 'group' }>> {
+    return [...this.contextTokens.keys()].map((id) => ({ chatId: id, chatType: 'dm' as const }));
+  }
+
   async send(chatId: string, text: string): Promise<void> {
     const contextToken = this.contextTokens.get(chatId);
     if (!contextToken) {

@@ -456,7 +456,9 @@ function renderConfigPanel(data: DashboardData): string {
   }
 
   if (esc_) {
-    const targetDesc = esc_.target ? `${esc_.target.channel}:${esc_.target.chatId.slice(0, 16)}` : 'no target';
+    const targetDesc = esc_.target
+      ? `${esc_.target.channel}:${(esc_.target.chatId ?? 'all').slice(0, 16)}`
+      : 'no target';
     advancedParts.push(
       `<div class="config-row"><span class="config-key">Escalation</span>${configBadge(esc_.enabled)} <span class="dim" style="margin-left:8px">${esc(targetDesc)}</span></div>`,
     );
@@ -681,7 +683,7 @@ function renderScheduledTasks(data: DashboardData): string {
       const statusText = t.lastStatus ?? 'never run';
       const lastRun = t.lastRun ? new Date(t.lastRun).toLocaleString() : '-';
       const target = t.target
-        ? `${esc(t.target.channel)}:${esc(t.target.chatId.slice(0, 12))}…`
+        ? `${esc(t.target.channel)}:${esc((t.target.chatId ?? 'all').slice(0, 12))}…`
         : '<span class="dim">none</span>';
       const enabledClass = t.enabled ? 'task-enabled' : 'task-disabled';
       const enabledLabel = t.enabled ? 'Enabled' : 'Disabled';
