@@ -1,3 +1,10 @@
+# [0.39.0](https://github.com/0xranx/golembot/compare/v0.38.0...v0.39.0) (2026-03-23)
+
+
+### Features
+
+* allow omitting chatId in scheduled task target for broadcast ([e7c5147](https://github.com/0xranx/golembot/commit/e7c5147942882ced2a3725592ba8ddb0b279d0fc))
+
 # [0.38.0](https://github.com/0xranx/golembot/compare/v0.37.0...v0.38.0) (2026-03-22)
 
 
