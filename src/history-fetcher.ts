@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { ChannelAdapter, ChannelMessage } from './channel.js';
+import { buildConversationKey, buildSessionKey, type ChannelAdapter, type ChannelMessage } from './channel.js';
 import { type InboxChannelMsg, type InboxStore } from './inbox.js';
 import type { SeenMessageStore } from './seen-messages.js';
 
@@ -190,7 +190,9 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
 
       log(verbose, `[history-fetch] ${wmKey}: ${newMessages.length} new message(s)`);
 
-      const sessionKey = `${type}:${chat.chatId}`;
+      const conversationMsg = newMessages[newMessages.length - 1];
+      const sessionKey =
+        conversationMsg.chatType === 'group' ? buildConversationKey(conversationMsg) : buildSessionKey(conversationMsg);
 
       // Session-level suppression: if WebSocket delivered any real-time message
       // for this session within the current poll cycle, skip the triage entirely.
@@ -238,7 +240,7 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
 
       // Use the last message's info for reply routing.
       // mentioned is true if ANY message in the batch was @this-bot.
-      const lastMsg = newMessages[newMessages.length - 1];
+      const lastMsg = conversationMsg;
       const anyMentioned = newMessages.some((m) => m.mentioned === true);
       const channelMsg: InboxChannelMsg = {
         channelType: type,
@@ -247,6 +249,7 @@ export async function fetchMissedMessages(opts: HistoryFetcherOpts, watermarks: 
         chatId: chat.chatId,
         chatType: chat.chatType,
         messageId: lastMsg.messageId,
+        threadId: lastMsg.threadId,
         mentioned: anyMentioned || undefined,
       };
 

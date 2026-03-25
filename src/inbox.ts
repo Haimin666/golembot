@@ -13,6 +13,7 @@ export interface InboxChannelMsg {
   chatId: string;
   chatType: 'dm' | 'group';
   messageId?: string;
+  threadId?: string;
   /** Whether the bot was @mentioned in this message. */
   mentioned?: boolean;
 }
