@@ -49,7 +49,8 @@ export class WecomAdapter implements ChannelAdapter {
   }
 
   private handleFrame(frame: any, onMessage: (msg: ChannelMessage) => void, fallbackText?: string): void {
-    const msgId: string | undefined = frame.msgId || frame.message_id;
+    const body = frame?.body ?? frame;
+    const msgId: string | undefined = body.msgid || body.msgId || body.message_id;
     if (msgId) {
       if (this.seenMsgIds.has(msgId)) return;
       this.seenMsgIds.add(msgId);
@@ -59,20 +60,28 @@ export class WecomAdapter implements ChannelAdapter {
       }
     }
 
-    const text = frame.content?.text || frame.text || fallbackText || '';
+    const text =
+      body.text?.content ||
+      body.content?.text ||
+      (typeof body.text === 'string' ? body.text : undefined) ||
+      fallbackText ||
+      '';
     if (!text) return;
 
-    const isGroup = frame.chatType === 'group' || frame.chat_type === 'group';
+    const senderId = body.from?.userid || body.userId || (typeof body.from === 'string' ? body.from : '') || '';
+    const chatType = body.chattype || body.chatType || body.chat_type;
+    const isGroup = chatType === 'group';
+    const chatId = body.chatid || body.chatId || body.conversation_id || (!isGroup ? senderId : '');
 
     const channelMsg: ChannelMessage = {
       channelType: 'wecom',
-      senderId: frame.userId || frame.from || '',
-      senderName: frame.userName || frame.from_name,
-      chatId: frame.chatId || frame.conversation_id || '',
+      senderId,
+      senderName: body.userName || body.from_name,
+      chatId,
       chatType: isGroup ? 'group' : 'dm',
       text,
       messageId: msgId,
-      mentioned: frame.mentioned,
+      mentioned: body.mentioned,
       raw: frame,
     };
 
