@@ -149,6 +149,55 @@ describe('WecomAdapter', () => {
       const msg: ChannelMessage = onMessageMock.mock.calls[0][0];
       expect(msg.text).toBe('(image)');
     });
+
+    it('parses SDK callback fields from frame.body and keeps raw frame', () => {
+      const textHandler = handlers.get('message.text')!;
+      const frame = {
+        event: 'message.text',
+        body: {
+          msgid: 'body-msg-1',
+          from: { userid: 'user-body-1' },
+          from_name: 'Body User',
+          chattype: 'group',
+          chatid: 'group-body-1',
+          text: { content: 'Hello from body' },
+          mentioned: true,
+        },
+      };
+
+      textHandler(frame);
+
+      expect(onMessageMock).toHaveBeenCalledOnce();
+      const msg: ChannelMessage = onMessageMock.mock.calls[0][0];
+      expect(msg.senderId).toBe('user-body-1');
+      expect(msg.senderName).toBe('Body User');
+      expect(msg.chatId).toBe('group-body-1');
+      expect(msg.chatType).toBe('group');
+      expect(msg.text).toBe('Hello from body');
+      expect(msg.messageId).toBe('body-msg-1');
+      expect(msg.mentioned).toBe(true);
+      expect(msg.raw).toBe(frame);
+    });
+
+    it('falls back to senderId as chatId for single-chat SDK callbacks', () => {
+      const textHandler = handlers.get('message.text')!;
+      textHandler({
+        body: {
+          msgId: 'body-msg-2',
+          userId: 'user-body-2',
+          chatType: 'single',
+          content: { text: 'DM via body' },
+        },
+      });
+
+      expect(onMessageMock).toHaveBeenCalledOnce();
+      const msg: ChannelMessage = onMessageMock.mock.calls[0][0];
+      expect(msg.senderId).toBe('user-body-2');
+      expect(msg.chatId).toBe('user-body-2');
+      expect(msg.chatType).toBe('dm');
+      expect(msg.text).toBe('DM via body');
+      expect(msg.messageId).toBe('body-msg-2');
+    });
   });
 
   describe('reply', () => {
