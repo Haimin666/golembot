@@ -25,6 +25,20 @@ describe('buildSessionKey', () => {
     };
     expect(buildSessionKey(msg)).toBe('dingtalk:conv_single:user001');
   });
+
+  it('uses thread-specific key for slack dm threads', () => {
+    const msg: ChannelMessage = {
+      channelType: 'slack',
+      senderId: 'U001',
+      chatId: 'D001',
+      chatType: 'dm',
+      text: 'hello in thread',
+      threadId: '1742920000.123456',
+      raw: {},
+    };
+
+    expect(buildSessionKey(msg)).toBe('slack:D001:U001:thread:1742920000.123456');
+  });
 });
 
 describe('stripMention', () => {

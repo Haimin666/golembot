@@ -2,6 +2,7 @@ import { mkdir, readFile as readFileAsync } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  buildConversationKey,
   buildSessionKey,
   type ChannelAdapter,
   type ChannelMessage,
@@ -83,7 +84,7 @@ export interface GroupMessage {
   isBot: boolean;
 }
 
-/** Recent message history per group (key: `channelType:chatId`). */
+/** Recent message history per group conversation (channel or Slack thread). */
 export const groupHistories = new Map<string, GroupMessage[]>();
 
 /** Total bot replies sent per group — used as a safety valve against runaway chains. */
@@ -325,7 +326,7 @@ export async function handleMessage(
   // ── Slash command interception ──
   const parsed = parseCommand(userText);
   if (parsed) {
-    const sessionKey = msg.chatType === 'group' ? `${msg.channelType}:${msg.chatId}` : buildSessionKey(msg);
+    const sessionKey = msg.chatType === 'group' ? buildConversationKey(msg) : buildSessionKey(msg);
     const cmdCtx: CommandContext = {
       dir,
       sessionKey,
@@ -353,7 +354,7 @@ export async function handleMessage(
   let injectPass = false;
 
   if (msg.chatType === 'group') {
-    const groupKey = `${msg.channelType}:${msg.chatId}`;
+    const groupKey = buildConversationKey(msg);
     sessionKey = groupKey;
     const gc = resolveGroupChatConfig(config);
 
@@ -608,7 +609,7 @@ export async function handleMessage(
 
     // Update group history with the full reply + increment turn counter
     if (fullReply.trim() && msg.chatType === 'group') {
-      const groupKey = `${msg.channelType}:${msg.chatId}`;
+      const groupKey = buildConversationKey(msg);
       const gc = resolveGroupChatConfig(config);
       const hist = groupHistories.get(groupKey) ?? [];
       hist.push({ senderName: config.name, text: fullReply.trim(), isBot: true });
@@ -712,6 +713,7 @@ export function channelMsgToInbox(
       chatId: msg.chatId,
       chatType: msg.chatType,
       messageId: msg.messageId,
+      threadId: msg.threadId,
       mentioned: msg.mentioned,
     },
   };
@@ -934,7 +936,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
             // Build sessionKey + fullText the same way handleMessage does,
             // but we need the ChannelMessage for reply routing, so we store the
             // raw msg reference keyed by entry ID in a local map.
-            const sessionKey = msg.chatType === 'group' ? `${msg.channelType}:${msg.chatId}` : buildSessionKey(msg);
+            const sessionKey = msg.chatType === 'group' ? buildConversationKey(msg) : buildSessionKey(msg);
 
             const entry = channelMsgToInbox(msg, sessionKey, msg.text);
             log(verbose, `[${type}] enqueued message from ${msg.senderName || msg.senderId}`);
@@ -1028,6 +1030,7 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
           chatId: chMsg.chatId,
           chatType: chMsg.chatType,
           messageId: chMsg.messageId,
+          threadId: chMsg.threadId,
           text: entry.message,
           raw: {},
           // For history-fetch triage, mentioned is set from the adapter's

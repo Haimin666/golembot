@@ -101,6 +101,7 @@ export class SlackAdapter implements ChannelAdapter {
         chatType: 'dm',
         text: message.text || (images.length > 0 ? '(image)' : ''),
         messageId: message.ts,
+        threadId: message.thread_ts || message.ts,
         images: images.length > 0 ? images : undefined,
         raw: message,
       });
@@ -123,6 +124,7 @@ export class SlackAdapter implements ChannelAdapter {
         chatType: 'group',
         text,
         messageId: event.ts,
+        threadId: event.thread_ts || event.ts,
         mentioned: true,
         raw: event,
       });
@@ -173,10 +175,11 @@ export class SlackAdapter implements ChannelAdapter {
         );
       }
     }
+    const threadTs = msg.threadId ?? msg.messageId;
     await this.app.client.chat.postMessage({
       channel: msg.chatId,
       text: mrkdwn,
-      ...(msg.messageId ? { thread_ts: msg.messageId } : {}),
+      ...(threadTs ? { thread_ts: threadTs } : {}),
     });
   }
 
@@ -213,9 +216,10 @@ export class SlackAdapter implements ChannelAdapter {
           senderId: msg.user || 'unknown',
           senderName,
           chatId,
-          chatType: 'group', // determined by caller; conversations.history works for both
+          chatType: chatId.startsWith('D') ? 'dm' : 'group',
           text: msg.text,
           messageId: msg.ts,
+          threadId: msg.thread_ts || msg.ts,
           raw: msg,
         });
       }

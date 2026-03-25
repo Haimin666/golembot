@@ -27,6 +27,8 @@ export interface ChannelMessage {
   text: string;
   /** Platform-native message ID, used for quote/reply. */
   messageId?: string;
+  /** Platform-native thread or conversation root ID, used for thread-scoped routing. */
+  threadId?: string;
   /** Images attached to the message (downloaded by the adapter). */
   images?: ImageAttachment[];
   /** Files (non-image) attached to the message (downloaded by the adapter). */
@@ -118,7 +120,19 @@ export interface ChannelAdapter {
 }
 
 export function buildSessionKey(msg: ChannelMessage): string {
+  if (msg.channelType === 'slack' && msg.chatType === 'dm' && msg.threadId) {
+    return `slack:${msg.chatId}:${msg.senderId}:thread:${msg.threadId}`;
+  }
   return `${msg.channelType}:${msg.chatId}:${msg.senderId}`;
+}
+
+export function buildConversationKey(
+  msg: Pick<ChannelMessage, 'channelType' | 'chatId' | 'chatType' | 'threadId'>,
+): string {
+  if (msg.channelType === 'slack' && msg.chatType === 'group' && msg.threadId) {
+    return `slack:${msg.chatId}:thread:${msg.threadId}`;
+  }
+  return `${msg.channelType}:${msg.chatId}`;
 }
 
 /**

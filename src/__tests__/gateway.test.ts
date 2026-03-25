@@ -12,6 +12,7 @@ import {
   groupHistories,
   groupLastActivity,
   groupTurnCounters,
+  handleMessage,
   purgeIdleGroups,
   requireFields,
   resolveGroupChatConfig,
@@ -430,6 +431,125 @@ describe('GROUP_TURN_RESET_MS', () => {
     // Simulate the reset condition: Date.now() - lastActivity > GROUP_TURN_RESET_MS
     expect(now - oneHourAgo > GROUP_TURN_RESET_MS).toBe(true); // → reset
     expect(now - justNow > GROUP_TURN_RESET_MS).toBe(false); // → no reset
+  });
+});
+
+describe('Slack thread conversation keys', () => {
+  it('uses thread-scoped conversation key for Slack group messages', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'golem-thread-group-'));
+    const sessionKeys: string[] = [];
+    const replies: string[] = [];
+
+    const assistant = {
+      async *chat(_text: string, opts: { sessionKey: string }) {
+        sessionKeys.push(opts.sessionKey);
+        yield { type: 'text' as const, content: 'thread reply' };
+        yield { type: 'done' as const, durationMs: 1 };
+      },
+      async setEngine() {},
+      async setModel() {},
+      async getStatus() {
+        return { engine: 'cursor', model: undefined, skills: [] };
+      },
+      async resetSession() {},
+      async listModels() {
+        return [];
+      },
+    };
+
+    const adapter = {
+      async reply(_msg: ChannelMessage, text: string) {
+        replies.push(text);
+      },
+    };
+
+    const msg: ChannelMessage = {
+      channelType: 'slack',
+      senderId: 'U001',
+      senderName: 'Alice',
+      chatId: 'C001',
+      chatType: 'group',
+      text: 'please help',
+      threadId: '1742920000.123456',
+      mentioned: true,
+      raw: {},
+    };
+
+    try {
+      await handleMessage(
+        msg,
+        { name: 'GolemBot', engine: 'cursor' } as any,
+        assistant as any,
+        adapter,
+        'slack',
+        false,
+        dir,
+      );
+
+      expect(sessionKeys).toEqual(['slack:C001:thread:1742920000.123456']);
+      expect(replies).toEqual(['thread reply']);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      clearGroupChatState('slack:C001:thread:1742920000.123456');
+    }
+  });
+
+  it('uses thread-scoped conversation key for Slack group slash commands', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'golem-thread-cmd-'));
+    const resetKeys: Array<string | undefined> = [];
+    const replies: string[] = [];
+
+    const assistant = {
+      async chat() {
+        throw new Error('chat should not run for slash commands');
+      },
+      async setEngine() {},
+      async setModel() {},
+      async getStatus() {
+        return { engine: 'cursor', model: undefined, skills: [] };
+      },
+      async resetSession(sessionKey?: string) {
+        resetKeys.push(sessionKey);
+      },
+      async listModels() {
+        return [];
+      },
+    };
+
+    const adapter = {
+      async reply(_msg: ChannelMessage, text: string) {
+        replies.push(text);
+      },
+    };
+
+    const msg: ChannelMessage = {
+      channelType: 'slack',
+      senderId: 'U001',
+      senderName: 'Alice',
+      chatId: 'C001',
+      chatType: 'group',
+      text: '/reset',
+      threadId: '1742920000.123456',
+      raw: {},
+    };
+
+    try {
+      await handleMessage(
+        msg,
+        { name: 'GolemBot', engine: 'cursor' } as any,
+        assistant as any,
+        adapter,
+        'slack',
+        false,
+        dir,
+      );
+
+      expect(resetKeys).toEqual(['slack:C001:thread:1742920000.123456']);
+      expect(replies).toEqual(['Session reset.']);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      clearGroupChatState('slack:C001:thread:1742920000.123456');
+    }
   });
 });
 
