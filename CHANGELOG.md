@@ -1,3 +1,10 @@
+## [0.40.2](https://github.com/0xranx/golembot/compare/v0.40.1...v0.40.2) (2026-03-25)
+
+
+### Bug Fixes
+
+* isolate Slack sessions by thread ([5e45ee3](https://github.com/0xranx/golembot/commit/5e45ee320421ee298d62c3867686c7c238a42210))
+
 ## [0.40.1](https://github.com/0xranx/golembot/compare/v0.40.0...v0.40.1) (2026-03-25)
 
 
