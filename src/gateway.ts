@@ -64,6 +64,15 @@ export function splitMessage(text: string, maxLen: number): string[] {
   return chunks;
 }
 
+function summarizeToolCall(name: string, args: string, maxLen = 72): string {
+  const firstToken = name.split(/\s/)[0];
+  const label = firstToken.includes('/') ? firstToken.split('/').pop()! : firstToken;
+  const compactArgs = args.replace(/\s+/g, ' ').trim();
+  if (!compactArgs || compactArgs === '{}' || compactArgs === '[]') return `🔧 ${label}...`;
+  const preview = compactArgs.length > maxLen ? `${compactArgs.slice(0, maxLen)}...` : compactArgs;
+  return `🔧 ${label} ${preview}`;
+}
+
 interface GatewayOpts {
   dir?: string;
   port?: number;
@@ -317,7 +326,10 @@ export async function handleMessage(
   msg: ChannelMessage,
   config: GolemConfig,
   assistant: Pick<Assistant, 'chat' | 'setEngine' | 'setModel' | 'getStatus' | 'resetSession' | 'listModels'>,
-  adapter: Pick<ChannelAdapter, 'reply' | 'maxMessageLength' | 'typing' | 'getGroupMembers'>,
+  adapter: Pick<
+    ChannelAdapter,
+    'reply' | 'maxMessageLength' | 'typing' | 'getGroupMembers' | 'sendStatus' | 'updateStatus' | 'clearStatus'
+  >,
   channelType: string,
   verbose: boolean,
   dir: string,
@@ -423,7 +435,6 @@ export async function handleMessage(
   }
 
   log(verbose, `[${channelType}] received from ${senderLabel}: "${userText}" → session ${sessionKey}`);
-
   // Send typing indicator immediately, then refresh every 4s while waiting for AI.
   // Telegram's typing action expires after ~5s, so we keep it alive.
   let typingTimer: ReturnType<typeof setInterval> | undefined;
@@ -452,10 +463,67 @@ export async function handleMessage(
 
   const maxLen = adapter.maxMessageLength ?? 4000;
   const streamingConfig = resolveStreamingConfig(config);
+  let hasVisibleStatus = false;
+  let thinkingStatusTimer: ReturnType<typeof setTimeout> | undefined;
+  let statusMessageId: string | undefined;
+  let statusMessageText: string | undefined;
+  let statusFinalized = false;
+
+  const cancelThinkingStatus = () => {
+    if (thinkingStatusTimer !== undefined) {
+      clearTimeout(thinkingStatusTimer);
+      thinkingStatusTimer = undefined;
+    }
+  };
+
+  const sendStatusUpdate = async (text: string): Promise<void> => {
+    if (!text.trim()) return;
+    cancelThinkingStatus();
+    if (adapter.sendStatus && adapter.updateStatus && adapter.clearStatus) {
+      if (!statusMessageId) {
+        statusMessageId = await adapter.sendStatus(msg, text.trim());
+      } else {
+        await adapter.updateStatus(msg, statusMessageId, text.trim());
+      }
+      statusMessageText = text.trim();
+      return;
+    }
+    if (hasVisibleStatus) return;
+    hasVisibleStatus = true;
+    await adapter.reply(msg, text.trim());
+  };
+
+  const finalizeStatusUpdate = async (finalText = '✅ Done'): Promise<void> => {
+    cancelThinkingStatus();
+    if (!statusMessageId) return;
+    if (adapter.updateStatus) {
+      await adapter.updateStatus(msg, statusMessageId, finalText);
+      statusMessageText = finalText;
+      statusFinalized = true;
+      return;
+    }
+    if (adapter.clearStatus) {
+      const currentStatusId = statusMessageId;
+      statusMessageId = undefined;
+      await adapter.clearStatus(msg, currentStatusId);
+    }
+  };
+
+  if (msg.chatType === 'dm') {
+    thinkingStatusTimer = setTimeout(() => {
+      sendStatusUpdate('⏳ thinking...').catch(() => {});
+    }, 1500);
+  }
 
   // Helper: send a text chunk to the IM channel (handles splitMessage + mentions).
   const sendChunk = async (text: string): Promise<void> => {
     if (!text.trim()) return;
+    hasVisibleStatus = true;
+    cancelThinkingStatus();
+    if (statusMessageId && adapter.updateStatus && statusMessageText !== '✍️ replying...') {
+      await adapter.updateStatus(msg, statusMessageId, '✍️ replying...');
+      statusMessageText = '✍️ replying...';
+    }
     // Final safety net: never send [PASS]/[SKIP] sentinel values to IM
     const sentinel = text.trim();
     if (sentinel === '[PASS]' || sentinel === '[SKIP]') {
@@ -486,7 +554,6 @@ export async function handleMessage(
   try {
     let fullReply = '';
     let hasError = false;
-
     // When injectPass is active (smart mode, not mentioned), force buffered behavior
     // to prevent [PASS] sentinel from leaking to IM before we can detect and suppress it.
     const effectiveMode = injectPass ? 'buffered' : streamingConfig.mode;
@@ -532,15 +599,9 @@ export async function handleMessage(
           // Agent switches to tool use — flush accumulated text first
           await flush('tool_call');
           if (streamingConfig.showToolCalls) {
-            // Extract a short tool label from the tool name.
-            // Codex: "/bin/bash -lc 'cd ... && ls -la'" → "bash"
-            // Claude Code: "Bash", "Read" → as-is
-            // OpenCode: "bash", "read" → as-is
-            const rawName = event.name;
-            const firstToken = rawName.split(/\s/)[0]; // "/bin/bash" or "Bash" or "read"
-            const label = firstToken.includes('/') ? firstToken.split('/').pop()! : firstToken;
-            log(verbose, `[${channelType}] stream tool_call: ${label}`);
-            await adapter.reply(msg, `🔧 ${label}...`);
+            const hint = summarizeToolCall(event.name, event.args);
+            log(verbose, `[${channelType}] stream tool_call: ${hint}`);
+            await sendStatusUpdate(hint);
           } else {
             log(verbose, `[${channelType}] stream tool_call: ${event.name.slice(0, 40)}`);
           }
@@ -575,6 +636,7 @@ export async function handleMessage(
       }
 
       if (fullReply.trim()) {
+        await finalizeStatusUpdate();
         log(verbose, `[${channelType}] replied to ${senderLabel}: "${fullReply.trim().slice(0, 80)}..." (streaming)`);
         trackMetrics({ responsePreview: fullReply.trim().slice(0, 120) });
       }
@@ -608,6 +670,7 @@ export async function handleMessage(
 
       if (fullReply.trim()) {
         await sendChunk(fullReply);
+        await finalizeStatusUpdate();
         log(verbose, `[${channelType}] replied to ${senderLabel}: "${fullReply.trim().slice(0, 80)}..."`);
         trackMetrics({ responsePreview: fullReply.trim().slice(0, 120) });
       }
@@ -631,6 +694,10 @@ export async function handleMessage(
       // best effort
     }
   } finally {
+    if (!statusFinalized && statusMessageId) {
+      await finalizeStatusUpdate();
+    }
+    cancelThinkingStatus();
     if (typingTimer !== undefined) clearInterval(typingTimer);
   }
 }
@@ -1047,10 +1114,16 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
         // For inbox entries (especially history-fetch), the raw object is empty,
         // so adapter.reply() may fail (e.g. Discord needs raw.reply()).
         // Wrap adapter to fallback to send() when reply() throws.
-        const wrappedAdapter: Pick<ChannelAdapter, 'reply' | 'maxMessageLength' | 'typing' | 'getGroupMembers'> = {
+        const wrappedAdapter: Pick<
+          ChannelAdapter,
+          'reply' | 'maxMessageLength' | 'typing' | 'getGroupMembers' | 'sendStatus' | 'updateStatus' | 'clearStatus'
+        > = {
           maxMessageLength: adapter.maxMessageLength,
           typing: adapter.typing?.bind(adapter),
           getGroupMembers: adapter.getGroupMembers?.bind(adapter),
+          sendStatus: adapter.sendStatus?.bind(adapter),
+          updateStatus: adapter.updateStatus?.bind(adapter),
+          clearStatus: adapter.clearStatus?.bind(adapter),
           reply: async (m, text, opts) => {
             try {
               await adapter.reply(m, text, opts);

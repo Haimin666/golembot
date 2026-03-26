@@ -476,7 +476,11 @@ function makeErrorEventAssistant(): MockAssistant {
 
 type MockAdapter = {
   replies: Array<{ msg: ChannelMessage; text: string; options?: ReplyOptions }>;
+  statusOps: Array<{ type: 'create' | 'update' | 'clear'; id?: string; text?: string }>;
   reply(msg: ChannelMessage, text: string, options?: ReplyOptions): Promise<void>;
+  sendStatus?(msg: ChannelMessage, text: string): Promise<string>;
+  updateStatus?(msg: ChannelMessage, statusId: string, text: string): Promise<void>;
+  clearStatus?(msg: ChannelMessage, statusId: string): Promise<void>;
   maxMessageLength?: number;
   getGroupMembers?: (chatId: string) => Promise<Map<string, string>>;
 };
@@ -484,9 +488,20 @@ type MockAdapter = {
 function makeMockAdapter(maxLen?: number): MockAdapter {
   const obj: MockAdapter = {
     replies: [],
+    statusOps: [],
     maxMessageLength: maxLen,
     async reply(msg: ChannelMessage, text: string, options?: ReplyOptions) {
       obj.replies.push({ msg, text, options });
+    },
+    async sendStatus(_msg: ChannelMessage, text: string) {
+      obj.statusOps.push({ type: 'create', id: 'status-1', text });
+      return 'status-1';
+    },
+    async updateStatus(_msg: ChannelMessage, statusId: string, text: string) {
+      obj.statusOps.push({ type: 'update', id: statusId, text });
+    },
+    async clearStatus(_msg: ChannelMessage, statusId: string) {
+      obj.statusOps.push({ type: 'clear', id: statusId });
     },
   };
   return obj;
@@ -1213,10 +1228,41 @@ describe('handleMessage — full gateway pipeline', () => {
       const msg = makeDmMsg();
       const config = makeConfig({ streaming: { mode: 'streaming', showToolCalls: true } } as any);
       await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
-      expect(adapter.replies.length).toBe(3);
+      expect(adapter.replies.length).toBe(2);
       expect(adapter.replies[0].text).toBe('Let me check.');
-      expect(adapter.replies[1].text).toBe('🔧 run_tests...');
-      expect(adapter.replies[2].text).toBe('All tests pass.');
+      expect(adapter.replies[1].text).toBe('All tests pass.');
+      expect(adapter.statusOps).toEqual([
+        { type: 'create', id: 'status-1', text: '🔧 run_tests...' },
+        { type: 'update', id: 'status-1', text: '✍️ replying...' },
+        { type: 'update', id: 'status-1', text: '✅ Done' },
+      ]);
+    });
+
+    it('streaming mode includes truncated tool args in tool_call hints', async () => {
+      const assistant = makeStreamingAssistant([
+        {
+          type: 'tool_call',
+          name: 'read',
+          args: '{"filePath":"/Users/makang/.zelda/notes.md","offset":1,"limit":200}',
+        },
+        { type: 'text', content: 'Done reading.' },
+        { type: 'done', sessionId: 'x' },
+      ]);
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg();
+      const config = makeConfig({ streaming: { mode: 'streaming', showToolCalls: true } } as any);
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+      expect(adapter.replies.length).toBe(1);
+      expect(adapter.replies[0].text).toBe('Done reading.');
+      expect(adapter.statusOps).toEqual([
+        {
+          type: 'create',
+          id: 'status-1',
+          text: '🔧 read {"filePath":"/Users/makang/.zelda/notes.md","offset":1,"limit":200}',
+        },
+        { type: 'update', id: 'status-1', text: '✍️ replying...' },
+        { type: 'update', id: 'status-1', text: '✅ Done' },
+      ]);
     });
 
     it('streaming mode does not show tool_call hints when disabled', async () => {
@@ -1297,6 +1343,64 @@ describe('handleMessage — full gateway pipeline', () => {
       await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
       expect(adapter.replies.length).toBeGreaterThanOrEqual(1);
       expect(adapter.replies.some((r) => r.text.includes('error occurred'))).toBe(true);
+    });
+
+    it('sends a thinking status before a delayed first reply', async () => {
+      vi.useFakeTimers();
+      try {
+        const assistant: MockAssistant = {
+          ...mockAssistantStubs,
+          callCount: 0,
+          lastSessionKey: undefined,
+          lastPrompt: undefined,
+          async *chat(message: string, opts: { sessionKey?: string } = {}) {
+            assistant.callCount++;
+            assistant.lastPrompt = message;
+            assistant.lastSessionKey = opts.sessionKey;
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            yield { type: 'text' as const, content: 'Final answer.' };
+            yield { type: 'done' as const, sessionId: 'x' };
+          },
+        };
+        const adapter = makeMockAdapter();
+        const msg = makeDmMsg();
+        const promise = handleMessage(msg, makeConfig(), assistant, adapter, 'slack', false, dir);
+
+        await vi.advanceTimersByTimeAsync(1600);
+        expect(adapter.statusOps[0]).toEqual({ type: 'create', id: 'status-1', text: '⏳ thinking...' });
+
+        await vi.advanceTimersByTimeAsync(1000);
+        await promise;
+
+        expect(adapter.replies[0].text).toBe('Final answer.');
+        expect(adapter.statusOps[1]).toEqual({ type: 'update', id: 'status-1', text: '✍️ replying...' });
+        expect(adapter.statusOps[2]).toEqual({ type: 'update', id: 'status-1', text: '✅ Done' });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('updates a single status message across multiple tool calls', async () => {
+      const assistant = makeStreamingAssistant([
+        { type: 'tool_call', name: 'read', args: '{"filePath":"/tmp/a.txt"}' },
+        { type: 'tool_call', name: 'bash', args: '{"command":"pnpm vitest run src/__tests__/gateway.test.ts"}' },
+        { type: 'text', content: 'Done.' },
+        { type: 'done', sessionId: 'x' },
+      ]);
+      const adapter = makeMockAdapter();
+      const msg = makeDmMsg();
+      const config = makeConfig({ streaming: { mode: 'streaming', showToolCalls: true } } as any);
+
+      await handleMessage(msg, config, assistant, adapter, 'slack', false, dir);
+
+      expect(adapter.replies).toHaveLength(1);
+      expect(adapter.replies[0].text).toBe('Done.');
+      expect(adapter.statusOps).toEqual([
+        { type: 'create', id: 'status-1', text: '🔧 read {"filePath":"/tmp/a.txt"}' },
+        { type: 'update', id: 'status-1', text: '🔧 bash {"command":"pnpm vitest run src/__tests__/gateway.test.ts"}' },
+        { type: 'update', id: 'status-1', text: '✍️ replying...' },
+        { type: 'update', id: 'status-1', text: '✅ Done' },
+      ]);
     });
   });
 

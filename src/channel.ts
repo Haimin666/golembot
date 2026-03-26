@@ -94,6 +94,15 @@ export interface ChannelAdapter {
    */
   typing?(msg: ChannelMessage): Promise<void>;
   /**
+   * Optional: create a temporary status/progress message that can be updated.
+   * Returns a platform-native status identifier if supported.
+   */
+  sendStatus?(msg: ChannelMessage, text: string): Promise<string>;
+  /** Optional: update a previously created status/progress message. */
+  updateStatus?(msg: ChannelMessage, statusId: string, text: string): Promise<void>;
+  /** Optional: clear a previously created status/progress message. */
+  clearStatus?(msg: ChannelMessage, statusId: string): Promise<void>;
+  /**
    * Optional: resolve group members for @mention support.
    * Returns a map of display name → platform-specific user ID.
    * Called by the gateway when the AI reply contains @mentions.
