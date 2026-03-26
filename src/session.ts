@@ -38,6 +38,14 @@ export function getHistoryPath(dir: string, sessionKey: string): string {
   return historyPath(dir, sessionKey);
 }
 
+export function getFallbackSessionKey(sessionKey?: string): string | undefined {
+  if (!sessionKey) return undefined;
+  const m = /^slack:([^:]+):([^:]+):thread:(.+)$/.exec(sessionKey);
+  if (!m) return undefined;
+  const [, chatId, senderId] = m;
+  return `slack:${chatId}:${senderId}`;
+}
+
 async function readStore(dir: string): Promise<SessionStore> {
   try {
     const raw = await readFile(sessionPath(dir), 'utf-8');
@@ -64,7 +72,8 @@ async function writeStore(dir: string, store: SessionStore): Promise<void> {
 
 export async function loadSession(dir: string, key?: string, engineType?: string): Promise<string | undefined> {
   const store = await readStore(dir);
-  const entry = store[key || DEFAULT_KEY];
+  const resolvedKey = key || DEFAULT_KEY;
+  const entry = store[resolvedKey];
   if (!entry) return undefined;
   // Invalidate session if it was saved by a different engine type to prevent
   // cross-engine session ID contamination (e.g. claude-code UUID passed to opencode).
