@@ -115,6 +115,11 @@ describe('session', () => {
   });
 
   describe('lastUsed timestamp', () => {
+    it('does not reuse base DM engine session for absent Slack DM thread keys', async () => {
+      await saveSession(dir, 'base-sess', 'slack:D001:U001');
+      expect(await loadSession(dir, 'slack:D001:U001:thread:1742811111.000100')).toBeUndefined();
+    });
+
     it('saveSession records lastUsed', async () => {
       const before = Date.now();
       await saveSession(dir, 'ts-sess');

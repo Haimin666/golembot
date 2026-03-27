@@ -563,6 +563,38 @@ describe('createAssistant', () => {
       expect(capturedPrompt).not.toContain('[System: This is a new session');
       expect(capturedPrompt).toBe('first message');
     });
+
+    it('creates a new engine session for Slack DM threads without injecting base DM history', async () => {
+      let capturedPrompt = '';
+      let capturedSessionId: string | undefined;
+      mockedCreateEngine.mockReturnValue({
+        async *invoke(prompt: string, opts: InvokeOpts) {
+          capturedPrompt = prompt;
+          capturedSessionId = opts.sessionId;
+          yield { type: 'done', sessionId: 'thread-engine-sess' } as StreamEvent;
+        },
+      });
+
+      const { saveSession, appendHistory } = await import('../session.js');
+      await saveSession(dir, 'base-engine-sess', 'slack:D001:U001', 'cursor');
+      await appendHistory(dir, {
+        ts: 'ts',
+        sessionKey: 'slack:D001:U001',
+        role: 'user',
+        content: 'old dm context',
+      });
+
+      const assistant = createAssistant({ dir, timeoutMs: 5000 });
+      for await (const _ of assistant.chat('thread follow-up', {
+        sessionKey: 'slack:D001:U001:thread:1742811111.000100',
+      })) {
+      }
+
+      expect(capturedSessionId).toBeUndefined();
+      expect(capturedPrompt).toBe('thread follow-up');
+      expect(await loadSession(dir, 'slack:D001:U001')).toBe('base-engine-sess');
+      expect(await loadSession(dir, 'slack:D001:U001:thread:1742811111.000100')).toBe('thread-engine-sess');
+    });
   });
 
   // ── init ──────────────────────────────────────────
