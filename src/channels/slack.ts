@@ -85,7 +85,9 @@ export class SlackAdapter implements ChannelAdapter {
     this.app.message(async ({ message }: any) => {
       if (message.subtype) return; // ignore edits, bot messages, etc.
       if (message.channel_type !== 'im') return; // group messages handled via app_mention
-      if (this.dedup(message.client_msg_id || message.ts)) return;
+      const dedupId = message.client_msg_id || message.ts;
+      const isDuplicate = this.dedup(dedupId);
+      if (isDuplicate) return;
 
       // Download attached images (Slack file uploads)
       const images = await this.downloadFiles(message.files);
@@ -180,6 +182,33 @@ export class SlackAdapter implements ChannelAdapter {
       channel: msg.chatId,
       text: mrkdwn,
       ...(threadTs ? { thread_ts: threadTs } : {}),
+    });
+  }
+
+  async sendStatus(msg: ChannelMessage, text: string): Promise<string> {
+    if (!this.app) return '';
+    const res = await this.app.client.chat.postMessage({
+      channel: msg.chatId,
+      text: markdownToMrkdwn(text),
+      ...((msg.threadId ?? msg.messageId) ? { thread_ts: msg.threadId ?? msg.messageId } : {}),
+    });
+    return res.ts || '';
+  }
+
+  async updateStatus(msg: ChannelMessage, statusId: string, text: string): Promise<void> {
+    if (!this.app || !statusId) return;
+    await this.app.client.chat.update({
+      channel: msg.chatId,
+      ts: statusId,
+      text: markdownToMrkdwn(text),
+    });
+  }
+
+  async clearStatus(msg: ChannelMessage, statusId: string): Promise<void> {
+    if (!this.app || !statusId) return;
+    await this.app.client.chat.delete({
+      channel: msg.chatId,
+      ts: statusId,
     });
   }
 
