@@ -1,3 +1,15 @@
+# [0.41.0](https://github.com/0xranx/golembot/compare/v0.40.2...v0.41.0) (2026-03-27)
+
+
+### Bug Fixes
+
+* isolate Slack DM thread sessions from base DM history ([ea32438](https://github.com/0xranx/golembot/commit/ea324383fe4eff4ceb8dc8660afe864ad76bea50))
+
+
+### Features
+
+* streamline Slack streaming status updates ([74fd4d6](https://github.com/0xranx/golembot/commit/74fd4d6b76499a9e93cf0d9d12e2d28ad0269e0d))
+
 ## [0.40.2](https://github.com/0xranx/golembot/compare/v0.40.1...v0.40.2) (2026-03-25)
 
 
