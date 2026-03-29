@@ -1,3 +1,10 @@
+# [0.43.0](https://github.com/0xranx/golembot/compare/v0.42.0...v0.43.0) (2026-03-29)
+
+
+### Features
+
+* expand codex runtime controls ([aaba986](https://github.com/0xranx/golembot/commit/aaba9864fce390bbb7c29d9b6bb038e8152e2d43))
+
 # [0.42.0](https://github.com/0xranx/golembot/compare/v0.41.0...v0.42.0) (2026-03-29)
 
 
