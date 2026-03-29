@@ -122,9 +122,15 @@ export interface EscalationConfig {
 }
 
 export type CodexMode = 'safe' | 'unrestricted';
+export type CodexSandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access';
+export type CodexApprovalMode = 'untrusted' | 'on-request' | 'never';
 
 export interface CodexConfig {
   mode?: CodexMode;
+  sandbox?: CodexSandboxMode;
+  approval?: CodexApprovalMode;
+  search?: boolean;
+  addDirs?: string[];
 }
 
 export interface ProviderConfig {
@@ -256,10 +262,26 @@ export async function loadConfig(dir: string): Promise<GolemConfig> {
     config.skipPermissions = doc.skipPermissions;
   }
   if (doc.codex && typeof doc.codex === 'object') {
-    const codexDoc = doc.codex as Record<string, unknown>;
+    const codexDoc = resolveEnvPlaceholders(doc.codex as Record<string, unknown>);
     const codex: CodexConfig = {};
     if (codexDoc.mode === 'safe' || codexDoc.mode === 'unrestricted') {
       codex.mode = codexDoc.mode;
+    }
+    if (
+      codexDoc.sandbox === 'read-only' ||
+      codexDoc.sandbox === 'workspace-write' ||
+      codexDoc.sandbox === 'danger-full-access'
+    ) {
+      codex.sandbox = codexDoc.sandbox;
+    }
+    if (codexDoc.approval === 'untrusted' || codexDoc.approval === 'on-request' || codexDoc.approval === 'never') {
+      codex.approval = codexDoc.approval;
+    }
+    if (typeof codexDoc.search === 'boolean') {
+      codex.search = codexDoc.search;
+    }
+    if (Array.isArray(codexDoc.addDirs)) {
+      codex.addDirs = codexDoc.addDirs.filter((dir): dir is string => typeof dir === 'string');
     }
     if (Object.keys(codex).length > 0) config.codex = codex;
   }

@@ -67,7 +67,7 @@ FEISHU_APP_SECRET=xxxxxxxxxxxxxxxxxx
 ## 工作原理
 
 - **传输**：通过 `@larksuiteoapi/node-sdk` 的 `WSClient` 建立 WebSocket 长连接
-- **事件**：监听 `im.message.receive_v1` 事件（仅文本消息）
+- **事件**：监听 `im.message.receive_v1` 事件，处理 `text`、`image`、`post`、`file`、`audio` 五类消息
 - **回复**：通过 `client.im.v1.message.create()` 发送消息，根据内容自动选择格式
 - **聊天类型**：支持单聊（私信）和群聊
 - **私聊上下文**：私聊中 Gateway 会注入发送者的显示名称，让 bot 知道对方是谁
@@ -96,7 +96,8 @@ golembot gateway --verbose
 ## 说明
 
 - WebSocket 模式意味着机器人可以在 NAT/防火墙后运行，无需端口转发
-- 仅处理文本消息；图片、文件等类型被忽略
+- 入站图片会下载后作为 `images` 传递；文件和音频会作为 `files` 传递
+- `post` 富文本消息会保留文本内容，并在有内联图片时一并下载
 - 群聊中使用 `mention-only` 策略（默认）时，机器人只响应直接 @它 的消息（可通过 `groupPolicy` 配置）
 - 未开通 `contact:contact.base:readonly` 权限时，bot 将使用用户的 `open_id` 代替显示名称
 - 未开通 `im:chat:readonly` 权限时，回复中的 @mention 将以纯文本形式发送，不触发飞书原生提及

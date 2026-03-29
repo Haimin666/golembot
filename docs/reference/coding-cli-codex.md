@@ -300,7 +300,7 @@ model = "codex-mini-latest"
 
 1. **`--json` flag placement**: Must come after `exec` subcommand — `codex exec --json`, not `codex --json exec`.
 
-2. **`resume` is a subcommand, not a flag**: `codex exec resume <id> "prompt"` — all flags must come after `resume`, not before it.
+2. **`resume` is a subcommand, not a flag**: `codex exec resume <id> "prompt"` — but not all flags belong to the `exec` subcommand. Top-level flags like `--ask-for-approval` and `--search` must be placed before `exec`, while `--json`, `--sandbox`, `--add-dir`, and `--image` stay on `exec`.
 
 3. **`--skip-git-repo-check` required**: Without this flag, Codex refuses to run outside a Git repository. GolemBot uses temp dirs, so this flag is mandatory.
 
@@ -322,4 +322,6 @@ model = "codex-mini-latest"
 
 12. **Input size cap**: Shared ~1M-character input cap as of v0.106.0 to prevent hangs on oversized inputs.
 
-13. **Rapid release pace**: Codex CLI iterates fast; verify flag syntax against the installed version's `codex exec --help` output before relying on it in CI.
+13. **`--image` changes prompt ordering**: when attaching images, keep the prompt before `--image <path>...` in the `exec` argument list. Putting image flags first can make Codex think it should read the prompt from stdin.
+
+14. **Rapid release pace**: Codex CLI iterates fast; verify flag syntax against the installed version's `codex exec --help` output before relying on it in CI.

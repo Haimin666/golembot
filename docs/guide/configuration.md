@@ -25,7 +25,12 @@ skipPermissions: true
 
 # Optional: Codex runtime mode (Codex engine only)
 codex:
-  mode: unrestricted         # unrestricted (default) | safe
+  mode: unrestricted         # optional shorthand: unrestricted | safe
+  sandbox: workspace-write   # read-only | workspace-write | danger-full-access
+  approval: on-request       # untrusted | on-request | never
+  search: true
+  addDirs:
+    - ../shared-assets
 
 # Optional: granular agent permissions (Cursor engine only)
 permissions:
@@ -186,11 +191,22 @@ Codex-specific execution settings.
 ```yaml
 codex:
   mode: unrestricted
+  sandbox: workspace-write
+  approval: on-request
+  search: false
+  addDirs:
+    - ../shared-assets
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `mode` | `string` | `unrestricted` | `unrestricted` runs Codex with `--dangerously-bypass-approvals-and-sandbox`. `safe` uses `--full-auto` and keeps Codex sandboxed |
+| `mode` | `string` | `unrestricted` | Compatibility shorthand. `unrestricted` runs Codex with `--dangerously-bypass-approvals-and-sandbox`. `safe` uses `--full-auto` |
+| `sandbox` | `string` | — | Fine-grained sandbox control: `read-only`, `workspace-write`, or `danger-full-access` |
+| `approval` | `string` | — | Fine-grained approval policy: `untrusted`, `on-request`, or `never` (passed before `exec`) |
+| `search` | `boolean` | `false` | Enable Codex live web search (`--search`, passed before `exec`) |
+| `addDirs` | `string[]` | — | Extra writable directories passed as `--add-dir` (resolved relative to the workspace when not absolute) |
+
+If `sandbox` or `approval` is set, GolemBot uses explicit `--sandbox` / `--ask-for-approval` flags and does not use `mode`. `approval` and `search` are forwarded as top-level Codex CLI flags before `exec`; `sandbox` and `addDirs` remain on the `exec` subcommand. When only one of `sandbox` or `approval` is set, the other defaults to `workspace-write` / `on-request`.
 
 ### `persona`
 
@@ -413,6 +429,10 @@ interface GolemConfig {
   skipPermissions?: boolean;
   codex?: {
     mode?: 'safe' | 'unrestricted';
+    sandbox?: 'read-only' | 'workspace-write' | 'danger-full-access';
+    approval?: 'untrusted' | 'on-request' | 'never';
+    search?: boolean;
+    addDirs?: string[];
   };
   timeout?: number;             // seconds, default 300
   maxConcurrent?: number;       // default 10

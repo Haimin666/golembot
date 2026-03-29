@@ -137,11 +137,11 @@ Slack / Telegram / Discord / 飞书 / 钉钉 / 企业微信 / 微信 / HTTP API
 | Skill 注入 | `.cursor/skills/` | `.claude/skills/` + CLAUDE.md | `.opencode/skills/` + opencode.json | workspace 根目录的 `AGENTS.md` |
 | 会话恢复 | `--resume` | `--resume` | `--session` | `exec resume <thread_id>` |
 | API Key | CURSOR_API_KEY | ANTHROPIC_API_KEY | 取决于 Provider | `CODEX_API_KEY`（推荐）/ ChatGPT OAuth |
-| 运行模式 | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | permission config | 默认 `unrestricted`，可选 `safe` |
+| 运行模式 | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | permission config | 默认 `unrestricted`；也支持 `sandbox` / `approval` / `search` / `addDirs` |
 
 所有引擎暴露的 `StreamEvent` 接口完全一致 —— 切换引擎无需改任何代码。
 
-如果你使用 Codex，要注意 GolemBot 默认采用 `codex.mode: unrestricted`。如果你希望保留 Codex 沙箱，请显式设置 `codex.mode: safe`。
+如果你使用 Codex，要注意 GolemBot 默认采用 `codex.mode: unrestricted`。如果你希望保留 Codex 沙箱，请显式设置 `codex.mode: safe`。也可以进一步使用 `codex.sandbox`、`codex.approval`、`codex.search`、`codex.addDirs` 做细粒度控制。
 
 ## 配置
 
@@ -174,9 +174,14 @@ channels:
     _adapter: ./adapters/email-adapter.js
     token: ${EMAIL_TOKEN}
 
-# 可选：Codex 运行模式（仅 Codex 引擎）
+# 可选：Codex 运行控制（仅 Codex 引擎）
 codex:
-  mode: unrestricted   # Codex 默认值；设为 safe 可保留沙箱
+  mode: unrestricted   # 兼容别名；设为 safe 可保留沙箱
+  sandbox: workspace-write
+  approval: on-request
+  search: true
+  addDirs:
+    - ../shared-assets
 
 gateway:
   port: 3000

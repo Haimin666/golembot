@@ -70,6 +70,20 @@ describe('workspace', () => {
       const cfg = await loadConfig(dir);
       expect(cfg.codex).toEqual({ mode: 'safe' });
     });
+
+    it('reads extended codex config fields', async () => {
+      await writeFile(
+        join(dir, 'golem.yaml'),
+        'name: bot\nengine: codex\ncodex:\n  sandbox: read-only\n  approval: never\n  search: true\n  addDirs:\n    - ../shared\n',
+      );
+      const cfg = await loadConfig(dir);
+      expect(cfg.codex).toEqual({
+        sandbox: 'read-only',
+        approval: 'never',
+        search: true,
+        addDirs: ['../shared'],
+      });
+    });
   });
 
   // ── writeConfig ───────────────────────────────────
@@ -100,9 +114,25 @@ describe('workspace', () => {
     });
 
     it('round-trips codex config', async () => {
-      await writeConfig(dir, { name: 'test', engine: 'codex', codex: { mode: 'unrestricted' } });
+      await writeConfig(dir, {
+        name: 'test',
+        engine: 'codex',
+        codex: {
+          mode: 'unrestricted',
+          sandbox: 'workspace-write',
+          approval: 'on-request',
+          search: true,
+          addDirs: ['../shared'],
+        },
+      });
       const cfg = await loadConfig(dir);
-      expect(cfg.codex).toEqual({ mode: 'unrestricted' });
+      expect(cfg.codex).toEqual({
+        mode: 'unrestricted',
+        sandbox: 'workspace-write',
+        approval: 'on-request',
+        search: true,
+        addDirs: ['../shared'],
+      });
     });
   });
 

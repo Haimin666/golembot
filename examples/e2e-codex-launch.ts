@@ -9,6 +9,7 @@
  *   - explicit codex.mode: safe
  *   - resume path => exec resume
  *   - HTTP service path => real server-triggered Codex launch
+ *   - explicit search / image / add-dir / sandbox / approval flags
  *
  * Run:
  *   pnpm run build && pnpm run e2e:codex:launch
@@ -20,7 +21,7 @@ import { chmod, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:f
 import http from 'node:http';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
-import { createAssistant, createGolemServer, type StreamEvent } from '../dist/index.js';
+import { createAssistant, createGolemServer, type ImageAttachment, type StreamEvent } from '../dist/index.js';
 
 try {
   const envPath = resolvePath(new URL('.', import.meta.url).pathname, '..', '.env');
@@ -134,7 +135,7 @@ async function readInvocations(logPath: string): Promise<Invocation[]> {
 async function collectChat(
   assistant: ReturnType<typeof createAssistant>,
   message: string,
-  chatOpts?: { sessionKey?: string },
+  chatOpts?: { sessionKey?: string; images?: ImageAttachment[] },
 ): Promise<{ events: StreamEvent[]; fullText: string; sessionId?: string }> {
   const events: StreamEvent[] = [];
   let fullText = '';
@@ -353,6 +354,51 @@ try {
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
+  }
+
+  step('Explicit search, image, add-dir, sandbox, and approval flags are forwarded');
+  {
+    const dir = join(harnessDir, 'feature-flags');
+    const sharedDir = join(harnessDir, 'shared-assets');
+    await mkdir(dir, { recursive: true });
+    await mkdir(sharedDir, { recursive: true });
+    const assistant = makeAssistant(dir);
+    await assistant.init({ engine: 'codex', name: 'feature-flags-bot' });
+    await writeFile(
+      join(dir, 'golem.yaml'),
+      [
+        'name: feature-flags-bot',
+        'engine: codex',
+        'codex:',
+        '  sandbox: read-only',
+        '  approval: never',
+        '  search: true',
+        '  addDirs:',
+        '    - ../shared-assets',
+        '',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const startIndex = (await readInvocations(logPath)).length;
+    const pixelPng = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn2M6cAAAAASUVORK5CYII=',
+      'base64',
+    );
+    const { fullText } = await collectChat(assistant, 'Reply with IMAGE only.', {
+      sessionKey: 'feature-user',
+      images: [{ mimeType: 'image/png', data: pixelPng, fileName: 'pixel.png' }],
+    });
+    const invocation = lastInvocation(await readInvocations(logPath), startIndex);
+
+    record('Feature flags chat succeeded', fullText.trim().length > 0);
+    record('Feature flags invocation captured', !!invocation);
+    record('Feature flags use explicit sandbox', !!invocation?.argv.includes('read-only'));
+    record('Feature flags use explicit approval', !!invocation?.argv.includes('never'));
+    record('Feature flags enable search', !!invocation?.argv.includes('--search'));
+    record('Feature flags include add-dir', !!invocation?.argv.includes('--add-dir'));
+    record('Feature flags include image input', !!invocation?.argv.includes('--image'));
+    record('Feature flags do not use mode alias', !invocation?.argv.includes('--full-auto'));
   }
 
   console.log(`\n${CYAN}${BOLD}════════════════════════ Summary ════════════════════════${RESET}\n`);

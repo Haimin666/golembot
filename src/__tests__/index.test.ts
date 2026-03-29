@@ -407,12 +407,15 @@ describe('createAssistant', () => {
     });
 
     it('passes codex config from config to engine', async () => {
-      await writeFile(join(dir, 'golem.yaml'), 'name: test-bot\nengine: codex\ncodex:\n  mode: safe\n');
+      await writeFile(
+        join(dir, 'golem.yaml'),
+        'name: test-bot\nengine: codex\ncodex:\n  sandbox: read-only\n  approval: never\n  search: true\n',
+      );
 
-      let capturedCodexMode: string | undefined;
+      let capturedCodex: InvokeOpts['codex'];
       mockedCreateEngine.mockReturnValue({
         async *invoke(_p: string, opts: InvokeOpts) {
-          capturedCodexMode = opts.codex?.mode;
+          capturedCodex = opts.codex;
           yield { type: 'done', sessionId: 'sess-codex' } as StreamEvent;
         },
       });
@@ -421,7 +424,11 @@ describe('createAssistant', () => {
       for await (const _ of assistant.chat('hello')) {
       }
 
-      expect(capturedCodexMode).toBe('safe');
+      expect(capturedCodex).toEqual({
+        sandbox: 'read-only',
+        approval: 'never',
+        search: true,
+      });
     });
   });
 

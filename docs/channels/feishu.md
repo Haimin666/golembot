@@ -67,7 +67,7 @@ Standard Markdown syntax is automatically converted — no configuration needed.
 ## How It Works
 
 - **Transport**: WebSocket long-connection via `WSClient` from `@larksuiteoapi/node-sdk`
-- **Events**: Listens for `im.message.receive_v1` events (text messages only)
+- **Events**: Listens for `im.message.receive_v1` events and handles `text`, `image`, `post`, `file`, and `audio` messages
 - **Reply**: Sends messages via `client.im.v1.message.create()` — format is auto-selected based on content
 - **Chat types**: Supports both DMs and group chats
 - **DM context**: In private chats, the gateway injects the sender's display name so the bot knows who it's talking to
@@ -96,7 +96,8 @@ This is a passive tracking feature — it tells you when users have seen your bo
 ## Notes
 
 - WebSocket mode means the bot works behind NAT/firewalls without port forwarding
-- Only text messages are processed; images, files, and other types are ignored
+- Incoming images are downloaded and forwarded as `images`; files and audio are forwarded as `files`
+- `post` messages keep their text content and also download inline images when present
 - The adapter automatically handles connection lifecycle
 - In group chats with `mention-only` policy (default), the bot only responds to messages that directly @mention it — other group traffic is ignored (configurable via `groupPolicy`)
 - See the [permissions table](#permissions) for details on required vs. optional scopes and their degradation behavior

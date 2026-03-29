@@ -137,11 +137,11 @@ Slack / Telegram / Discord / Feishu / DingTalk / WeCom / WeChat / HTTP API
 | Skill Injection | `.cursor/skills/` | `.claude/skills/` + CLAUDE.md | `.opencode/skills/` + opencode.json | `AGENTS.md` at workspace root |
 | Session Resume | `--resume` | `--resume` | `--session` | `exec resume <thread_id>` |
 | API Key | CURSOR_API_KEY | ANTHROPIC_API_KEY | Depends on Provider | `CODEX_API_KEY` (preferred) / ChatGPT OAuth |
-| Runtime Mode | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | permission config | default `unrestricted`, optional `safe` |
+| Runtime Mode | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | permission config | default `unrestricted`; also supports `sandbox` / `approval` / `search` / `addDirs` |
 
 The `StreamEvent` interface is identical across all engines — switching requires zero code changes.
 
-If you run Codex, note that GolemBot defaults to `codex.mode: unrestricted`. Set `codex.mode: safe` if you want to keep Codex sandboxed.
+If you run Codex, note that GolemBot defaults to `codex.mode: unrestricted`. Set `codex.mode: safe` if you want to keep Codex sandboxed. You can also use fine-grained `codex.sandbox`, `codex.approval`, `codex.search`, and `codex.addDirs` settings.
 
 ## Configuration
 
@@ -174,9 +174,14 @@ channels:
     _adapter: ./adapters/email-adapter.js
     token: ${EMAIL_TOKEN}
 
-# Optional: Codex runtime mode (Codex engine only)
+# Optional: Codex runtime controls (Codex engine only)
 codex:
-  mode: unrestricted   # default for Codex; set safe to keep sandboxing
+  mode: unrestricted   # compatibility alias; set safe to keep sandboxing
+  sandbox: workspace-write
+  approval: on-request
+  search: true
+  addDirs:
+    - ../shared-assets
 
 gateway:
   port: 3000

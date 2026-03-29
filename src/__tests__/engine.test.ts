@@ -1559,9 +1559,11 @@ describe('buildCodexExecArgs', () => {
 
     const args = buildCodexExecArgs('fix tests', {
       codex: undefined,
+      imagePaths: undefined,
       model: undefined,
       provider: undefined,
       sessionId: undefined,
+      workspace: '/tmp/ws',
     });
 
     expect(args).toEqual([
@@ -1576,9 +1578,11 @@ describe('buildCodexExecArgs', () => {
   it('uses safe mode when configured', () => {
     const args = buildCodexExecArgs('review src', {
       codex: { mode: 'safe' },
+      imagePaths: undefined,
       model: 'gpt-5.4',
       provider: undefined,
       sessionId: undefined,
+      workspace: '/tmp/ws',
     });
 
     expect(args).toEqual([
@@ -1595,6 +1599,7 @@ describe('buildCodexExecArgs', () => {
   it('builds resume args with provider overrides', () => {
     const args = buildCodexExecArgs('continue', {
       codex: { mode: 'unrestricted' },
+      imagePaths: undefined,
       model: 'gpt-5.4',
       provider: {
         codexProfile: 'm21',
@@ -1602,6 +1607,7 @@ describe('buildCodexExecArgs', () => {
         codexWireApi: 'responses',
       },
       sessionId: 'thread_123',
+      workspace: '/tmp/ws',
     });
 
     expect(args).toEqual([
@@ -1620,6 +1626,87 @@ describe('buildCodexExecArgs', () => {
       'gpt-5.4',
       'thread_123',
       'continue',
+    ]);
+  });
+
+  it('uses explicit sandbox and approval config when provided', () => {
+    const args = buildCodexExecArgs('inspect repo', {
+      codex: {
+        mode: 'unrestricted',
+        sandbox: 'read-only',
+        approval: 'never',
+      },
+      imagePaths: undefined,
+      model: undefined,
+      provider: undefined,
+      sessionId: undefined,
+      workspace: '/tmp/ws',
+    });
+
+    expect(args).toEqual([
+      '--ask-for-approval',
+      'never',
+      'exec',
+      '--json',
+      '--sandbox',
+      'read-only',
+      '--skip-git-repo-check',
+      'inspect repo',
+    ]);
+  });
+
+  it('defaults the missing explicit execution pair to workspace-write/on-request', () => {
+    const args = buildCodexExecArgs('inspect repo', {
+      codex: {
+        sandbox: 'danger-full-access',
+      },
+      imagePaths: undefined,
+      model: undefined,
+      provider: undefined,
+      sessionId: undefined,
+      workspace: '/tmp/ws',
+    });
+
+    expect(args).toEqual([
+      '--ask-for-approval',
+      'on-request',
+      'exec',
+      '--json',
+      '--sandbox',
+      'danger-full-access',
+      '--skip-git-repo-check',
+      'inspect repo',
+    ]);
+  });
+
+  it('passes search, image, and add-dir flags', () => {
+    const args = buildCodexExecArgs('describe image', {
+      codex: {
+        search: true,
+        addDirs: ['../shared', '/var/tmp/assets'],
+      },
+      imagePaths: ['/tmp/ws/.golem/images/a.png', '/tmp/ws/.golem/images/b.png'],
+      model: undefined,
+      provider: undefined,
+      sessionId: undefined,
+      workspace: '/tmp/ws',
+    });
+
+    expect(args).toEqual([
+      '--search',
+      'exec',
+      '--json',
+      '--dangerously-bypass-approvals-and-sandbox',
+      '--skip-git-repo-check',
+      '--add-dir',
+      '/tmp/shared',
+      '--add-dir',
+      '/var/tmp/assets',
+      'describe image',
+      '--image',
+      '/tmp/ws/.golem/images/a.png',
+      '--image',
+      '/tmp/ws/.golem/images/b.png',
     ]);
   });
 });

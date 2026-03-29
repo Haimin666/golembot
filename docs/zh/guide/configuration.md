@@ -25,7 +25,12 @@ skipPermissions: true
 
 # 可选：Codex 运行模式（仅 Codex 引擎）
 codex:
-  mode: unrestricted         # unrestricted（默认）| safe
+  mode: unrestricted         # 可选简写：unrestricted | safe
+  sandbox: workspace-write   # read-only | workspace-write | danger-full-access
+  approval: on-request       # untrusted | on-request | never
+  search: true
+  addDirs:
+    - ../shared-assets
 
 # 可选：细粒度 Agent 权限控制（仅 Cursor 引擎）
 permissions:
@@ -187,11 +192,22 @@ Codex 引擎专属执行设置。
 ```yaml
 codex:
   mode: unrestricted
+  sandbox: workspace-write
+  approval: on-request
+  search: false
+  addDirs:
+    - ../shared-assets
 ```
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `mode` | `string` | `unrestricted` | `unrestricted` 使用 `--dangerously-bypass-approvals-and-sandbox` 启动 Codex。`safe` 使用 `--full-auto`，保留 Codex 沙箱 |
+| `mode` | `string` | `unrestricted` | 兼容简写。`unrestricted` 使用 `--dangerously-bypass-approvals-and-sandbox`。`safe` 使用 `--full-auto` |
+| `sandbox` | `string` | — | 细粒度沙箱控制：`read-only`、`workspace-write` 或 `danger-full-access` |
+| `approval` | `string` | — | 细粒度审批策略：`untrusted`、`on-request` 或 `never`（在 `exec` 前传递） |
+| `search` | `boolean` | `false` | 开启 Codex 实时网页搜索（`--search`，在 `exec` 前传递） |
+| `addDirs` | `string[]` | — | 作为 `--add-dir` 传递的额外可写目录（相对路径会按 workspace 解析） |
+
+如果设置了 `sandbox` 或 `approval`，GolemBot 会显式传递 `--sandbox` / `--ask-for-approval`，不再使用 `mode`。其中 `approval` 和 `search` 会作为 `exec` 前的顶层 Codex CLI 参数传递，`sandbox` 和 `addDirs` 仍然挂在 `exec` 子命令上。如果只设置了其中一个，另一个默认补成 `workspace-write` / `on-request`。
 
 ### `persona`
 
@@ -384,6 +400,10 @@ interface GolemConfig {
   skipPermissions?: boolean;
   codex?: {
     mode?: 'safe' | 'unrestricted';
+    sandbox?: 'read-only' | 'workspace-write' | 'danger-full-access';
+    approval?: 'untrusted' | 'on-request' | 'never';
+    search?: boolean;
+    addDirs?: string[];
   };
   timeout?: number;             // 秒，默认 300
   maxConcurrent?: number;       // 默认 10

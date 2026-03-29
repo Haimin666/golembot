@@ -16,7 +16,8 @@ The Codex engine invokes the OpenAI `codex` CLI (`@openai/codex`), which uses Op
 name: my-bot
 engine: codex
 codex:
-  mode: unrestricted  # default: unrestricted; set safe to keep Codex sandboxed
+  mode: unrestricted  # compatibility alias; see fine-grained settings below
+  search: true
 # model: o4-mini   # optional; omit when using ChatGPT OAuth
 ```
 
@@ -76,22 +77,43 @@ codex models
 const bot = createAssistant({ dir: './my-bot', model: 'o4-mini' })
 ```
 
-## Permission Mode
+## Runtime Controls
 
-GolemBot controls Codex's execution mode with `codex.mode`:
+GolemBot supports both a shorthand `mode` and fine-grained Codex execution settings:
 
 ```yaml
 engine: codex
 codex:
-  mode: unrestricted  # unrestricted (default) | safe
+  mode: unrestricted     # optional shorthand: unrestricted | safe
+  sandbox: workspace-write
+  approval: on-request
+  search: false
+  addDirs:
+    - ../shared-assets
 ```
 
-Available modes:
+Shorthand modes:
 
 | Mode | CLI flags | Behavior |
 |------|-----------|----------|
 | `unrestricted` | `--dangerously-bypass-approvals-and-sandbox` | No sandbox, no approval prompts. Intended for externally sandboxed environments |
 | `safe` | `--full-auto` | Automatic execution inside Codex's `workspace-write` sandbox |
+
+Fine-grained fields:
+
+| Field | CLI flag | Description |
+|------|----------|-------------|
+| `sandbox` | `--sandbox <mode>` | `read-only`, `workspace-write`, or `danger-full-access` |
+| `approval` | `--ask-for-approval <policy>` | `untrusted`, `on-request`, or `never` (passed as a top-level Codex CLI flag before `exec`) |
+| `search` | `--search` | Enables Codex's live web search tool (passed before `exec`) |
+| `addDirs` | `--add-dir <path>` | Adds extra writable directories alongside the workspace |
+
+Precedence:
+
+- If `codex.sandbox` or `codex.approval` is set, GolemBot passes explicit `--sandbox` / `--ask-for-approval` flags and does not use the `mode` alias.
+- When only one of `sandbox` or `approval` is set, the other defaults to `workspace-write` / `on-request`.
+- If neither is set, GolemBot falls back to `mode`, which defaults to `unrestricted`.
+- `approval` and `search` are emitted as top-level Codex CLI flags before `exec`; `sandbox`, `addDirs`, and `image` stay on the `exec` subcommand.
 
 ## How It Works
 
@@ -114,8 +136,16 @@ Flags used:
 | `--json` | NDJSON output, required for stream parsing |
 | `--dangerously-bypass-approvals-and-sandbox` | Default `unrestricted` mode: disables prompts and sandboxing |
 | `--full-auto` | `safe` mode: disables prompts but keeps Codex sandboxed |
+| `--sandbox <mode>` / `--ask-for-approval <policy>` | Fine-grained execution control when `codex.sandbox` / `codex.approval` are configured (`--ask-for-approval` is passed before `exec`) |
+| `--search` | Enables live web search (passed before `exec`) |
+| `--image <path>` | Attaches an input image to the prompt |
+| `--add-dir <path>` | Adds extra writable directories |
 | `--skip-git-repo-check` | Allows running outside a Git repository (temp dirs, CI workspaces) |
 | `--model <name>` | Override model (API key mode only) |
+
+### Images and Search
+
+When users send image attachments through GolemBot, the Codex engine now forwards them with `--image <path>`. If `codex.search: true` is enabled, GolemBot also passes `--search` so Codex can use live web search during the turn.
 
 ### Skill Injection
 

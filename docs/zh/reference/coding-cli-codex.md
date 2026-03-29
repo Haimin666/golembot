@@ -300,7 +300,7 @@ model = "codex-mini-latest"
 
 1. **`--json` 标志位置**: 必须放在 `exec` 子命令之后 — `codex exec --json`，而不是 `codex --json exec`。
 
-2. **`resume` 是子命令，不是标志**: `codex exec resume <id> "prompt"` — 所有标志必须放在 `resume` 之后，不能放在之前。
+2. **`resume` 是子命令，不是标志**: `codex exec resume <id> "prompt"` —— 但不是所有参数都属于 `exec` 子命令。像 `--ask-for-approval`、`--search` 这样的顶层参数必须放在 `exec` 前，而 `--json`、`--sandbox`、`--add-dir`、`--image` 仍然挂在 `exec` 上。
 
 3. **`--skip-git-repo-check` 必须**: 没有此标志，Codex 拒绝在 Git 仓库外运行。GolemBot 使用临时目录，所以此标志是必需的。
 
@@ -322,4 +322,6 @@ model = "codex-mini-latest"
 
 12. **输入大小上限**: 自 v0.106.0 起共享 ~1M 字符输入上限，防止超大输入导致挂起。
 
-13. **快速发布节奏**: Codex CLI 迭代很快；在 CI 中使用前，先用已安装版本的 `codex exec --help` 验证标志语法。
+13. **`--image` 会影响 prompt 顺序**: 带图片输入时，要把 prompt 放在 `exec` 参数列表里的 `--image <path>...` 前面。若把图片参数放在 prompt 前，Codex 可能会误判成要从 stdin 读取 prompt。
+
+14. **快速发布节奏**: Codex CLI 迭代很快；在 CI 中使用前，先用已安装版本的 `codex exec --help` 验证标志语法。

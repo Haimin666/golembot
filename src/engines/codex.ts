@@ -11,20 +11,30 @@ export function resolveCodexMode(opts: Pick<InvokeOpts, 'codex'>): 'safe' | 'unr
 
 export function buildCodexExecArgs(
   prompt: string,
-  opts: Pick<InvokeOpts, 'codex' | 'model' | 'provider' | 'sessionId'>,
+  opts: Pick<InvokeOpts, 'codex' | 'imagePaths' | 'model' | 'provider' | 'sessionId' | 'workspace'>,
 ): string[] {
   const codexProfile = opts.provider?.codexProfile;
   const codexProviderId = opts.provider?.codexProviderId;
+  const codexConfig = opts.codex;
+  const hasExplicitExecutionConfig = !!(codexConfig?.sandbox || codexConfig?.approval);
+  const globalFlags: string[] = [];
 
   // Build args respecting the `exec` / `exec resume` subcommand structure:
   //   new session : codex exec        [flags] [--model X] <prompt>
   //   resume      : codex exec resume [flags] [--model X] <session_id> <prompt>
   // Flags must follow the subcommand they belong to; `resume` has its own flag set.
-  const sharedFlags = [
-    '--json',
-    resolveCodexMode(opts) === 'safe' ? '--full-auto' : '--dangerously-bypass-approvals-and-sandbox',
-    '--skip-git-repo-check',
-  ];
+  const sharedFlags = ['--json'];
+  if (hasExplicitExecutionConfig) {
+    sharedFlags.push('--sandbox', codexConfig?.sandbox ?? 'workspace-write');
+    globalFlags.push('--ask-for-approval', codexConfig?.approval ?? 'on-request');
+  } else {
+    sharedFlags.push(resolveCodexMode(opts) === 'safe' ? '--full-auto' : '--dangerously-bypass-approvals-and-sandbox');
+  }
+  sharedFlags.push('--skip-git-repo-check');
+  if (codexConfig?.search) globalFlags.push('--search');
+  for (const dir of codexConfig?.addDirs ?? []) {
+    sharedFlags.push('--add-dir', resolve(opts.workspace, dir));
+  }
   if (codexProfile) sharedFlags.push('--profile', codexProfile);
   if (codexProviderId) sharedFlags.push('-c', `model_provider="${codexProviderId}"`);
   if (codexProviderId && opts.provider?.codexWireApi === 'responses') {
@@ -32,9 +42,11 @@ export function buildCodexExecArgs(
   }
 
   const modelFlag = opts.model ? ['--model', opts.model] : [];
+  const imageFlags = (opts.imagePaths ?? []).flatMap((path) => ['--image', path]);
+  const trailingArgs = [prompt, ...imageFlags];
   return opts.sessionId
-    ? ['exec', 'resume', ...sharedFlags, ...modelFlag, opts.sessionId, prompt]
-    : ['exec', ...sharedFlags, ...modelFlag, prompt];
+    ? [...globalFlags, 'exec', 'resume', ...sharedFlags, ...modelFlag, opts.sessionId, ...trailingArgs]
+    : [...globalFlags, 'exec', ...sharedFlags, ...modelFlag, ...trailingArgs];
 }
 
 // ── NDJSON event parsing ─────────────────────────────────
