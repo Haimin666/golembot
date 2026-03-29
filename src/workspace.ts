@@ -121,6 +121,12 @@ export interface EscalationConfig {
   enabled?: boolean;
 }
 
+export type CodexMode = 'safe' | 'unrestricted';
+
+export interface CodexConfig {
+  mode?: CodexMode;
+}
+
 export interface ProviderConfig {
   /** API base URL (e.g. "https://api.minimax.chat/v1") */
   baseUrl?: string;
@@ -166,6 +172,7 @@ export interface GolemConfig {
   engine: string;
   model?: string;
   skipPermissions?: boolean;
+  codex?: CodexConfig;
   channels?: ChannelsConfig;
   gateway?: GatewayConfig;
   /** Agent invocation timeout in seconds. Default: 300 (5 minutes). */
@@ -247,6 +254,14 @@ export async function loadConfig(dir: string): Promise<GolemConfig> {
 
   if (typeof doc.skipPermissions === 'boolean') {
     config.skipPermissions = doc.skipPermissions;
+  }
+  if (doc.codex && typeof doc.codex === 'object') {
+    const codexDoc = doc.codex as Record<string, unknown>;
+    const codex: CodexConfig = {};
+    if (codexDoc.mode === 'safe' || codexDoc.mode === 'unrestricted') {
+      codex.mode = codexDoc.mode;
+    }
+    if (Object.keys(codex).length > 0) config.codex = codex;
   }
   if (doc.channels && typeof doc.channels === 'object') {
     config.channels = resolveEnvPlaceholders(doc.channels as ChannelsConfig);
@@ -369,6 +384,7 @@ export async function writeConfig(dir: string, config: GolemConfig): Promise<voi
   };
   if (config.model) content.model = config.model;
   if (typeof config.skipPermissions === 'boolean') content.skipPermissions = config.skipPermissions;
+  if (config.codex && Object.keys(config.codex).length > 0) content.codex = config.codex;
   if (config.channels) content.channels = config.channels;
   if (config.gateway) content.gateway = config.gateway;
   if (typeof config.timeout === 'number') content.timeout = config.timeout;
@@ -390,7 +406,7 @@ export async function writeConfig(dir: string, config: GolemConfig): Promise<voi
 }
 
 // Fields that require a gateway restart when changed
-const RESTART_REQUIRED_KEYS = new Set(['engine', 'model', 'channels', 'gateway', 'mcp']);
+const RESTART_REQUIRED_KEYS = new Set(['engine', 'model', 'codex', 'channels', 'gateway', 'mcp']);
 
 function needsRestart(patch: Record<string, unknown>): boolean {
   for (const key of Object.keys(patch)) {

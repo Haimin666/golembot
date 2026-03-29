@@ -36,7 +36,7 @@ The Configuration Panel displays **all** `golem.yaml` settings organized into 7 
 
 | Section | Fields |
 |---------|--------|
-| **Engine & Runtime** | engine, model, skipPermissions, timeout, maxConcurrent, maxQueuePerSession, sessionTtlDays |
+| **Engine & Runtime** | engine, model, codex.mode, skipPermissions, timeout, maxConcurrent, maxQueuePerSession, sessionTtlDays |
 | **Gateway** | host, port, auth token (masked) |
 | **Provider** | baseUrl, apiKey (masked), model override, failover threshold, recovery cooldown, fallback |
 | **Group Chat** | groupPolicy, historyLimit, maxTurns |
@@ -61,7 +61,7 @@ When you save a change, the dashboard checks whether the field requires a gatewa
 
 | Hot-reloadable (immediate) | Restart required |
 |---|---|
-| timeout, maxConcurrent, sessionTtlDays, groupChat, streaming, persona, permissions, systemPrompt | engine, model, channels, gateway, mcp, provider.baseUrl, provider.apiKey |
+| timeout, maxConcurrent, sessionTtlDays, groupChat, streaming, persona, permissions, systemPrompt | engine, model, codex, channels, gateway, mcp, provider.baseUrl, provider.apiKey |
 
 If a restart is needed, a yellow warning banner appears at the top of the page:
 

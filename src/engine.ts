@@ -1,4 +1,4 @@
-import type { McpServerConfig, ProviderConfig } from './workspace.js';
+import type { CodexConfig, McpServerConfig, ProviderConfig } from './workspace.js';
 
 // ── Core types ───────────────────────────────────────────
 
@@ -17,6 +17,7 @@ export interface InvokeOpts {
   model?: string;
   apiKey?: string;
   skipPermissions?: boolean;
+  codex?: CodexConfig;
   signal?: AbortSignal;
   /** Absolute paths to image files attached to the user message. Engines may use these for native multimodal support. */
   imagePaths?: string[];
@@ -43,7 +44,13 @@ export interface AgentEngine {
 // ── Re-exports from engine implementations ───────────────
 
 export { ClaudeCodeEngine, injectClaudeSkills, parseClaudeStreamLine } from './engines/claude-code.js';
-export { CodexEngine, injectCodexSkills, parseCodexStreamLine } from './engines/codex.js';
+export {
+  buildCodexExecArgs,
+  CodexEngine,
+  injectCodexSkills,
+  parseCodexStreamLine,
+  resolveCodexMode,
+} from './engines/codex.js';
 export { CursorEngine, injectSkills, parseStreamLine } from './engines/cursor.js';
 export {
   ensureOpenCodeConfig,

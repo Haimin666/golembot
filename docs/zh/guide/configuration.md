@@ -23,6 +23,10 @@ model: claude-sonnet         # 可选，首选模型
 # 可选：跳过 Agent 权限确认
 skipPermissions: true
 
+# 可选：Codex 运行模式（仅 Codex 引擎）
+codex:
+  mode: unrestricted         # unrestricted（默认）| safe
+
 # 可选：细粒度 Agent 权限控制（仅 Cursor 引擎）
 permissions:
   allowedPaths:
@@ -127,6 +131,7 @@ gateway:
 |------|------|--------|------|
 | `model` | `string` | — | 首选模型，格式因引擎而异 — 详见各引擎文档 |
 | `skipPermissions` | `boolean` | `true` | 是否跳过 Agent 权限确认 |
+| `codex` | `object` | — | Codex 专属运行配置，详见 [`codex`](#codex) |
 | `timeout` | `number` | `300` | 引擎调用超时（秒）。超时后 CLI 进程被终止并触发 `type: 'error'` 事件 |
 | `maxConcurrent` | `number` | `10` | 全局最大并发 `chat()` 调用数 |
 | `maxQueuePerSession` | `number` | `3` | 每个 sessionKey 最大排队请求数 |
@@ -174,6 +179,19 @@ permissions:
 | `deniedCommands` | `string[]` | Agent 不可执行的 Shell 命令 |
 
 所有字段可选。空数组或未提供不产生影响。修改 permissions 后需重新运行 `golembot init` 以重新生成 `.cursor/cli.json`。
+
+### `codex`
+
+Codex 引擎专属执行设置。
+
+```yaml
+codex:
+  mode: unrestricted
+```
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `mode` | `string` | `unrestricted` | `unrestricted` 使用 `--dangerously-bypass-approvals-and-sandbox` 启动 Codex。`safe` 使用 `--full-auto`，保留 Codex 沙箱 |
 
 ### `persona`
 
@@ -364,6 +382,9 @@ interface GolemConfig {
   engine: string;
   model?: string;
   skipPermissions?: boolean;
+  codex?: {
+    mode?: 'safe' | 'unrestricted';
+  };
   timeout?: number;             // 秒，默认 300
   maxConcurrent?: number;       // 默认 10
   maxQueuePerSession?: number;  // 默认 3

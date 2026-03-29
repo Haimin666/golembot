@@ -310,7 +310,7 @@ model = "codex-mini-latest"
 
 6. **双重凭证的认证冲突**: 同时存在 ChatGPT 会话 + `OPENAI_API_KEY` 可能导致不可预测的认证行为。对于 CI，明确使用 `codex login --with-api-key`。
 
-7. **`codex exec` 默认自动取消审批**: 没有 `--full-auto`，代理在无头模式下自动取消任何权限升级请求 — 需要提升权限的任务会静默失败。GolemBot 集成时始终使用 `--full-auto`。
+7. **`codex exec` 默认自动取消审批**: 没有显式执行模式时，代理在无头模式下会自动取消权限升级请求。GolemBot 现在通过 `codex.mode` 暴露这层语义：默认 `unrestricted` 映射到 `--dangerously-bypass-approvals-and-sandbox`，而 `safe` 映射到 `--full-auto`。
 
 8. **WebSocket 重连噪音（OAuth 模式）**: Codex Cloud（ChatGPT OAuth 使用）总是在 WebSocket 连接失败后重试 4 次再回退到 HTTPS。这会在重试期间输出 `{"type":"error","message":"Reconnecting... X/5 ..."}` 事件。GolemBot 自动抑制这些 — 它们不是真实错误。
 

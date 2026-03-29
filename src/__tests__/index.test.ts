@@ -405,6 +405,24 @@ describe('createAssistant', () => {
 
       expect(capturedSkipPermissions).toBeUndefined();
     });
+
+    it('passes codex config from config to engine', async () => {
+      await writeFile(join(dir, 'golem.yaml'), 'name: test-bot\nengine: codex\ncodex:\n  mode: safe\n');
+
+      let capturedCodexMode: string | undefined;
+      mockedCreateEngine.mockReturnValue({
+        async *invoke(_p: string, opts: InvokeOpts) {
+          capturedCodexMode = opts.codex?.mode;
+          yield { type: 'done', sessionId: 'sess-codex' } as StreamEvent;
+        },
+      });
+
+      const assistant = createAssistant({ dir });
+      for await (const _ of assistant.chat('hello')) {
+      }
+
+      expect(capturedCodexMode).toBe('safe');
+    });
   });
 
   // ── rate limiting ─────────────────────────────────

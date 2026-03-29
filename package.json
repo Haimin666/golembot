@@ -25,6 +25,7 @@
     "e2e:claude-code": "tsx examples/e2e-claude-code.ts",
     "e2e:opencode": "tsx examples/e2e-opencode.ts",
     "e2e:codex": "tsx examples/e2e-codex.ts",
+    "e2e:codex:launch": "tsx examples/e2e-codex-launch.ts",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",

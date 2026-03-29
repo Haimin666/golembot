@@ -142,7 +142,7 @@ Health check endpoint (no authentication required).
 
 When running in gateway mode (`golembot gateway`), the root path serves an HTML Dashboard with:
 - Bot status, engine, model, and uptime
-- **Configuration Panel** — all `golem.yaml` settings at a glance (engine, model, timeout, gateway, provider, group chat, streaming, permissions, MCP servers, system prompt, inbox, escalation)
+- **Configuration Panel** — all `golem.yaml` settings at a glance (engine, model, codex.mode, timeout, gateway, provider, group chat, streaming, permissions, MCP servers, system prompt, inbox, escalation)
 - **Fleet Peers** — multi-bot visibility when running multiple GolemBot instances
 - Channel connection status (connected / failed / not configured)
 - Real-time message statistics and cost tracking
@@ -223,6 +223,7 @@ Update `golem.yaml` settings remotely. Requires authentication.
 ```json
 {
   "timeout": 180,
+  "codex": { "mode": "safe" },
   "groupChat": { "groupPolicy": "smart" }
 }
 ```
@@ -240,7 +241,7 @@ The `needsRestart` flag indicates whether the change takes effect immediately or
 
 | Hot-reloadable (immediate) | Restart required |
 |---|---|
-| `timeout`, `maxConcurrent`, `sessionTtlDays`, `groupChat`, `streaming`, `persona`, `permissions`, `systemPrompt` | `engine`, `model`, `channels`, `gateway`, `mcp`, `provider.baseUrl`, `provider.apiKey`, `provider.fallback` |
+| `timeout`, `maxConcurrent`, `sessionTtlDays`, `groupChat`, `streaming`, `persona`, `permissions`, `systemPrompt` | `engine`, `model`, `codex`, `channels`, `gateway`, `mcp`, `provider.baseUrl`, `provider.apiKey`, `provider.fallback` |
 
 **Example:**
 

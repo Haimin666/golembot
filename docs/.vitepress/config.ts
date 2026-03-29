@@ -63,6 +63,13 @@ const sidebarEn = [
     ],
   },
   {
+    text: 'Testing',
+    items: [
+      { text: 'IM Playbook', link: '/testing/im-playbook' },
+      { text: 'Issues Log', link: '/testing/issues' },
+    ],
+  },
+  {
     text: 'More',
     items: [
       { text: 'FAQ', link: '/faq' },
@@ -143,6 +150,13 @@ const sidebarZh = [
       { text: 'StreamEvent', link: '/zh/api/stream-events' },
       { text: 'HTTP API', link: '/zh/api/http-api' },
       { text: 'Channel Adapter', link: '/zh/api/channel-adapter' },
+    ],
+  },
+  {
+    text: '测试',
+    items: [
+      { text: 'IM 测试手册', link: '/zh/testing/im-playbook' },
+      { text: '问题记录', link: '/zh/testing/issues' },
     ],
   },
   {

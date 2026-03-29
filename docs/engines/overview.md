@@ -11,7 +11,7 @@ GolemBot supports four Coding Agent engines. All four expose the same `StreamEve
 | Skill injection | `.cursor/skills/` | `.claude/skills/` + `CLAUDE.md` | `.opencode/skills/` + `opencode.json` | `AGENTS.md` |
 | Session resume | `--resume <id>` | `--resume <id>` | `--session <id>` | `resume <thread_id>` |
 | API key env | `CURSOR_API_KEY` | `ANTHROPIC_API_KEY` | Depends on provider | `CODEX_API_KEY` |
-| Permission bypass | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | `opencode.json` permission config | `--full-auto` |
+| Permission bypass | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | `opencode.json` permission config | default `unrestricted`; `safe` uses `--full-auto` |
 | Cost tracking | — | `costUsd`, `numTurns` | `costUsd` (accumulated) | — |
 
 ## Unified StreamEvent
@@ -68,7 +68,7 @@ Start with **Claude Code** — it has the best overall experience, provides cost
 - **Cursor** — best if you already use Cursor IDE and have a Cursor subscription
 - **Claude Code** — first-party Anthropic CLI, provides cost and turn tracking
 - **OpenCode** — open-source, supports multiple LLM providers (Anthropic, OpenAI, OpenRouter, etc.)
-- **Codex** — OpenAI's CLI agent (`@openai/codex`), uses `CODEX_API_KEY`
+- **Codex** — OpenAI's CLI agent (`@openai/codex`), uses `CODEX_API_KEY`, defaults to `codex.mode: unrestricted`
 
 ## What's Next
 

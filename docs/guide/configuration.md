@@ -23,6 +23,10 @@ model: claude-sonnet         # optional, preferred model
 # Optional: bypass agent permission prompts
 skipPermissions: true
 
+# Optional: Codex runtime mode (Codex engine only)
+codex:
+  mode: unrestricted         # unrestricted (default) | safe
+
 # Optional: granular agent permissions (Cursor engine only)
 permissions:
   allowedPaths:
@@ -126,6 +130,7 @@ gateway:
 |-------|------|---------|-------------|
 | `model` | `string` | — | Preferred model. Format varies by engine — see each engine's docs for valid values |
 | `skipPermissions` | `boolean` | `true` | Whether to bypass agent permission prompts |
+| `codex` | `object` | — | Codex-specific runtime options — see [`codex`](#codex) section |
 | `timeout` | `number` | `300` | Engine invocation timeout in seconds. The underlying CLI process is killed and a `type: 'error'` event is emitted |
 | `maxConcurrent` | `number` | `10` | Maximum number of parallel `chat()` calls across all sessions |
 | `maxQueuePerSession` | `number` | `3` | Maximum number of requests that can be queued per session key |
@@ -173,6 +178,19 @@ permissions:
 | `deniedCommands` | `string[]` | Shell commands the agent must not run |
 
 All fields are optional. Empty or omitted arrays have no effect. Run `golembot init` after changing permissions to regenerate `.cursor/cli.json`.
+
+### `codex`
+
+Codex-specific execution settings.
+
+```yaml
+codex:
+  mode: unrestricted
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `mode` | `string` | `unrestricted` | `unrestricted` runs Codex with `--dangerously-bypass-approvals-and-sandbox`. `safe` uses `--full-auto` and keeps Codex sandboxed |
 
 ### `persona`
 
@@ -393,6 +411,9 @@ interface GolemConfig {
   engine: string;
   model?: string;
   skipPermissions?: boolean;
+  codex?: {
+    mode?: 'safe' | 'unrestricted';
+  };
   timeout?: number;             // seconds, default 300
   maxConcurrent?: number;       // default 10
   maxQueuePerSession?: number;  // default 3

@@ -64,6 +64,12 @@ describe('workspace', () => {
       const cfg = await loadConfig(dir);
       expect(cfg.skipPermissions).toBeUndefined();
     });
+
+    it('reads codex mode field', async () => {
+      await writeFile(join(dir, 'golem.yaml'), 'name: bot\nengine: codex\ncodex:\n  mode: safe\n');
+      const cfg = await loadConfig(dir);
+      expect(cfg.codex).toEqual({ mode: 'safe' });
+    });
   });
 
   // ── writeConfig ───────────────────────────────────
@@ -91,6 +97,12 @@ describe('workspace', () => {
       await writeConfig(dir, { name: 'test', engine: 'cursor' });
       const raw = await readFile(join(dir, 'golem.yaml'), 'utf-8');
       expect(raw).not.toContain('skipPermissions');
+    });
+
+    it('round-trips codex config', async () => {
+      await writeConfig(dir, { name: 'test', engine: 'codex', codex: { mode: 'unrestricted' } });
+      const cfg = await loadConfig(dir);
+      expect(cfg.codex).toEqual({ mode: 'unrestricted' });
     });
   });
 

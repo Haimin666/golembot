@@ -20,8 +20,8 @@ Cursor vs Claude Code vs OpenCode vs Codex — GolemBot 支持的所有引擎的
 | 非交互式命令 | `agent -p "prompt"` | `claude -p "prompt"` | `opencode run "prompt"` | `codex exec "prompt"` |
 | JSON 输出标志 | `--output-format stream-json` | `--output-format stream-json` | `--format json` | `--json` (跟在 `exec` 后) |
 | 模型选择 | `--model <alias>` | `--model <alias>` | `--model provider/model` | `--model <id>` |
-| 权限绕过 | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | 权限配置 `"*": "allow"` | `--full-auto` 或 `--yolo` |
-| 核心无头参数 | `--approve-mcps` | `--dangerously-skip-permissions` | 权限配置 `"*": "allow"` | `--full-auto` |
+| 权限绕过 | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | 权限配置 `"*": "allow"` | `--dangerously-bypass-approvals-and-sandbox`（GolemBot 默认）或 `--full-auto` |
+| 核心无头参数 | `--approve-mcps` | `--dangerously-skip-permissions` | 权限配置 `"*": "allow"` | `--dangerously-bypass-approvals-and-sandbox` 或 `--full-auto` |
 | 详细输出 | 默认 | `--verbose` (必须) | 默认 | 自动输出到 stderr |
 
 ## 会话管理

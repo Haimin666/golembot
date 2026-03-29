@@ -136,9 +136,12 @@ Slack / Telegram / Discord / Feishu / DingTalk / WeCom / WeChat / HTTP API
 |---|---|---|---|---|
 | Skill Injection | `.cursor/skills/` | `.claude/skills/` + CLAUDE.md | `.opencode/skills/` + opencode.json | `AGENTS.md` at workspace root |
 | Session Resume | `--resume` | `--resume` | `--session` | `exec resume <thread_id>` |
-| API Key | CURSOR_API_KEY | ANTHROPIC_API_KEY | Depends on Provider | OPENAI_API_KEY or ChatGPT OAuth |
+| API Key | CURSOR_API_KEY | ANTHROPIC_API_KEY | Depends on Provider | `CODEX_API_KEY` (preferred) / ChatGPT OAuth |
+| Runtime Mode | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | permission config | default `unrestricted`, optional `safe` |
 
 The `StreamEvent` interface is identical across all engines — switching requires zero code changes.
+
+If you run Codex, note that GolemBot defaults to `codex.mode: unrestricted`. Set `codex.mode: safe` if you want to keep Codex sandboxed.
 
 ## Configuration
 
@@ -170,6 +173,10 @@ channels:
   my-email:
     _adapter: ./adapters/email-adapter.js
     token: ${EMAIL_TOKEN}
+
+# Optional: Codex runtime mode (Codex engine only)
+codex:
+  mode: unrestricted   # default for Codex; set safe to keep sandboxing
 
 gateway:
   port: 3000
@@ -229,6 +236,7 @@ pnpm run build
 pnpm run test          # Unit tests (1252+)
 pnpm run e2e:opencode  # End-to-end tests (OpenCode)
 pnpm run e2e:codex     # End-to-end tests (Codex)
+pnpm run e2e:codex:launch  # Real Codex launch verification (flags, resume, HTTP path)
 ```
 
 ## Contributing

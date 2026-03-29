@@ -230,6 +230,11 @@ describe('patchConfigFull', () => {
     expect(result.needsRestart).toBe(true);
   });
 
+  it('returns needsRestart=true for codex config change', async () => {
+    const result = await patchConfigFull(tmpDir, { codex: { mode: 'safe' } });
+    expect(result.needsRestart).toBe(true);
+  });
+
   it('returns needsRestart=false for hot-reloadable fields', async () => {
     const result = await patchConfigFull(tmpDir, { timeout: 600, sessionTtlDays: 7 });
     expect(result.needsRestart).toBe(false);

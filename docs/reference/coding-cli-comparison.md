@@ -20,8 +20,8 @@ Cursor vs Claude Code vs OpenCode vs Codex — side-by-side reference for all Go
 | Non-interactive command | `agent -p "prompt"` | `claude -p "prompt"` | `opencode run "prompt"` | `codex exec "prompt"` |
 | JSON output flag | `--output-format stream-json` | `--output-format stream-json` | `--format json` | `--json` (flag after `exec`) |
 | Model selection | `--model <alias>` | `--model <alias>` | `--model provider/model` | `--model <id>` |
-| Permission bypass | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | Permission config `"*": "allow"` | `--full-auto` or `--yolo` |
-| Core headless params | `--approve-mcps` | `--dangerously-skip-permissions` | Permission config `"*": "allow"` | `--full-auto` |
+| Permission bypass | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | Permission config `"*": "allow"` | `--dangerously-bypass-approvals-and-sandbox` (default in GolemBot) or `--full-auto` |
+| Core headless params | `--approve-mcps` | `--dangerously-skip-permissions` | Permission config `"*": "allow"` | `--dangerously-bypass-approvals-and-sandbox` or `--full-auto` |
 | Verbose output | Default | `--verbose` (required) | Default | Goes to stderr automatically |
 
 ## Session Management

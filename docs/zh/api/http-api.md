@@ -111,7 +111,7 @@ data: {"type":"error","message":"Agent invocation timed out"}
 
 在 gateway 模式（`golembot gateway`）下，根路径提供 HTML Dashboard，包含：
 - Bot 状态、引擎、模型和运行时间
-- **配置面板** — 一览所有 `golem.yaml` 设置（引擎、模型、超时、网关、供应商、群聊、流式、权限、MCP 服务器、系统提示词、消息队列、升级）
+- **配置面板** — 一览所有 `golem.yaml` 设置（引擎、模型、`codex.mode`、超时、网关、供应商、群聊、流式、权限、MCP 服务器、系统提示词、消息队列、升级）
 - **Fleet 节点** — 多 Bot 部署时的实例互相感知
 - 通道连接状态（已连接 / 失败 / 未配置）
 - 实时消息统计和费用追踪
@@ -181,6 +181,7 @@ data: {"type":"error","message":"Agent invocation timed out"}
 ```json
 {
   "timeout": 180,
+  "codex": { "mode": "safe" },
   "groupChat": { "groupPolicy": "smart" }
 }
 ```
@@ -198,7 +199,7 @@ data: {"type":"error","message":"Agent invocation timed out"}
 
 | 热更新（立即生效） | 需要重启 |
 |---|---|
-| `timeout`、`maxConcurrent`、`sessionTtlDays`、`groupChat`、`streaming`、`persona`、`permissions`、`systemPrompt` | `engine`、`model`、`channels`、`gateway`、`mcp`、`provider.baseUrl`、`provider.apiKey`、`provider.fallback` |
+| `timeout`、`maxConcurrent`、`sessionTtlDays`、`groupChat`、`streaming`、`persona`、`permissions`、`systemPrompt` | `engine`、`model`、`codex`、`channels`、`gateway`、`mcp`、`provider.baseUrl`、`provider.apiKey`、`provider.fallback` |
 
 **示例：**
 

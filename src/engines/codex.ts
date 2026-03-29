@@ -5,10 +5,42 @@ import type { AgentEngine, InvokeOpts, ListModelsOpts, StreamEvent } from '../en
 import { codexProviderEnv } from './provider-env.js';
 import { isOnPath, stripAnsi } from './shared.js';
 
+export function resolveCodexMode(opts: Pick<InvokeOpts, 'codex'>): 'safe' | 'unrestricted' {
+  return opts.codex?.mode ?? 'unrestricted';
+}
+
+export function buildCodexExecArgs(
+  prompt: string,
+  opts: Pick<InvokeOpts, 'codex' | 'model' | 'provider' | 'sessionId'>,
+): string[] {
+  const codexProfile = opts.provider?.codexProfile;
+  const codexProviderId = opts.provider?.codexProviderId;
+
+  // Build args respecting the `exec` / `exec resume` subcommand structure:
+  //   new session : codex exec        [flags] [--model X] <prompt>
+  //   resume      : codex exec resume [flags] [--model X] <session_id> <prompt>
+  // Flags must follow the subcommand they belong to; `resume` has its own flag set.
+  const sharedFlags = [
+    '--json',
+    resolveCodexMode(opts) === 'safe' ? '--full-auto' : '--dangerously-bypass-approvals-and-sandbox',
+    '--skip-git-repo-check',
+  ];
+  if (codexProfile) sharedFlags.push('--profile', codexProfile);
+  if (codexProviderId) sharedFlags.push('-c', `model_provider="${codexProviderId}"`);
+  if (codexProviderId && opts.provider?.codexWireApi === 'responses') {
+    sharedFlags.push('-c', `model_providers.${codexProviderId}.wire_api="responses"`);
+  }
+
+  const modelFlag = opts.model ? ['--model', opts.model] : [];
+  return opts.sessionId
+    ? ['exec', 'resume', ...sharedFlags, ...modelFlag, opts.sessionId, prompt]
+    : ['exec', ...sharedFlags, ...modelFlag, prompt];
+}
+
 // ── NDJSON event parsing ─────────────────────────────────
 
 /**
- * Parse a single NDJSON line from `codex exec --json --full-auto`.
+ * Parse a single NDJSON line from `codex exec --json`.
  *
  * Event format:
  *   - { type: "thread.started", thread_id: "thread_abc123" }
@@ -149,19 +181,8 @@ export class CodexEngine implements AgentEngine {
 
     const bin = findCodexBin();
     const codexProfile = opts.provider?.codexProfile;
-    const codexProviderId = opts.provider?.codexProviderId;
     const codexEnvKey = opts.provider?.codexEnvKey;
 
-    // Build args respecting the `exec` / `exec resume` subcommand structure:
-    //   new session : codex exec        [flags] [--model X] <prompt>
-    //   resume      : codex exec resume [flags] [--model X] <session_id> <prompt>
-    // Flags must follow the subcommand they belong to; `resume` has its own flag set.
-    const sharedFlags = ['--json', '--full-auto', '--skip-git-repo-check'];
-    if (codexProfile) sharedFlags.push('--profile', codexProfile);
-    if (codexProviderId) sharedFlags.push('-c', `model_provider="${codexProviderId}"`);
-    if (codexProviderId && opts.provider?.codexWireApi === 'responses') {
-      sharedFlags.push('-c', `model_providers.${codexProviderId}.wire_api="responses"`);
-    }
     // Codex does not natively support MCP; inject available servers as a prompt hint
     let finalPrompt = prompt;
     if (opts.mcpConfig && Object.keys(opts.mcpConfig).length > 0) {
@@ -174,10 +195,7 @@ export class CodexEngine implements AgentEngine {
       finalPrompt = `[Available MCP servers — these are configured but not directly accessible in this engine:\n${serverList}]\n\n${prompt}`;
     }
 
-    const modelFlag = opts.model ? ['--model', opts.model] : [];
-    const args = opts.sessionId
-      ? ['exec', 'resume', ...sharedFlags, ...modelFlag, opts.sessionId, finalPrompt]
-      : ['exec', ...sharedFlags, ...modelFlag, finalPrompt];
+    const args = buildCodexExecArgs(finalPrompt, opts);
 
     const env: Record<string, string> = { ...(process.env as Record<string, string>) };
     // If a Codex profile is provided, let Codex load provider/base_url/model

@@ -136,9 +136,12 @@ Slack / Telegram / Discord / 飞书 / 钉钉 / 企业微信 / 微信 / HTTP API
 |---|---|---|---|---|
 | Skill 注入 | `.cursor/skills/` | `.claude/skills/` + CLAUDE.md | `.opencode/skills/` + opencode.json | workspace 根目录的 `AGENTS.md` |
 | 会话恢复 | `--resume` | `--resume` | `--session` | `exec resume <thread_id>` |
-| API Key | CURSOR_API_KEY | ANTHROPIC_API_KEY | 取决于 Provider | OPENAI_API_KEY 或 ChatGPT OAuth |
+| API Key | CURSOR_API_KEY | ANTHROPIC_API_KEY | 取决于 Provider | `CODEX_API_KEY`（推荐）/ ChatGPT OAuth |
+| 运行模式 | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | permission config | 默认 `unrestricted`，可选 `safe` |
 
 所有引擎暴露的 `StreamEvent` 接口完全一致 —— 切换引擎无需改任何代码。
+
+如果你使用 Codex，要注意 GolemBot 默认采用 `codex.mode: unrestricted`。如果你希望保留 Codex 沙箱，请显式设置 `codex.mode: safe`。
 
 ## 配置
 
@@ -170,6 +173,10 @@ channels:
   my-email:
     _adapter: ./adapters/email-adapter.js
     token: ${EMAIL_TOKEN}
+
+# 可选：Codex 运行模式（仅 Codex 引擎）
+codex:
+  mode: unrestricted   # Codex 默认值；设为 safe 可保留沙箱
 
 gateway:
   port: 3000
@@ -229,6 +236,7 @@ pnpm run build
 pnpm run test          # 单元测试 (1252+)
 pnpm run e2e:opencode  # 端到端测试（OpenCode）
 pnpm run e2e:codex     # 端到端测试（Codex）
+pnpm run e2e:codex:launch  # 真实 Codex 启动校验（flags、resume、HTTP 路径）
 ```
 
 ## 参与贡献

@@ -498,7 +498,7 @@ class OpenCodeEngine implements AgentEngine {
 | 技能注入 | `.cursor/skills/` 软链接 | `.claude/skills/` + CLAUDE.md | `.opencode/skills/` + opencode.json | N/A（prompt 注入） |
 | 会话恢复 | `--resume <uuid>` | `--resume <uuid>` | `--session <ses_xxx>` | `exec resume <thread_id>` |
 | API Key | CURSOR_API_KEY | ANTHROPIC_API_KEY | 取决于提供商 | CODEX_API_KEY |
-| 权限绕过 | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | opencode.json permission | `--full-auto` |
+| 权限绕过 | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | opencode.json permission | 默认 `unrestricted`；`safe` 时使用 `--full-auto` |
 
 但对外暴露的 `StreamEvent` 完全一致。
 

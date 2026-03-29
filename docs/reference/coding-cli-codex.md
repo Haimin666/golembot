@@ -310,7 +310,7 @@ model = "codex-mini-latest"
 
 6. **Auth conflict with dual credentials**: Both ChatGPT session + `OPENAI_API_KEY` can cause unpredictable auth behavior. For CI, use `codex login --with-api-key` explicitly.
 
-7. **`codex exec` default auto-cancels approvals**: Without `--full-auto`, the agent auto-cancels any permission escalation requests in headless mode — tasks requiring elevated permissions silently fail. Always use `--full-auto` for GolemBot integration.
+7. **`codex exec` default auto-cancels approvals**: Without an explicit execution mode, the agent auto-cancels permission escalation requests in headless mode. GolemBot now exposes this as `codex.mode`: default `unrestricted` maps to `--dangerously-bypass-approvals-and-sandbox`, while `safe` maps to `--full-auto`.
 
 8. **WebSocket reconnection noise (OAuth mode)**: Codex Cloud (used with ChatGPT OAuth) always retries the WebSocket connection 4 times before falling back to HTTPS. This emits `{"type":"error","message":"Reconnecting... X/5 ..."}` events during retries. GolemBot suppresses these automatically — they are not real errors.
 

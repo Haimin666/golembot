@@ -36,7 +36,7 @@ golembot gateway -p 3010  # 自定义端口: http://localhost:3010
 
 | 分组 | 字段 |
 |------|------|
-| **引擎与运行时** | engine, model, skipPermissions, timeout, maxConcurrent, maxQueuePerSession, sessionTtlDays |
+| **引擎与运行时** | engine, model, codex.mode, skipPermissions, timeout, maxConcurrent, maxQueuePerSession, sessionTtlDays |
 | **网关** | host, port, auth token（脱敏显示） |
 | **Provider** | baseUrl, apiKey（脱敏显示）, model override, failover threshold, recovery cooldown, fallback |
 | **群聊** | groupPolicy, historyLimit, maxTurns |
@@ -61,7 +61,7 @@ golembot gateway -p 3010  # 自定义端口: http://localhost:3010
 
 | 热加载（立即生效） | 需要重启 |
 |---|---|
-| timeout, maxConcurrent, sessionTtlDays, groupChat, streaming, persona, permissions, systemPrompt | engine, model, channels, gateway, mcp, provider.baseUrl, provider.apiKey |
+| timeout, maxConcurrent, sessionTtlDays, groupChat, streaming, persona, permissions, systemPrompt | engine, model, codex, channels, gateway, mcp, provider.baseUrl, provider.apiKey |
 
 如需重启，页面顶部会显示黄色警告条：
 

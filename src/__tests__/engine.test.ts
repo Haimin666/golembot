@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { StreamEvent } from '../engine.js';
 import {
+  buildCodexExecArgs,
   ClaudeCodeEngine,
   CodexEngine,
   CursorEngine,
@@ -18,6 +19,7 @@ import {
   parseCodexStreamLine,
   parseOpenCodeStreamLine,
   parseStreamLine,
+  resolveCodexMode,
   resolveOpenCodeEnv,
   stripAnsi,
 } from '../engine.js';
@@ -1544,6 +1546,81 @@ describe('parseCodexStreamLine', () => {
     expect(allEvents[1]).toEqual({ type: 'tool_call', name: 'ls -la', args: '' });
     expect(allEvents[2].type).toBe('tool_result');
     expect(allEvents[3]).toEqual({ type: 'done', sessionId: 'thread_abc123' });
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// Codex arg building
+// ═══════════════════════════════════════════════════════
+
+describe('buildCodexExecArgs', () => {
+  it('defaults to unrestricted mode', () => {
+    expect(resolveCodexMode({ codex: undefined })).toBe('unrestricted');
+
+    const args = buildCodexExecArgs('fix tests', {
+      codex: undefined,
+      model: undefined,
+      provider: undefined,
+      sessionId: undefined,
+    });
+
+    expect(args).toEqual([
+      'exec',
+      '--json',
+      '--dangerously-bypass-approvals-and-sandbox',
+      '--skip-git-repo-check',
+      'fix tests',
+    ]);
+  });
+
+  it('uses safe mode when configured', () => {
+    const args = buildCodexExecArgs('review src', {
+      codex: { mode: 'safe' },
+      model: 'gpt-5.4',
+      provider: undefined,
+      sessionId: undefined,
+    });
+
+    expect(args).toEqual([
+      'exec',
+      '--json',
+      '--full-auto',
+      '--skip-git-repo-check',
+      '--model',
+      'gpt-5.4',
+      'review src',
+    ]);
+  });
+
+  it('builds resume args with provider overrides', () => {
+    const args = buildCodexExecArgs('continue', {
+      codex: { mode: 'unrestricted' },
+      model: 'gpt-5.4',
+      provider: {
+        codexProfile: 'm21',
+        codexProviderId: 'minimax',
+        codexWireApi: 'responses',
+      },
+      sessionId: 'thread_123',
+    });
+
+    expect(args).toEqual([
+      'exec',
+      'resume',
+      '--json',
+      '--dangerously-bypass-approvals-and-sandbox',
+      '--skip-git-repo-check',
+      '--profile',
+      'm21',
+      '-c',
+      'model_provider="minimax"',
+      '-c',
+      'model_providers.minimax.wire_api="responses"',
+      '--model',
+      'gpt-5.4',
+      'thread_123',
+      'continue',
+    ]);
   });
 });
 

@@ -498,7 +498,7 @@ Key differences between the four engines:
 | Skill injection | `.cursor/skills/` symlink | `.claude/skills/` + CLAUDE.md | `.opencode/skills/` + opencode.json | N/A (prompt-injected) |
 | Session resume | `--resume <uuid>` | `--resume <uuid>` | `--session <ses_xxx>` | `exec resume <thread_id>` |
 | API Key | CURSOR_API_KEY | ANTHROPIC_API_KEY | Depends on Provider | CODEX_API_KEY |
-| Permission bypass | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | opencode.json permission | `--full-auto` |
+| Permission bypass | `--force --trust --sandbox disabled` | `--dangerously-skip-permissions` | opencode.json permission | default `unrestricted`; `safe` uses `--full-auto` |
 
 But the externally exposed `StreamEvent` is completely consistent.
 

@@ -15,6 +15,8 @@ The Codex engine invokes the OpenAI `codex` CLI (`@openai/codex`), which uses Op
 # golem.yaml
 name: my-bot
 engine: codex
+codex:
+  mode: unrestricted  # default: unrestricted; set safe to keep Codex sandboxed
 # model: o4-mini   # optional; omit when using ChatGPT OAuth
 ```
 
@@ -74,6 +76,23 @@ codex models
 const bot = createAssistant({ dir: './my-bot', model: 'o4-mini' })
 ```
 
+## Permission Mode
+
+GolemBot controls Codex's execution mode with `codex.mode`:
+
+```yaml
+engine: codex
+codex:
+  mode: unrestricted  # unrestricted (default) | safe
+```
+
+Available modes:
+
+| Mode | CLI flags | Behavior |
+|------|-----------|----------|
+| `unrestricted` | `--dangerously-bypass-approvals-and-sandbox` | No sandbox, no approval prompts. Intended for externally sandboxed environments |
+| `safe` | `--full-auto` | Automatic execution inside Codex's `workspace-write` sandbox |
+
 ## How It Works
 
 ### CLI Invocation
@@ -82,10 +101,10 @@ GolemBot calls the Codex CLI in headless mode:
 
 ```bash
 # New session
-codex exec --json --full-auto --skip-git-repo-check "<prompt>"
+codex exec --json --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check "<prompt>"
 
 # Resume session
-codex exec resume --json --full-auto --skip-git-repo-check <thread_id> "<prompt>"
+codex exec resume --json --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check <thread_id> "<prompt>"
 ```
 
 Flags used:
@@ -93,7 +112,8 @@ Flags used:
 | Flag | Purpose |
 |------|---------|
 | `--json` | NDJSON output, required for stream parsing |
-| `--full-auto` | Disables interactive permission prompts — required for headless operation |
+| `--dangerously-bypass-approvals-and-sandbox` | Default `unrestricted` mode: disables prompts and sandboxing |
+| `--full-auto` | `safe` mode: disables prompts but keeps Codex sandboxed |
 | `--skip-git-repo-check` | Allows running outside a Git repository (temp dirs, CI workspaces) |
 | `--model <name>` | Override model (API key mode only) |
 
@@ -134,7 +154,7 @@ Codex emits NDJSON (`--json`). The parser handles:
 The `thread_id` from `thread.started` is saved as `sessionId`. On the next turn GolemBot calls:
 
 ```bash
-codex exec resume --json --full-auto --skip-git-repo-check <thread_id> "<prompt>"
+codex exec resume --json --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check <thread_id> "<prompt>"
 ```
 
 The `resume` subcommand inherits all flags and continues the existing session context.
