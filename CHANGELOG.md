@@ -1,3 +1,10 @@
+# [0.42.0](https://github.com/0xranx/golembot/compare/v0.41.0...v0.42.0) (2026-03-29)
+
+
+### Features
+
+* add codex runtime modes and launch e2e ([32094cd](https://github.com/0xranx/golembot/commit/32094cdbc1c594459ecc92ba818a2f3a89c237a9))
+
 # [0.41.0](https://github.com/0xranx/golembot/compare/v0.40.2...v0.41.0) (2026-03-27)
 
 
