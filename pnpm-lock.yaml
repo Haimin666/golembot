@@ -19,7 +19,7 @@ importers:
         version: 13.1.0
       dingtalk-stream:
         specifier: ^2.0.0
-        version: 2.1.4
+        version: 2.1.6-beta.1
       inquirer:
         specifier: ^12.0.0
         version: 12.11.1(@types/node@22.19.13)
@@ -1745,8 +1745,8 @@ packages:
   devlop@1.1.0:
     resolution: {integrity: sha512-RWmIqhcFf1lRYBvNmr7qTNuyCt/7/ns2jbpp1+PalgE/rDQcBT0fioSMUpJ93irlUhC5hrg4cYqe6U+0ImW0rA==}
 
-  dingtalk-stream@2.1.4:
-    resolution: {integrity: sha512-rgQbXLGWfASuB9onFcqXTnRSj4ZotimhBOnzrB4kS19AaU9lshXiuofs1GAYcKh5uzPWCAuEs3tMtiadTQWP4A==}
+  dingtalk-stream@2.1.6-beta.1:
+    resolution: {integrity: sha512-uYcBnf0Z4rfHHyN1ae4YnAFA6hUW2DmGVb0OZ53r/A272kuHnZynylE5pEJIJHkNIer6R9PCqpnsfsk9IuvglQ==}
 
   dir-glob@3.0.1:
     resolution: {integrity: sha512-WkrWp9GR4KXfKGYzOLmTuGVi1UWFfws377n9cc55/tb6DuqyF6pcQ5AbiHEshaDpY9v6oaSr2XCDidGmMwdzIA==}
@@ -4395,7 +4395,7 @@ snapshots:
       '@slack/types': 2.20.0
       '@slack/web-api': 7.14.1
       '@types/express': 5.0.6
-      axios: 1.13.6
+      axios: 1.13.6(debug@4.4.3)
       express: 5.2.1
       path-to-regexp: 8.3.0
       raw-body: 3.0.2
@@ -4441,7 +4441,7 @@ snapshots:
       '@slack/types': 2.20.0
       '@types/node': 22.19.13
       '@types/retry': 0.12.0
-      axios: 1.13.6
+      axios: 1.13.6(debug@4.4.3)
       eventemitter3: 5.0.4
       form-data: 4.0.5
       is-electron: 2.2.2
@@ -4679,7 +4679,7 @@ snapshots:
       '@vueuse/shared': 12.8.2(typescript@5.9.3)
       vue: 3.5.29(typescript@5.9.3)
     optionalDependencies:
-      axios: 1.13.6
+      axios: 1.13.6(debug@4.4.3)
       focus-trap: 7.8.0
     transitivePeerDependencies:
       - typescript
@@ -4769,14 +4769,6 @@ snapshots:
   assertion-error@2.0.1: {}
 
   asynckit@0.4.0: {}
-
-  axios@1.13.6:
-    dependencies:
-      follow-redirects: 1.15.11
-      form-data: 4.0.5
-      proxy-from-env: 1.1.0
-    transitivePeerDependencies:
-      - debug
 
   axios@1.13.6(debug@4.4.3):
     dependencies:
@@ -5003,7 +4995,7 @@ snapshots:
     dependencies:
       dequal: 2.0.3
 
-  dingtalk-stream@2.1.4:
+  dingtalk-stream@2.1.6-beta.1:
     dependencies:
       axios: 1.13.6(debug@4.4.3)
       debug: 4.4.3
@@ -5273,8 +5265,6 @@ snapshots:
   focus-trap@7.8.0:
     dependencies:
       tabbable: 6.4.0
-
-  follow-redirects@1.15.11: {}
 
   follow-redirects@1.15.11(debug@4.4.3):
     optionalDependencies:

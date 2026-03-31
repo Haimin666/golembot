@@ -1,0 +1,170 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1774942667550,
+  "projectRoot": "/Users/lbc/Public/www/golembot",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "vitest",
+        "version": "4.0.18",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "pnpm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "pnpm build",
+    "testCommand": "pnpm test",
+    "lintCommand": "pnpm lint",
+    "devCommand": "pnpm dev",
+    "scripts": {
+      "build": "tsc",
+      "dev": "tsx src/cli.ts",
+      "test": "vitest run",
+      "test:watch": "vitest",
+      "dev:gateway": "pnpm build && node dist/cli.js gateway --verbose",
+      "e2e": "tsx examples/e2e-test.ts",
+      "e2e:headless": "tsx examples/e2e-headless.ts",
+      "e2e:claude-code": "tsx examples/e2e-claude-code.ts",
+      "e2e:opencode": "tsx examples/e2e-opencode.ts",
+      "e2e:codex": "tsx examples/e2e-codex.ts",
+      "e2e:codex:launch": "tsx examples/e2e-codex-launch.ts",
+      "docs:dev": "vitepress dev docs",
+      "docs:build": "vitepress build docs",
+      "docs:preview": "vitepress preview docs",
+      "prepublishOnly": "pnpm run build",
+      "lint": "biome check src/",
+      "lint:fix": "biome check --write src/",
+      "format": "biome format --write src/",
+      "release": "semantic-release",
+      "prepare": "husky"
+    }
+  },
+  "conventions": {
+    "namingStyle": "camelCase/PascalCase",
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "examples",
+      "src"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 3,
+      "lastAccessed": 1774942667407,
+      "keyFiles": [
+        "faq.md",
+        "index.md",
+        "launch-copy.md"
+      ]
+    },
+    "examples": {
+      "path": "examples",
+      "purpose": "Example code",
+      "fileCount": 9,
+      "lastAccessed": 1774942667408,
+      "keyFiles": [
+        "e2e-claude-code.ts",
+        "e2e-codex-launch.ts",
+        "e2e-codex.ts",
+        "e2e-headless.ts",
+        "e2e-opencode.ts"
+      ]
+    },
+    "skills": {
+      "path": "skills",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1774942667501,
+      "keyFiles": []
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 27,
+      "lastAccessed": 1774942667502,
+      "keyFiles": [
+        "channel.ts",
+        "cli-utils.ts",
+        "cli.ts",
+        "commands.ts",
+        "dashboard.ts"
+      ]
+    },
+    "templates": {
+      "path": "templates",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1774942667503,
+      "keyFiles": []
+    },
+    "docs/api": {
+      "path": "docs/api",
+      "purpose": "API routes",
+      "fileCount": 4,
+      "lastAccessed": 1774942667503,
+      "keyFiles": [
+        "channel-adapter.md",
+        "create-assistant.md",
+        "http-api.md"
+      ]
+    },
+    "docs/assets": {
+      "path": "docs/assets",
+      "purpose": "Static assets",
+      "fileCount": 11,
+      "lastAccessed": 1774942667504,
+      "keyFiles": [
+        "dashboard.png",
+        "demo.mp4",
+        "feishu-chat.png"
+      ]
+    },
+    "src/__tests__": {
+      "path": "src/__tests__",
+      "purpose": "Test files",
+      "fileCount": 36,
+      "lastAccessed": 1774942667506,
+      "keyFiles": [
+        "channel.test.ts",
+        "cli-integration.test.ts",
+        "cli-utils.test.ts"
+      ]
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

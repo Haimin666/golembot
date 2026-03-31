@@ -15,6 +15,8 @@ export interface FeishuChannelConfig {
 export interface DingtalkChannelConfig {
   clientId: string;
   clientSecret: string;
+  /** Interactive card template ID for streaming AI cards. Required for streaming card support. */
+  cardTemplateId?: string;
 }
 
 export interface WecomChannelConfig {

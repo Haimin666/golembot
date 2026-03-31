@@ -7,6 +7,15 @@ function generateOutTrackId(): string {
   return `golem-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Generate a UUID v4 for idempotency keys. */
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export class DingtalkAdapter implements ChannelAdapter {
   readonly name = 'dingtalk';
   readonly maxMessageLength = 4000;
@@ -15,8 +24,16 @@ export class DingtalkAdapter implements ChannelAdapter {
   private seenMsgIds = new Set<string>();
   private static readonly MAX_SEEN = 500;
 
-  /** Active streaming card state: outTrackId → { chatId, webhook } */
-  private streamCards = new Map<string, { chatId: string; webhook?: string }>();
+  /** Active streaming card state: outTrackId → { chatId, chatType, senderId, webhook, accumulatedContent } */
+  private streamCards = new Map<
+    string,
+    { chatId: string; chatType: 'dm' | 'group'; senderId?: string; webhook?: string; accumulatedContent: string }
+  >();
+
+  /** Session → active card tracking for streaming updates.
+   * Maps sessionKey (chatId:senderId) to the current streaming card's outTrackId.
+   * This allows reply() to update the card instead of sending separate messages. */
+  private sessionActiveCards = new Map<string, string>();
 
   constructor(config: DingtalkChannelConfig) {
     this.config = config;
@@ -139,6 +156,19 @@ export class DingtalkAdapter implements ChannelAdapter {
   async reply(msg: ChannelMessage, text: string, _options?: ReplyOptions): Promise<void> {
     const raw = msg.raw as { _sessionWebhook?: string; senderStaffId?: string };
     const webhook = raw?._sessionWebhook;
+
+    // Check if there's an active streaming card for this session
+    const sessionKey = `${msg.chatId}:${msg.senderId}`;
+    const activeCardId = this.sessionActiveCards.get(sessionKey);
+
+    if (activeCardId && this.streamCards.has(activeCardId)) {
+      // Update the streaming card instead of sending a separate message
+      // This enables the typewriter effect for streaming replies
+      await this.updateStreamingCardContent(activeCardId, text);
+      return;
+    }
+
+    // No active card - send as regular message
     if (!webhook) return;
 
     const body = {
@@ -159,117 +189,218 @@ export class DingtalkAdapter implements ChannelAdapter {
     });
   }
 
+  /**
+   * Update the content of a streaming card.
+   * This is called by reply() when there's an active streaming card.
+   *
+   * IMPORTANT: Gateway sends chunks (paragraphs), not accumulated content.
+   * We need to accumulate content ourselves for the typewriter effect.
+   */
+  private async updateStreamingCardContent(outTrackId: string, text: string): Promise<void> {
+    const accessToken = await this.dwClient?.getAccessToken?.();
+    if (!accessToken) return;
+
+    const cardInfo = this.streamCards.get(outTrackId);
+    if (!cardInfo) return;
+
+    // Accumulate content (Gateway sends chunks, not full content)
+    cardInfo.accumulatedContent = (cardInfo.accumulatedContent || '') + text;
+
+    const requestBody = {
+      outTrackId,
+      guid: generateUUID(),
+      key: 'content',
+      content: cardInfo.accumulatedContent,
+      isFull: true,
+      isFinalize: false,
+      isError: false,
+    };
+
+    try {
+      const resp = await fetch('https://api.dingtalk.com/v1.0/card/streaming', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-acs-dingtalk-access-token': accessToken,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!resp.ok) {
+        const errorText = await resp.text();
+        console.warn(`[dingtalk] streaming card update failed (${resp.status}): ${errorText}`);
+      }
+    } catch (e) {
+      console.error('[dingtalk] updateStreamingCardContent error:', (e as Error).message);
+    }
+  }
+
   // ── Streaming status support (interactive card with live updates) ──
 
   /**
-   * Create a streaming status card via the DingTalk robot send API.
-   * Uses `sampleFreeCard` with an `outTrackId` so the card can be updated
-   * in-place via `PATCH /v1.0/card/instances`.
+   * Create a streaming status card using DingTalk's interactive card API.
+   * Uses `/v1.0/im/interactiveCards/send` with a pre-configured card template.
    *
-   * Falls back to a markdown message via session webhook if the card API fails.
+   * For DMs: Uses conversationType=0 and receiverUserIdList
+   * For Groups: Uses conversationType=1 and openConversationId
    */
   async sendStatus(msg: ChannelMessage, text: string): Promise<string> {
     const outTrackId = generateOutTrackId();
     const accessToken = await this.dwClient?.getAccessToken?.();
     const webhook = (msg.raw as { _sessionWebhook?: string })?._sessionWebhook;
 
-    this.streamCards.set(outTrackId, { chatId: msg.chatId, webhook: webhook || undefined });
-
-    if (!accessToken) return outTrackId;
-
-    // Build the interactive card payload
-    const cardParam = JSON.stringify({
-      config: { wideScreenMode: true },
-      header: {
-        title: { tag: 'plain_text', content: '🤖 AI Assistant' },
-        template: 'grey',
-      },
-      elements: [{ tag: 'markdown', content: text || '⏳ Thinking...' }],
+    // Store card state for later updates
+    this.streamCards.set(outTrackId, {
+      chatId: msg.chatId,
+      chatType: msg.chatType,
+      senderId: msg.senderId,
+      webhook: webhook || undefined,
+      accumulatedContent: '', // Initialize empty for streaming accumulation
     });
 
+    // Register as active card for this session (for streaming reply updates)
+    const sessionKey = `${msg.chatId}:${msg.senderId}`;
+    this.sessionActiveCards.set(sessionKey, outTrackId);
+
+    if (!accessToken || !this.config.cardTemplateId) {
+      // No template configured or no token - fallback to webhook markdown
+      console.warn(`[dingtalk] cardTemplateId not configured or no access token, falling back to webhook`);
+      await this.sendFallbackMarkdown(webhook, accessToken, text);
+      return outTrackId;
+    }
+
+    // Build the interactive card request
+    const isDM = msg.chatType === 'dm';
+    const requestBody: Record<string, unknown> = {
+      cardTemplateId: this.config.cardTemplateId,
+      outTrackId,
+      conversationType: isDM ? 0 : 1,
+      cardData: {
+        cardParamMap: {
+          content: text || '⏳ Thinking...',
+        },
+      },
+    };
+
+    // DM requires receiverUserIdList; Group requires openConversationId
+    if (isDM) {
+      requestBody.receiverUserIdList = [msg.senderId];
+    } else {
+      requestBody.openConversationId = msg.chatId;
+    }
+
     try {
-      const resp = await fetch('https://api.dingtalk.com/v1.0/robot/groupMessages/send', {
+      const resp = await fetch('https://api.dingtalk.com/v1.0/im/interactiveCards/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-acs-dingtalk-access-token': accessToken,
         },
-        body: JSON.stringify({
-          openConversationId: msg.chatId,
-          msgKey: 'sampleFreeCard',
-          outTrackId,
-          msgParam: cardParam,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (resp.ok) {
-        console.log(`[dingtalk] streaming card created: ${outTrackId}`);
+        const result = await resp.json();
+        console.log(
+          `[dingtalk] interactive card created: ${outTrackId}, processQueryKey: ${result?.result?.processQueryKey || 'N/A'}`,
+        );
         return outTrackId;
       }
 
-      // Card send failed — fall back to webhook markdown
-      console.warn(`[dingtalk] card send failed (${resp.status}), falling back to webhook`);
+      // Card send failed — log and fall back to webhook
+      const errorText = await resp.text();
+      console.warn(`[dingtalk] card send failed (${resp.status}): ${errorText}, falling back to webhook`);
     } catch (e) {
       console.error('[dingtalk] sendStatus card error:', (e as Error).message);
     }
 
     // Fallback: send as markdown via session webhook
-    if (webhook) {
-      try {
-        await fetch(webhook, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-acs-dingtalk-access-token': accessToken,
-          },
-          body: JSON.stringify({
-            msgtype: 'markdown',
-            markdown: { title: '🤖 AI', text: text || '⏳ Thinking...' },
-          }),
-        });
-      } catch {
-        /* best effort */
-      }
-    }
-
+    await this.sendFallbackMarkdown(webhook, accessToken, text);
     return outTrackId;
   }
 
   /**
-   * Update an existing streaming card in-place via the card instances API.
-   * Uses the `outTrackId` from `sendStatus()` to identify the card.
+   * Send a fallback markdown message via session webhook.
+   */
+  private async sendFallbackMarkdown(
+    webhook: string | undefined,
+    accessToken: string | undefined,
+    text: string,
+  ): Promise<void> {
+    if (!webhook) return;
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (accessToken) {
+      headers['x-acs-dingtalk-access-token'] = accessToken;
+    }
+
+    try {
+      await fetch(webhook, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          msgtype: 'markdown',
+          markdown: { title: '🤖 AI', text: text || '⏳ Thinking...' },
+        }),
+      });
+    } catch {
+      /* best effort */
+    }
+  }
+
+  /**
+   * Update an existing streaming card using DingTalk's streaming API.
+   * Uses `PUT /v1.0/card/streaming` for typewriter effect.
+   *
+   * The content variable key must match what's defined in the card template.
+   * We use 'content' as the default key.
+   *
+   * Special handling: When text is "✅ Done" (finalize signal from gateway),
+   * we use the accumulated content and set isFinalize=true to mark completion.
+   * This preserves the actual AI response that was already streamed.
    */
   async updateStatus(msg: ChannelMessage, statusId: string, text: string): Promise<void> {
     const accessToken = await this.dwClient?.getAccessToken?.();
     if (!accessToken) return;
 
     const cardInfo = this.streamCards.get(statusId);
-    if (!cardInfo) return;
+    if (!cardInfo) {
+      console.warn(`[dingtalk] no card info found for statusId: ${statusId}`);
+      return;
+    }
 
-    const cardData = {
-      config: { wideScreenMode: true },
-      header: {
-        title: { tag: 'plain_text', content: '🤖 AI Assistant' },
-        template: 'grey',
-      },
-      elements: [{ tag: 'markdown', content: text }],
+    // Check if this is a finalize-only update (gateway signals completion)
+    // In this case, we use the accumulated content and set isFinalize=true
+    const isFinalizeOnly = text === '✅ Done' || text.toLowerCase() === 'done';
+
+    // Use the accumulated content from streaming updates
+    const content = cardInfo.accumulatedContent || text;
+
+    // Build streaming update request
+    // Note: For markdown content, isFull must be true
+    const requestBody: Record<string, unknown> = {
+      outTrackId: statusId,
+      guid: generateUUID(),
+      key: 'content', // Must match the variable name in the card template
+      content,
+      isFull: true, // Required for markdown content
+      isFinalize: true, // Always finalize on updateStatus call from gateway
+      isError: false,
     };
 
     try {
-      const resp = await fetch('https://api.dingtalk.com/v1.0/card/instances', {
-        method: 'PATCH',
+      const resp = await fetch('https://api.dingtalk.com/v1.0/card/streaming', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'x-acs-dingtalk-access-token': accessToken,
         },
-        body: JSON.stringify({
-          outTrackId: statusId,
-          cardData,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!resp.ok) {
-        console.warn(`[dingtalk] card update failed (${resp.status})`);
+        const errorText = await resp.text();
+        console.warn(`[dingtalk] card streaming update failed (${resp.status}): ${errorText}`);
       }
     } catch (e) {
       console.error('[dingtalk] updateStatus error:', (e as Error).message);
@@ -281,6 +412,16 @@ export class DingtalkAdapter implements ChannelAdapter {
    * The card itself remains visible in the chat with its final content.
    */
   async clearStatus(msg: ChannelMessage, statusId: string): Promise<void> {
+    // Also clean up the session → card mapping
+    const cardInfo = this.streamCards.get(statusId);
+    if (cardInfo) {
+      const sessionKey = `${cardInfo.chatId}:${cardInfo.senderId}`;
+      const currentActive = this.sessionActiveCards.get(sessionKey);
+      // Only clear if it's the same card (don't clear if a new card was created)
+      if (currentActive === statusId) {
+        this.sessionActiveCards.delete(sessionKey);
+      }
+    }
     this.streamCards.delete(statusId);
   }
 
