@@ -43,6 +43,27 @@ export function parseClaudeStreamLine(line: string): StreamEvent[] {
     return events;
   }
 
+  // ── Partial message / content block events (with --include-partial-messages) ──
+
+  if (type === 'content_block_delta') {
+    const delta = obj.delta as Record<string, unknown> | undefined;
+    if (!delta) return [];
+    if (delta.type === 'text_delta') {
+      const text = (delta.text as string) || '';
+      if (text) return [{ type: 'text', content: text }];
+    }
+    // input_json_delta for tool input streaming — ignore
+    return [];
+  }
+
+  if (type === 'content_block_start' || type === 'content_block_stop') {
+    return [];
+  }
+
+  if (type === 'message_start' || type === 'message_delta') {
+    return [];
+  }
+
   if (type === 'user') {
     const msg = obj.message as Record<string, unknown> | undefined;
     if (!msg) return [];
@@ -171,7 +192,7 @@ export class ClaudeCodeEngine implements AgentEngine {
     }
 
     const claudeBin = findClaudeBin();
-    const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose'];
+    const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--include-partial-messages'];
     if (opts.skipPermissions !== false) {
       args.push('--dangerously-skip-permissions');
       if (!_warnedSkipPermissions) {
@@ -223,6 +244,11 @@ export class ClaudeCodeEngine implements AgentEngine {
     let resolver: (() => void) | null = null;
     let buffer = '';
 
+    // Text deduplication for --include-partial-messages:
+    // Partial assistant messages contain the full accumulated text so far.
+    // Track the total text and emit only the delta (new text).
+    let textDedupAccum = '';
+
     function enqueue(evt: StreamEvent | null) {
       queue.push(evt);
       if (resolver) {
@@ -236,7 +262,45 @@ export class ClaudeCodeEngine implements AgentEngine {
       buffer = lines.pop() || '';
       for (const line of lines) {
         if (!line.trim()) continue;
-        for (const evt of parseClaudeStreamLine(line)) enqueue(evt);
+        const events = parseClaudeStreamLine(line);
+
+        // Collect text and non-text events separately for deduplication
+        const textParts: string[] = [];
+        const nonTextEvents: StreamEvent[] = [];
+        for (const evt of events) {
+          if (evt.type === 'text') {
+            textParts.push(evt.content);
+          } else {
+            nonTextEvents.push(evt);
+          }
+        }
+
+        // Dedup text: partial messages contain full accumulated text.
+        // Only emit the delta (new text since last emit).
+        if (textParts.length > 0) {
+          const fullText = textParts.join('');
+          if (textDedupAccum && fullText.startsWith(textDedupAccum) && fullText.length > textDedupAccum.length) {
+            const delta = fullText.slice(textDedupAccum.length);
+            textDedupAccum = fullText;
+            if (delta) enqueue({ type: 'text', content: delta });
+          } else if (fullText.length > 0 && (fullText.length > textDedupAccum.length || !textDedupAccum)) {
+            // New text that doesn't start with accum (new assistant turn after tool use)
+            // or first text ever — emit the full text
+            textDedupAccum = fullText;
+            enqueue({ type: 'text', content: fullText });
+          }
+          // else: duplicate or shorter — skip to avoid repeated content
+        }
+
+        // Emit non-text events as-is (tool_call, tool_result, done, error)
+        for (const evt of nonTextEvents) {
+          // After a tool_result, subsequent text will be from a new assistant turn
+          // Reset dedup accum so new text is not treated as duplicate
+          if (evt.type === 'tool_result') {
+            textDedupAccum = '';
+          }
+          enqueue(evt);
+        }
       }
     }
 
