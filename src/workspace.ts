@@ -135,6 +135,44 @@ export interface CodexConfig {
   addDirs?: string[];
 }
 
+/**
+ * Claude Code engine configuration.
+ * Allows dynamic CLI flag configuration while maintaining backward compatibility.
+ */
+export interface ClaudeCodeConfig {
+  /**
+   * Thinking effort level. Controls how much compute the model uses.
+   * - 'low': Fast, efficient responses
+   * - 'medium': Balanced (default)
+   * - 'high': Maximum reasoning depth
+   */
+  effort?: 'low' | 'medium' | 'high';
+  /**
+   * Maximum number of agentic turns per invocation.
+   * Default: unlimited (engine-controlled)
+   */
+  maxTurns?: number;
+  /**
+   * Working context percentage for memory-constrained environments.
+   * E.g., 0.5 means 50% of default context window.
+   */
+  workingContext?: number;
+  /**
+   * Enable/disable permission prompts.
+   * - true: Skip all permission prompts (equivalent to --dangerously-skip-permissions)
+   * - false: Require manual approval for sensitive operations
+   * Default: follows golem.yaml skipPermissions
+   */
+  skipPermissions?: boolean;
+  /**
+   * Additional CLI flags to pass through.
+   * Key-value pairs where key is the flag name (without --) and value is the flag value.
+   * For boolean flags, use 'true' as the value.
+   * Example: { 'no-context': 'true', 'timeout': '120' }
+   */
+  extraFlags?: Record<string, string | boolean>;
+}
+
 export interface ProviderConfig {
   /** API base URL (e.g. "https://api.minimax.chat/v1") */
   baseUrl?: string;
@@ -181,6 +219,8 @@ export interface GolemConfig {
   model?: string;
   skipPermissions?: boolean;
   codex?: CodexConfig;
+  /** Claude Code engine-specific configuration. */
+  claudeCode?: ClaudeCodeConfig;
   channels?: ChannelsConfig;
   gateway?: GatewayConfig;
   /** Agent invocation timeout in seconds. Default: 300 (5 minutes). */
@@ -286,6 +326,26 @@ export async function loadConfig(dir: string): Promise<GolemConfig> {
       codex.addDirs = codexDoc.addDirs.filter((dir): dir is string => typeof dir === 'string');
     }
     if (Object.keys(codex).length > 0) config.codex = codex;
+  }
+  if (doc.claudeCode && typeof doc.claudeCode === 'object') {
+    const ccDoc = resolveEnvPlaceholders(doc.claudeCode as Record<string, unknown>);
+    const claudeCode: ClaudeCodeConfig = {};
+    if (ccDoc.effort === 'low' || ccDoc.effort === 'medium' || ccDoc.effort === 'high') {
+      claudeCode.effort = ccDoc.effort;
+    }
+    if (typeof ccDoc.maxTurns === 'number') {
+      claudeCode.maxTurns = ccDoc.maxTurns;
+    }
+    if (typeof ccDoc.workingContext === 'number') {
+      claudeCode.workingContext = ccDoc.workingContext;
+    }
+    if (typeof ccDoc.skipPermissions === 'boolean') {
+      claudeCode.skipPermissions = ccDoc.skipPermissions;
+    }
+    if (ccDoc.extraFlags && typeof ccDoc.extraFlags === 'object') {
+      claudeCode.extraFlags = ccDoc.extraFlags as Record<string, string | boolean>;
+    }
+    if (Object.keys(claudeCode).length > 0) config.claudeCode = claudeCode;
   }
   if (doc.channels && typeof doc.channels === 'object') {
     config.channels = resolveEnvPlaceholders(doc.channels as ChannelsConfig);
@@ -409,6 +469,7 @@ export async function writeConfig(dir: string, config: GolemConfig): Promise<voi
   if (config.model) content.model = config.model;
   if (typeof config.skipPermissions === 'boolean') content.skipPermissions = config.skipPermissions;
   if (config.codex && Object.keys(config.codex).length > 0) content.codex = config.codex;
+  if (config.claudeCode && Object.keys(config.claudeCode).length > 0) content.claudeCode = config.claudeCode;
   if (config.channels) content.channels = config.channels;
   if (config.gateway) content.gateway = config.gateway;
   if (typeof config.timeout === 'number') content.timeout = config.timeout;
@@ -430,7 +491,7 @@ export async function writeConfig(dir: string, config: GolemConfig): Promise<voi
 }
 
 // Fields that require a gateway restart when changed
-const RESTART_REQUIRED_KEYS = new Set(['engine', 'model', 'codex', 'channels', 'gateway', 'mcp']);
+const RESTART_REQUIRED_KEYS = new Set(['engine', 'model', 'codex', 'claudeCode', 'channels', 'gateway', 'mcp']);
 
 function needsRestart(patch: Record<string, unknown>): boolean {
   for (const key of Object.keys(patch)) {

@@ -23,6 +23,8 @@ channels:
   dingtalk:
     clientId: ${DINGTALK_CLIENT_ID}
     clientSecret: ${DINGTALK_CLIENT_SECRET}
+    # Optional: interactive card template ID for streaming typewriter effect
+    cardTemplateId: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.schema
 ```
 
 ```sh
@@ -30,6 +32,14 @@ channels:
 DINGTALK_CLIENT_ID=dingxxxxxxxxxx
 DINGTALK_CLIENT_SECRET=xxxxxxxxxxxxxxxxxx
 ```
+
+### Streaming Cards (Optional)
+
+To enable typewriter streaming effect, create an interactive card template in DingTalk:
+
+1. Create a card template in DingTalk Developer Portal
+2. Copy the template ID to `cardTemplateId` field
+3. The card template must include a variable named `content`
 
 ## How It Works
 

@@ -10,3 +10,6 @@ docs/drafts/
 golem.yaml
 skills/
 memory/
+.DS_Store
+examples.json
+src/.DS_Store

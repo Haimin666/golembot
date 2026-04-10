@@ -99,7 +99,7 @@ export interface ChannelAdapter {
    */
   sendStatus?(msg: ChannelMessage, text: string): Promise<string>;
   /** Optional: update a previously created status/progress message. */
-  updateStatus?(msg: ChannelMessage, statusId: string, text: string): Promise<void>;
+  updateStatus?(msg: ChannelMessage, statusId: string, text: string, thinking?: string): Promise<void>;
   /** Optional: clear a previously created status/progress message. */
   clearStatus?(msg: ChannelMessage, statusId: string): Promise<void>;
   /**

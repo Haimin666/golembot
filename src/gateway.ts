@@ -86,6 +86,26 @@ function log(verbose: boolean, ...args: unknown[]): void {
   if (verbose) console.log(...args);
 }
 
+/**
+ * Build combined content for display, merging thinking and response.
+ * Used when sending to IM channels that need both thinking process and reply.
+ */
+function buildCombinedContent(thinking: string, text: string): string {
+  const parts: string[] = [];
+  if (thinking.trim()) {
+    parts.push('💭 **思考过程:**\n' + thinking.trim());
+  }
+  if (text.trim()) {
+    // Only add header if there's thinking content too
+    if (thinking.trim()) {
+      parts.push('📝 **回复:**\n' + text.trim());
+    } else {
+      parts.push(text.trim());
+    }
+  }
+  return parts.join('\n\n---\n\n');
+}
+
 // ── Group chat state (in-memory, per gateway process) ───────────────────────
 
 export interface GroupMessage {
@@ -460,6 +480,9 @@ export async function handleMessage(
 
   let costUsd: number | undefined;
   let durationMs: number | undefined;
+  let fullThinking = ''; // Accumulate thinking content separately
+  let fullReply = ''; // Accumulate reply content
+  let hasError = false; // Track if an error occurred during processing
 
   const maxLen = adapter.maxMessageLength ?? 4000;
   const streamingConfig = resolveStreamingConfig(config);
@@ -497,7 +520,15 @@ export async function handleMessage(
     cancelThinkingStatus();
     if (!statusMessageId) return;
     if (adapter.updateStatus) {
-      await adapter.updateStatus(msg, statusMessageId, finalText);
+      // Pass the finalize signal and thinking content to the adapter.
+      // The adapter (e.g., DingTalk) will use its accumulated content for the final display.
+      const verbose = process.env.GOLEM_VERBOSE === '1' || process.env.GOLEMBOT_VERBOSE === '1';
+      if (verbose) {
+        console.log(
+          `[gateway] finalizeStatusUpdate: fullThinking=${fullThinking.length} chars, fullReply=${fullReply.length} chars, finalText="${finalText.slice(0, 50)}..."`,
+        );
+      }
+      await adapter.updateStatus(msg, statusMessageId, finalText, fullThinking);
       statusMessageText = finalText;
       statusFinalized = true;
       return;
@@ -516,11 +547,12 @@ export async function handleMessage(
   }
 
   // Helper: send a text chunk to the IM channel (handles splitMessage + mentions).
-  const sendChunk = async (text: string): Promise<void> => {
+  const sendChunk = async (text: string, isThinking = false): Promise<void> => {
     if (!text.trim()) return;
     hasVisibleStatus = true;
     cancelThinkingStatus();
     if (statusMessageId && adapter.updateStatus && statusMessageText !== '✍️ replying...') {
+      // For streaming cards, update the status message
       await adapter.updateStatus(msg, statusMessageId, '✍️ replying...');
       statusMessageText = '✍️ replying...';
     }
@@ -552,8 +584,6 @@ export async function handleMessage(
   };
 
   try {
-    let fullReply = '';
-    let hasError = false;
     // When injectPass is active (smart mode, not mentioned), force buffered behavior
     // to prevent [PASS] sentinel from leaking to IM before we can detect and suppress it.
     const effectiveMode = injectPass ? 'buffered' : streamingConfig.mode;
@@ -595,6 +625,13 @@ export async function handleMessage(
             );
             await sendChunk(complete);
           }
+        } else if (event.type === 'thinking') {
+          // Accumulate thinking content separately
+          fullThinking += event.content;
+          const verbose = process.env.GOLEM_VERBOSE === '1' || process.env.GOLEMBOT_VERBOSE === '1';
+          if (verbose) {
+            console.log(`[gateway] thinking event: +${event.content.length} chars, total=${fullThinking.length} chars`);
+          }
         } else if (event.type === 'tool_call') {
           // Agent switches to tool use — flush accumulated text first
           await flush('tool_call');
@@ -613,6 +650,16 @@ export async function handleMessage(
         } else if (event.type === 'done') {
           costUsd = event.costUsd;
           durationMs = event.durationMs;
+          // If fullText is provided (from Claude Code result event), use it as the authoritative reply
+          // This ensures we have the complete content even if some streaming events were missed
+          if (event.fullText && event.fullText.length > fullReply.length) {
+            if (verbose) {
+              console.log(
+                `[gateway] using fullText from done event: ${event.fullText.length} chars (vs fullReply: ${fullReply.length} chars)`,
+              );
+            }
+            fullReply = event.fullText;
+          }
         }
       }
 
@@ -645,6 +692,12 @@ export async function handleMessage(
       for await (const event of assistant.chat(fullText, { sessionKey, images: msg.images, files: msg.files })) {
         if (event.type === 'text') {
           fullReply += event.content;
+        } else if (event.type === 'thinking') {
+          fullThinking += event.content;
+          const verbose = process.env.GOLEM_VERBOSE === '1' || process.env.GOLEMBOT_VERBOSE === '1';
+          if (verbose) {
+            console.log(`[gateway] thinking event: +${event.content.length} chars, total=${fullThinking.length} chars`);
+          }
         } else if (event.type === 'warning') {
           log(verbose, `[${channelType}] warning: ${event.message}`);
         } else if (event.type === 'error') {
@@ -653,6 +706,16 @@ export async function handleMessage(
         } else if (event.type === 'done') {
           costUsd = event.costUsd;
           durationMs = event.durationMs;
+          // If fullText is provided (from Claude Code result event), use it as the authoritative reply
+          // This ensures we have the complete content even if some streaming events were missed
+          if (event.fullText && event.fullText.length > fullReply.length) {
+            if (verbose) {
+              console.log(
+                `[gateway] using fullText from done event: ${event.fullText.length} chars (vs fullReply: ${fullReply.length} chars)`,
+              );
+            }
+            fullReply = event.fullText;
+          }
         }
       }
 
@@ -858,6 +921,11 @@ export async function startGateway(opts: GatewayOpts): Promise<void> {
 
   const config: GolemConfig = await loadConfig(dir);
   const verbose = opts.verbose ?? false;
+
+  // Set verbose env var so engines can log their CLI invocations
+  if (verbose) {
+    process.env.GOLEMBOT_VERBOSE = '1';
+  }
 
   const assistant: Assistant = createAssistant({
     dir,

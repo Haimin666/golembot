@@ -60,6 +60,7 @@ export type { TaskExecution, TaskRecord } from './task-store.js';
 export { TaskStore } from './task-store.js';
 export type {
   ChannelsConfig,
+  ClaudeCodeConfig,
   CodexConfig,
   DingtalkChannelConfig,
   DiscordChannelConfig,
@@ -345,6 +346,7 @@ export function createAssistant(opts: CreateAssistantOpts): Assistant {
         apiKey: apiKey || provider?.apiKey,
         skipPermissions: config.skipPermissions,
         codex: config.codex,
+        claudeCode: config.claudeCode,
         signal: controller.signal,
         imagePaths: imagePaths.length > 0 ? imagePaths : undefined,
         hasPermissionsConfig: !!config.permissions,

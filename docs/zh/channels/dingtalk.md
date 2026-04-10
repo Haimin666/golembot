@@ -23,6 +23,8 @@ channels:
   dingtalk:
     clientId: ${DINGTALK_CLIENT_ID}
     clientSecret: ${DINGTALK_CLIENT_SECRET}
+    # 可选：流式卡片模板ID，用于打字机效果
+    cardTemplateId: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.schema
 ```
 
 ```sh
@@ -30,6 +32,14 @@ channels:
 DINGTALK_CLIENT_ID=dingxxxxxxxxxx
 DINGTALK_CLIENT_SECRET=xxxxxxxxxxxxxxxxxx
 ```
+
+### 流式卡片（可选）
+
+要启用打字机效果，需要在钉钉开放平台创建交互式卡片模板：
+
+1. 在钉钉开放平台创建卡片模板
+2. 复制模板 ID 到 `cardTemplateId` 字段
+3. 卡片模板需要包含名为 `content` 的变量
 
 ## 启动
 

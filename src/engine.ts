@@ -1,9 +1,10 @@
-import type { CodexConfig, McpServerConfig, ProviderConfig } from './workspace.js';
+import type { ClaudeCodeConfig, CodexConfig, McpServerConfig, ProviderConfig } from './workspace.js';
 
 // ── Core types ───────────────────────────────────────────
 
 export type StreamEvent =
   | { type: 'text'; content: string }
+  | { type: 'thinking'; content: string }
   | { type: 'tool_call'; name: string; args: string }
   | { type: 'tool_result'; content: string }
   | { type: 'warning'; message: string }
@@ -18,6 +19,8 @@ export interface InvokeOpts {
   apiKey?: string;
   skipPermissions?: boolean;
   codex?: CodexConfig;
+  /** Claude Code engine-specific configuration. */
+  claudeCode?: ClaudeCodeConfig;
   signal?: AbortSignal;
   /** Absolute paths to image files attached to the user message. Engines may use these for native multimodal support. */
   imagePaths?: string[];

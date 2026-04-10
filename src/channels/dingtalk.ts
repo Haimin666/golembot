@@ -21,22 +21,91 @@ export class DingtalkAdapter implements ChannelAdapter {
   readonly maxMessageLength = 4000;
   private config: DingtalkChannelConfig;
   private dwClient: any;
+
+  /**
+   * SDK-level messageId dedup.
+   * DingTalk SDK may redeliver events with DIFFERENT headers.messageId,
+   * so this alone is NOT sufficient — see recentContentDedup below.
+   */
   private seenMsgIds = new Set<string>();
   private static readonly MAX_SEEN = 500;
 
-  /** Active streaming card state: outTrackId → { chatId, chatType, senderId, webhook, accumulatedContent } */
+  /**
+   * Content-level dedup: "senderId:text" → timestamp of last seen.
+   *
+   * WHY: DingTalk Stream SDK can redeliver the same message with a DIFFERENT
+   * messageId (e.g., WebSocket reconnect, internal retry). The SDK-level
+   * seenMsgIds only catches exact messageId matches, so redelivered messages
+   * with new IDs pass through and cause duplicate claude -p invocations.
+   *
+   * This set catches duplicates by content fingerprint:
+   *   key   = `${senderId}::${text}` (same sender + same text = same message)
+   *   value = timestamp when first seen
+   *   TTL   = 60 seconds (enough to catch fast redeliveries, won't block legit repeats)
+   */
+  private recentContentDedup = new Map<string, number>();
+  private static readonly CONTENT_DEDUP_TTL_MS = 60_000; // 60 seconds
+
+  /** Active streaming card state: outTrackId → card info */
   private streamCards = new Map<
     string,
-    { chatId: string; chatType: 'dm' | 'group'; senderId?: string; webhook?: string; accumulatedContent: string }
+    {
+      chatId: string;
+      chatType: 'dm' | 'group';
+      senderId?: string;
+      webhook?: string;
+      accumulatedThinking: string;
+      accumulatedContent: string;
+      /**
+       * The lookup key used to route reply() calls to this card.
+       * Uses msg.messageId when available (per-message isolation),
+       * falls back to "chatId:senderId" session key for backward compat.
+       */
+      cardKey: string;
+    }
   >();
 
-  /** Session → active card tracking for streaming updates.
-   * Maps sessionKey (chatId:senderId) to the current streaming card's outTrackId.
-   * This allows reply() to update the card instead of sending separate messages. */
+  /**
+   * cardKey → active card outTrackId mapping.
+   *
+   * IMPORTANT: The key is msg.messageId (per-message), NOT chatId:senderId (per-session).
+   * This ensures that when two DIFFERENT messages arrive from the same user,
+   * each message's reply() updates only its own streaming card.
+   */
   private sessionActiveCards = new Map<string, string>();
 
   constructor(config: DingtalkChannelConfig) {
     this.config = config;
+  }
+
+  /**
+   * Build a card routing key for the given message.
+   * Uses messageId for per-message isolation when available.
+   */
+  private buildCardKey(msg: ChannelMessage): string {
+    return msg.messageId || `${msg.chatId}:${msg.senderId}`;
+  }
+
+  /**
+   * Check content-level dedup. Returns true if this is a likely duplicate.
+   * Uses senderId + text as fingerprint with a 60-second TTL.
+   */
+  private isContentDuplicate(senderId: string, text: string): boolean {
+    const key = `${senderId}::${text}`;
+    const now = Date.now();
+    const seenAt = this.recentContentDedup.get(key);
+    if (seenAt !== undefined && now - seenAt < DingtalkAdapter.CONTENT_DEDUP_TTL_MS) {
+      return true; // Duplicate within TTL window
+    }
+    this.recentContentDedup.set(key, now);
+    // Purge expired entries periodically (keep map bounded)
+    if (this.recentContentDedup.size > 200) {
+      const cutoff = now - DingtalkAdapter.CONTENT_DEDUP_TTL_MS;
+      for (const [k, ts] of this.recentContentDedup) {
+        if (ts < cutoff) this.recentContentDedup.delete(k);
+      }
+    }
+    return false;
   }
 
   async start(onMessage: (msg: ChannelMessage) => void): Promise<void> {
@@ -55,7 +124,7 @@ export class DingtalkAdapter implements ChannelAdapter {
     });
 
     this.dwClient.registerCallbackListener(TOPIC_ROBOT, async (res: any) => {
-      // Deduplicate re-delivered events.
+      // ── Layer 1: SDK messageId dedup ──
       const msgId: string | undefined = res.headers?.messageId || JSON.parse(res.data).msgId;
       if (msgId) {
         if (this.seenMsgIds.has(msgId)) {
@@ -77,7 +146,6 @@ export class DingtalkAdapter implements ChannelAdapter {
       if (msgtype === 'text' || !msgtype) {
         text = data.text?.content?.trim() || '';
       } else if (msgtype === 'picture') {
-        // DingTalk picture messages include a download URL
         const picURL = data.content?.downloadCode || data.content?.picURL;
         if (picURL) {
           try {
@@ -96,7 +164,6 @@ export class DingtalkAdapter implements ChannelAdapter {
         }
         text = '(image)';
       } else if (msgtype === 'richText') {
-        // Rich text may contain text + images
         const richText = data.content?.richText;
         if (Array.isArray(richText)) {
           for (const section of richText) {
@@ -122,7 +189,6 @@ export class DingtalkAdapter implements ChannelAdapter {
           if (!text && images.length > 0) text = '(image)';
         }
       } else {
-        // Unsupported message type — skip
         this.dwClient.socketCallBackResponse(res.headers.messageId, { status: 'SUCCESS' });
         return;
       }
@@ -130,10 +196,24 @@ export class DingtalkAdapter implements ChannelAdapter {
       if (!text && images.length === 0) return;
 
       const isGroup = data.conversationType === '2';
+      const senderId = data.senderStaffId || data.senderId || '';
+
+      // ── Layer 2: Content fingerprint dedup ──
+      // DingTalk SDK may redeliver the same message with a DIFFERENT messageId
+      // (e.g., after WebSocket reconnect). The Layer 1 check above only catches
+      // exact messageId matches. This layer catches duplicates by content:
+      // same sender + same text within 60 seconds = duplicate.
+      if (text !== '(image)' && this.isContentDuplicate(senderId, text)) {
+        console.log(
+          `[dingtalk] content-dedup: skipping duplicate message from ${data.senderNick || senderId}: "${text.slice(0, 60)}..." (msgId=${msgId})`,
+        );
+        this.dwClient.socketCallBackResponse(res.headers.messageId, { status: 'SUCCESS' });
+        return;
+      }
 
       const channelMsg: ChannelMessage = {
         channelType: 'dingtalk',
-        senderId: data.senderStaffId || data.senderId || '',
+        senderId,
         senderName: data.senderNick,
         chatId: data.conversationId || '',
         chatType: isGroup ? 'group' : 'dm',
@@ -157,13 +237,12 @@ export class DingtalkAdapter implements ChannelAdapter {
     const raw = msg.raw as { _sessionWebhook?: string; senderStaffId?: string };
     const webhook = raw?._sessionWebhook;
 
-    // Check if there's an active streaming card for this session
-    const sessionKey = `${msg.chatId}:${msg.senderId}`;
-    const activeCardId = this.sessionActiveCards.get(sessionKey);
+    // Use messageId-based cardKey for per-message card isolation.
+    const cardKey = this.buildCardKey(msg);
+    const activeCardId = this.sessionActiveCards.get(cardKey);
 
     if (activeCardId && this.streamCards.has(activeCardId)) {
       // Update the streaming card instead of sending a separate message
-      // This enables the typewriter effect for streaming replies
       await this.updateStreamingCardContent(activeCardId, text);
       return;
     }
@@ -191,10 +270,9 @@ export class DingtalkAdapter implements ChannelAdapter {
 
   /**
    * Update the content of a streaming card.
-   * This is called by reply() when there's an active streaming card.
-   *
-   * IMPORTANT: Gateway sends chunks (paragraphs), not accumulated content.
-   * We need to accumulate content ourselves for the typewriter effect.
+   * Called by reply() when there's an active streaming card.
+   * Gateway sends chunks (paragraphs), not accumulated content,
+   * so we accumulate content here for the typewriter effect.
    */
   private async updateStreamingCardContent(outTrackId: string, text: string): Promise<void> {
     const accessToken = await this.dwClient?.getAccessToken?.();
@@ -203,8 +281,14 @@ export class DingtalkAdapter implements ChannelAdapter {
     const cardInfo = this.streamCards.get(outTrackId);
     if (!cardInfo) return;
 
-    // Accumulate content (Gateway sends chunks, not full content)
     cardInfo.accumulatedContent = (cardInfo.accumulatedContent || '') + text;
+
+    const verbose = process.env.GOLEM_VERBOSE === '1' || process.env.GOLEMBOT_VERBOSE === '1';
+    if (verbose) {
+      console.log(
+        `[dingtalk] updateStreamingCardContent: +${text.length} chars, total=${cardInfo.accumulatedContent.length} chars, preview="${text.slice(0, 50)}..."`,
+      );
+    }
 
     const requestBody = {
       outTrackId,
@@ -212,7 +296,7 @@ export class DingtalkAdapter implements ChannelAdapter {
       key: 'content',
       content: cardInfo.accumulatedContent,
       isFull: true,
-      isFinalize: false,
+      isFinalize: true,
       isError: false,
     };
 
@@ -229,6 +313,9 @@ export class DingtalkAdapter implements ChannelAdapter {
       if (!resp.ok) {
         const errorText = await resp.text();
         console.warn(`[dingtalk] streaming card update failed (${resp.status}): ${errorText}`);
+      } else if (verbose) {
+        const result = await resp.text();
+        console.log(`[dingtalk] streaming card update success: ${result.slice(0, 200)}`);
       }
     } catch (e) {
       console.error('[dingtalk] updateStreamingCardContent error:', (e as Error).message);
@@ -239,37 +326,32 @@ export class DingtalkAdapter implements ChannelAdapter {
 
   /**
    * Create a streaming status card using DingTalk's interactive card API.
-   * Uses `/v1.0/im/interactiveCards/send` with a pre-configured card template.
-   *
-   * For DMs: Uses conversationType=0 and receiverUserIdList
-   * For Groups: Uses conversationType=1 and openConversationId
    */
   async sendStatus(msg: ChannelMessage, text: string): Promise<string> {
     const outTrackId = generateOutTrackId();
     const accessToken = await this.dwClient?.getAccessToken?.();
     const webhook = (msg.raw as { _sessionWebhook?: string })?._sessionWebhook;
 
-    // Store card state for later updates
+    const cardKey = this.buildCardKey(msg);
+
     this.streamCards.set(outTrackId, {
       chatId: msg.chatId,
       chatType: msg.chatType,
       senderId: msg.senderId,
       webhook: webhook || undefined,
-      accumulatedContent: '', // Initialize empty for streaming accumulation
+      accumulatedThinking: '',
+      accumulatedContent: '',
+      cardKey,
     });
 
-    // Register as active card for this session (for streaming reply updates)
-    const sessionKey = `${msg.chatId}:${msg.senderId}`;
-    this.sessionActiveCards.set(sessionKey, outTrackId);
+    this.sessionActiveCards.set(cardKey, outTrackId);
 
     if (!accessToken || !this.config.cardTemplateId) {
-      // No template configured or no token - fallback to webhook markdown
       console.warn(`[dingtalk] cardTemplateId not configured or no access token, falling back to webhook`);
       await this.sendFallbackMarkdown(webhook, accessToken, text);
       return outTrackId;
     }
 
-    // Build the interactive card request
     const isDM = msg.chatType === 'dm';
     const requestBody: Record<string, unknown> = {
       cardTemplateId: this.config.cardTemplateId,
@@ -282,7 +364,6 @@ export class DingtalkAdapter implements ChannelAdapter {
       },
     };
 
-    // DM requires receiverUserIdList; Group requires openConversationId
     if (isDM) {
       requestBody.receiverUserIdList = [msg.senderId];
     } else {
@@ -307,21 +388,16 @@ export class DingtalkAdapter implements ChannelAdapter {
         return outTrackId;
       }
 
-      // Card send failed — log and fall back to webhook
       const errorText = await resp.text();
       console.warn(`[dingtalk] card send failed (${resp.status}): ${errorText}, falling back to webhook`);
     } catch (e) {
       console.error('[dingtalk] sendStatus card error:', (e as Error).message);
     }
 
-    // Fallback: send as markdown via session webhook
     await this.sendFallbackMarkdown(webhook, accessToken, text);
     return outTrackId;
   }
 
-  /**
-   * Send a fallback markdown message via session webhook.
-   */
   private async sendFallbackMarkdown(
     webhook: string | undefined,
     accessToken: string | undefined,
@@ -350,16 +426,8 @@ export class DingtalkAdapter implements ChannelAdapter {
 
   /**
    * Update an existing streaming card using DingTalk's streaming API.
-   * Uses `PUT /v1.0/card/streaming` for typewriter effect.
-   *
-   * The content variable key must match what's defined in the card template.
-   * We use 'content' as the default key.
-   *
-   * Special handling: When text is "✅ Done" (finalize signal from gateway),
-   * we use the accumulated content and set isFinalize=true to mark completion.
-   * This preserves the actual AI response that was already streamed.
    */
-  async updateStatus(msg: ChannelMessage, statusId: string, text: string): Promise<void> {
+  async updateStatus(msg: ChannelMessage, statusId: string, text: string, thinking?: string): Promise<void> {
     const accessToken = await this.dwClient?.getAccessToken?.();
     if (!accessToken) return;
 
@@ -369,22 +437,48 @@ export class DingtalkAdapter implements ChannelAdapter {
       return;
     }
 
-    // Check if this is a finalize-only update (gateway signals completion)
-    // In this case, we use the accumulated content and set isFinalize=true
+    const verbose = process.env.GOLEM_VERBOSE === '1' || process.env.GOLEMBOT_VERBOSE === '1';
+
     const isFinalizeOnly = text === '✅ Done' || text.toLowerCase() === 'done';
 
-    // Use the accumulated content from streaming updates
-    const content = cardInfo.accumulatedContent || text;
+    if (thinking !== undefined) {
+      cardInfo.accumulatedThinking = thinking;
+    }
 
-    // Build streaming update request
-    // Note: For markdown content, isFull must be true
+    if (verbose) {
+      console.log(
+        `[dingtalk] updateStatus: text="${text.slice(0, 50)}...", thinking=${thinking?.length || 0} chars, accumulatedContent=${cardInfo.accumulatedContent.length} chars, isFinalizeOnly=${isFinalizeOnly}`,
+      );
+    }
+
+    let content: string;
+    if (isFinalizeOnly) {
+      content = this.buildCombinedContent(cardInfo.accumulatedThinking, cardInfo.accumulatedContent);
+      if (verbose) {
+        console.log(
+          `[dingtalk] finalize: combined content = ${content.length} chars (thinking: ${cardInfo.accumulatedThinking.length}, reply: ${cardInfo.accumulatedContent.length})`,
+        );
+      }
+      // Clean up the card mapping for this specific message
+      const currentActive = this.sessionActiveCards.get(cardInfo.cardKey);
+      if (currentActive === statusId) {
+        this.sessionActiveCards.delete(cardInfo.cardKey);
+        if (verbose) {
+          console.log(`[dingtalk] finalize: cleared card mapping for cardKey=${cardInfo.cardKey}`);
+        }
+      }
+    } else {
+      const displayText = cardInfo.accumulatedContent || text;
+      content = this.buildCombinedContent(cardInfo.accumulatedThinking, displayText);
+    }
+
     const requestBody: Record<string, unknown> = {
       outTrackId: statusId,
       guid: generateUUID(),
-      key: 'content', // Must match the variable name in the card template
+      key: 'content',
       content,
-      isFull: true, // Required for markdown content
-      isFinalize: true, // Always finalize on updateStatus call from gateway
+      isFull: true,
+      isFinalize: true,
       isError: false,
     };
 
@@ -401,6 +495,9 @@ export class DingtalkAdapter implements ChannelAdapter {
       if (!resp.ok) {
         const errorText = await resp.text();
         console.warn(`[dingtalk] card streaming update failed (${resp.status}): ${errorText}`);
+      } else if (verbose) {
+        const result = await resp.text();
+        console.log(`[dingtalk] card streaming update success: ${result.slice(0, 200)}`);
       }
     } catch (e) {
       console.error('[dingtalk] updateStatus error:', (e as Error).message);
@@ -408,24 +505,306 @@ export class DingtalkAdapter implements ChannelAdapter {
   }
 
   /**
-   * Clean up a streaming card's tracking state.
-   * The card itself remains visible in the chat with its final content.
+   * Simplify Claude Code TUI output for better rendering in DingTalk cards.
+   *
+   * Claude Code's reply uses TUI (Terminal UI) formatting:
+   *   - Unicode box-drawing tables: ┌─┬┐ │ ├┼┤ └┴┘
+   *   - ANSI color/bold codes (stripped by stream-json)
+   *   - Fenced code blocks (```...```)
+   *   - Markdown headings, lists, inline code
+   *
+   * This transformer:
+   *   1. Parses TUI Unicode tables → DingTalk Markdown tables
+   *   2. Strips code block fences
+   *   3. Cleans up heading/list formatting
    */
+
+  // ── TUI table detection & parsing ──
+
+  /** Characters used in TUI box-drawing table borders */
+  private static readonly TUI_BOX_CHARS = '┌┐└┘├┤┬┴┼─│═╔╗╚╝║╠╣╦╩╬';
+
+  /** Check if a line is part of a TUI box-drawing table */
+  private isTUITableLine(line: string): boolean {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    // TUI data rows use │ as column separators.
+    // TUI border/separator lines use ─ ┌ ┐ └ ┘ ├ ┤ ┬ ┴ ┼ exclusively.
+    // Require at least 3 box-drawing chars AND the line must contain │ (data)
+    // or be composed almost entirely of box-drawing chars (separator).
+    let boxCharCount = 0;
+    let totalNonSpace = 0;
+    let hasPipe = false;
+    for (const ch of trimmed) {
+      if (ch === ' ') continue;
+      totalNonSpace++;
+      if (DingtalkAdapter.TUI_BOX_CHARS.includes(ch)) {
+        boxCharCount++;
+        if (ch === '│') hasPipe = true;
+      }
+    }
+    // Must have enough box chars relative to content
+    if (boxCharCount < 3) return false;
+    // Data row: must contain │ column separator
+    if (hasPipe) return true;
+    // Separator row: >60% of non-space chars must be box-drawing
+    return totalNonSpace > 0 && boxCharCount / totalNonSpace > 0.6;
+  }
+
+  /** Check if a line is a TUI table separator (no text content, only box chars and spaces) */
+  private isTUISeparator(line: string): boolean {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    for (const ch of trimmed) {
+      if (ch !== ' ' && !DingtalkAdapter.TUI_BOX_CHARS.includes(ch)) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Extract cell contents from a TUI data row like:
+   *   │ 423    │ 大数据   │ cc_user │ 3         │
+   * Returns array of trimmed cell strings.
+   */
+  private parseTUIDataRow(line: string): string[] {
+    // Split by │ and filter empty/whitespace cells
+    return line
+      .split('│')
+      .map((c) => c.trim())
+      .filter((c) => c.length > 0);
+  }
+
+  /**
+   * Find and convert TUI Unicode tables in the text to Markdown tables.
+   * Returns [modifiedText, foundAnyTable].
+   */
+  private convertTUITables(text: string): { text: string; converted: boolean } {
+    const lines = text.split('\n');
+    const result: string[] = [];
+    let tableRows: string[][] = []; // collected data rows (header + body)
+    let inTable = false;
+    let foundAny = false;
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      if (this.isTUITableLine(line)) {
+        // We're at a table line
+        if (!inTable) {
+          inTable = true;
+          tableRows = [];
+        }
+
+        if (this.isTUISeparator(line)) {
+          // Separator line between header and body, or between rows — skip
+          i++;
+          continue;
+        }
+
+        // Data row (header or body)
+        const cells = this.parseTUIDataRow(line);
+        if (cells.length > 0) {
+          tableRows.push(cells);
+        }
+        i++;
+      } else {
+        // Non-table line — flush any accumulated table
+        if (inTable && tableRows.length > 0) {
+          const mdTable = this.buildMarkdownTable(tableRows);
+          if (mdTable) {
+            result.push(mdTable);
+            foundAny = true;
+          }
+          tableRows = [];
+          inTable = false;
+        }
+        result.push(line);
+        i++;
+      }
+    }
+
+    // Flush trailing table
+    if (inTable && tableRows.length > 0) {
+      const mdTable = this.buildMarkdownTable(tableRows);
+      if (mdTable) {
+        result.push(mdTable);
+        foundAny = true;
+      }
+    }
+
+    return { text: result.join('\n'), converted: foundAny };
+  }
+
+  /**
+   * Build an HTML table from parsed TUI rows.
+   * Uses HTML <table> because DingTalk card Markdown does NOT render
+   * pipe tables (| col | col |) — they show as raw text.
+   * HTML tables with inline CSS render properly in DingTalk cards.
+   *
+   * First row = header (bold, light background), rest = body.
+   */
+  private buildMarkdownTable(rows: string[][]): string | null {
+    if (rows.length === 0) return null;
+
+    const numCols = Math.max(...rows.map((r) => r.length));
+    if (numCols === 0) return null;
+
+    // Pad all rows to the same column count
+    const padded = rows.map((r) => {
+      while (r.length < numCols) r.push('');
+      return r;
+    });
+
+    const header = padded[0];
+    const body = padded.slice(1);
+
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const parts: string[] = [];
+    parts.push(
+      '<table border="1" cellpadding="6" cellspacing="0" ' +
+        'style="border-collapse:collapse;border-color:#d0d0d0;width:100%;font-size:13px;">',
+    );
+
+    // Header row
+    parts.push(
+      '<tr style="background-color:#f5f5f5;font-weight:bold;">' +
+        header.map((h) => `<td style="border:1px solid #d0d0d0;padding:6px 10px;">${esc(h)}</td>`).join('') +
+        '</tr>',
+    );
+
+    // Body rows (alternating subtle background for readability)
+    for (let i = 0; i < body.length; i++) {
+      const row = body[i];
+      const bg = i % 2 === 1 ? 'background-color:#fafafa;' : '';
+      parts.push(
+        `<tr style="${bg}">` +
+          row.map((cell) => `<td style="border:1px solid #d0d0d0;padding:6px 10px;">${esc(cell)}</td>`).join('') +
+          '</tr>',
+      );
+    }
+
+    parts.push('</table>');
+    return parts.join('');
+  }
+
+  // ── Main simplification entry point ──
+
+  private simplifyMarkdownForCard(raw: string): string {
+    let text = raw;
+
+    // 1. Convert TUI Unicode tables to Markdown tables
+    const { text: afterTable, converted } = this.convertTUITables(text);
+    text = afterTable;
+
+    // 2. Convert standard Markdown tables (pipe-delimited) to bullet lists
+    //    Only if there was no TUI table conversion (avoid double-processing)
+    if (!converted) {
+      text = this.convertMarkdownPipeTables(text);
+    }
+
+    // 3. Remove fenced code block markers (keep content)
+    //    ```json ... ``` → plain text block
+    text = text.replace(/```[a-zA-Z]*\n?/g, '');
+    text = text.replace(/```/g, '');
+
+    // 4. Convert |command| style formatting to clean bullets
+    //    e.g. "|/help| 显示帮助" → "• `/help` 显示帮助"
+    text = text.replace(/^[\s]*\|([^|]+)\|\s+(.+)$/gm, '• `$1` $2');
+
+    // 5. Convert ### headings to **bold** text
+    text = text.replace(/^\s*#{1,4}\s+(.+)$/gm, '**$1**');
+
+    // 6. Clean up excessive blank lines (max 1 consecutive)
+    text = text.replace(/\n{3,}/g, '\n\n');
+
+    // 7. Remove leading/trailing whitespace
+    text = text.trim();
+
+    return text;
+  }
+
+  /**
+   * Convert pipe-delimited Markdown tables to bullet lists.
+   * Used as fallback when no TUI tables are detected.
+   */
+  private convertMarkdownPipeTables(text: string): string {
+    // Find consecutive pipe-delimited table blocks
+    const tableRegex = /((?:^\s*\|.+\|\s*$\n?)+)/gm;
+    const segments: string[] = [];
+    let lastEnd = 0;
+    let match: RegExpExecArray | null;
+    let found = false;
+
+    while ((match = tableRegex.exec(text)) !== null) {
+      if (match.index > lastEnd) {
+        segments.push(text.slice(lastEnd, match.index));
+      }
+
+      const block = match[1];
+      const rows = block
+        .split('\n')
+        .map((r) => r.trim())
+        .filter((r) => r && !r.match(/^\|[\s\-:|]+\|$/));
+
+      if (rows.length > 0) {
+        const bullets = rows
+          .map((row) => {
+            const cells = row
+              .split('|')
+              .map((c) => c.trim())
+              .filter((c) => c);
+            if (cells.length >= 2) {
+              return `• **${cells[0]}** ${cells.slice(1).join(' ')}`;
+            } else if (cells.length === 1) {
+              return `• ${cells[0]}`;
+            }
+            return '';
+          })
+          .filter(Boolean);
+        segments.push(bullets.join('\n'));
+        found = true;
+      }
+
+      lastEnd = match.index + match[0].length;
+    }
+
+    if (found) {
+      if (lastEnd < text.length) segments.push(text.slice(lastEnd));
+      return segments.join('\n');
+    }
+
+    return text;
+  }
+
+  private buildCombinedContent(thinking: string, text: string): string {
+    const parts: string[] = [];
+    if (thinking.trim()) {
+      parts.push('💭 **思考过程:**\n' + thinking.trim());
+    }
+    if (text.trim()) {
+      const displayText = this.simplifyMarkdownForCard(text);
+      if (thinking.trim()) {
+        parts.push('📝 **回复:**\n' + displayText);
+      } else {
+        parts.push(displayText);
+      }
+    }
+    return parts.join('\n\n---\n\n');
+  }
+
   async clearStatus(msg: ChannelMessage, statusId: string): Promise<void> {
-    // Also clean up the session → card mapping
     const cardInfo = this.streamCards.get(statusId);
     if (cardInfo) {
-      const sessionKey = `${cardInfo.chatId}:${cardInfo.senderId}`;
-      const currentActive = this.sessionActiveCards.get(sessionKey);
-      // Only clear if it's the same card (don't clear if a new card was created)
+      const currentActive = this.sessionActiveCards.get(cardInfo.cardKey);
       if (currentActive === statusId) {
-        this.sessionActiveCards.delete(sessionKey);
+        this.sessionActiveCards.delete(cardInfo.cardKey);
       }
     }
     this.streamCards.delete(statusId);
   }
 
-  /** DingTalk does not support a typing indicator API — no-op. */
   async typing(_msg: ChannelMessage): Promise<void> {
     // DingTalk has no typing indicator; rely on streaming card for user feedback.
   }
@@ -451,5 +830,7 @@ export class DingtalkAdapter implements ChannelAdapter {
   async stop(): Promise<void> {
     this.dwClient = null;
     this.streamCards.clear();
+    this.sessionActiveCards.clear();
+    this.recentContentDedup.clear();
   }
 }
