@@ -7,15 +7,6 @@ function generateOutTrackId(): string {
   return `golem-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Generate a UUID v4 for idempotency keys. */
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
 export class DingtalkAdapter implements ChannelAdapter {
   readonly name = 'dingtalk';
   readonly maxMessageLength = 4000;
@@ -23,22 +14,12 @@ export class DingtalkAdapter implements ChannelAdapter {
   private dwClient: any;
 
   /**
-   * SDK-level messageId dedup.
-   * DingTalk SDK may redeliver events with DIFFERENT headers.messageId,
-   * so this alone is NOT sufficient — see recentContentDedup below.
-   */
-  private seenMsgIds = new Set<string>();
-  private static readonly MAX_SEEN = 500;
-
-  /**
    * Content-level dedup: "senderId:text" → timestamp of last seen.
    *
-   * WHY: DingTalk Stream SDK can redeliver the same message with a DIFFERENT
-   * messageId (e.g., WebSocket reconnect, internal retry). The SDK-level
-   * seenMsgIds only catches exact messageId matches, so redelivered messages
-   * with new IDs pass through and cause duplicate claude -p invocations.
+   * DingTalk Stream SDK can redeliver the same message with a DIFFERENT
+   * messageId (e.g., WebSocket reconnect, internal retry).
    *
-   * This set catches duplicates by content fingerprint:
+   * Catches duplicates by content fingerprint:
    *   key   = `${senderId}::${text}` (same sender + same text = same message)
    *   value = timestamp when first seen
    *   TTL   = 60 seconds (enough to catch fast redeliveries, won't block legit repeats)
@@ -108,6 +89,27 @@ export class DingtalkAdapter implements ChannelAdapter {
     return false;
   }
 
+  /**
+   * Download an image from DingTalk using the provided download code/URL.
+   * Returns an ImageAttachment or undefined on failure.
+   */
+  private async downloadImage(picURL: string): Promise<ImageAttachment | undefined> {
+    try {
+      const accessToken = await this.dwClient?.getAccessToken?.();
+      const headers: Record<string, string> = {};
+      if (accessToken) headers['x-acs-dingtalk-access-token'] = accessToken;
+      const resp = await fetch(picURL, { headers });
+      if (resp.ok) {
+        const buf = Buffer.from(await resp.arrayBuffer());
+        const ct = resp.headers.get('content-type') || 'image/jpeg';
+        return { mimeType: ct.split(';')[0], data: buf };
+      }
+    } catch (e) {
+      console.error('[dingtalk] Failed to download image:', (e as Error).message);
+    }
+    return undefined;
+  }
+
   async start(onMessage: (msg: ChannelMessage) => void): Promise<void> {
     let sdk: any;
     try {
@@ -124,19 +126,7 @@ export class DingtalkAdapter implements ChannelAdapter {
     });
 
     this.dwClient.registerCallbackListener(TOPIC_ROBOT, async (res: any) => {
-      // ── Layer 1: SDK messageId dedup ──
       const msgId: string | undefined = res.headers?.messageId || JSON.parse(res.data).msgId;
-      if (msgId) {
-        if (this.seenMsgIds.has(msgId)) {
-          this.dwClient.socketCallBackResponse(res.headers.messageId, { status: 'SUCCESS' });
-          return;
-        }
-        this.seenMsgIds.add(msgId);
-        if (this.seenMsgIds.size > DingtalkAdapter.MAX_SEEN) {
-          const entries = [...this.seenMsgIds];
-          this.seenMsgIds = new Set(entries.slice(entries.length >> 1));
-        }
-      }
 
       const data = JSON.parse(res.data);
       const msgtype = data.msgtype;
@@ -148,46 +138,10 @@ export class DingtalkAdapter implements ChannelAdapter {
       } else if (msgtype === 'picture') {
         const picURL = data.content?.downloadCode || data.content?.picURL;
         if (picURL) {
-          try {
-            const accessToken = await this.dwClient?.getAccessToken?.();
-            const headers: Record<string, string> = {};
-            if (accessToken) headers['x-acs-dingtalk-access-token'] = accessToken;
-            const resp = await fetch(picURL, { headers });
-            if (resp.ok) {
-              const buf = Buffer.from(await resp.arrayBuffer());
-              const ct = resp.headers.get('content-type') || 'image/jpeg';
-              images.push({ mimeType: ct.split(';')[0], data: buf });
-            }
-          } catch (e) {
-            console.error('[dingtalk] Failed to download image:', (e as Error).message);
-          }
+          const img = await this.downloadImage(picURL);
+          if (img) images.push(img);
         }
         text = '(image)';
-      } else if (msgtype === 'richText') {
-        const richText = data.content?.richText;
-        if (Array.isArray(richText)) {
-          for (const section of richText) {
-            if (section.text) text += section.text;
-            if (section.downloadCode || section.picURL) {
-              const picURL = section.downloadCode || section.picURL;
-              try {
-                const accessToken = await this.dwClient?.getAccessToken?.();
-                const headers: Record<string, string> = {};
-                if (accessToken) headers['x-acs-dingtalk-access-token'] = accessToken;
-                const resp = await fetch(picURL, { headers });
-                if (resp.ok) {
-                  const buf = Buffer.from(await resp.arrayBuffer());
-                  const ct = resp.headers.get('content-type') || 'image/jpeg';
-                  images.push({ mimeType: ct.split(';')[0], data: buf });
-                }
-              } catch (e) {
-                console.error('[dingtalk] Failed to download rich text image:', (e as Error).message);
-              }
-            }
-          }
-          text = text.trim();
-          if (!text && images.length > 0) text = '(image)';
-        }
       } else {
         this.dwClient.socketCallBackResponse(res.headers.messageId, { status: 'SUCCESS' });
         return;
@@ -198,11 +152,7 @@ export class DingtalkAdapter implements ChannelAdapter {
       const isGroup = data.conversationType === '2';
       const senderId = data.senderStaffId || data.senderId || '';
 
-      // ── Layer 2: Content fingerprint dedup ──
-      // DingTalk SDK may redeliver the same message with a DIFFERENT messageId
-      // (e.g., after WebSocket reconnect). The Layer 1 check above only catches
-      // exact messageId matches. This layer catches duplicates by content:
-      // same sender + same text within 60 seconds = duplicate.
+      // Content fingerprint dedup: same sender + same text within 60s = duplicate.
       if (text !== '(image)' && this.isContentDuplicate(senderId, text)) {
         console.log(
           `[dingtalk] content-dedup: skipping duplicate message from ${data.senderNick || senderId}: "${text.slice(0, 60)}..." (msgId=${msgId})`,
@@ -292,7 +242,7 @@ export class DingtalkAdapter implements ChannelAdapter {
 
     const requestBody = {
       outTrackId,
-      guid: generateUUID(),
+      guid: crypto.randomUUID(),
       key: 'content',
       content: cardInfo.accumulatedContent,
       isFull: true,
@@ -474,7 +424,7 @@ export class DingtalkAdapter implements ChannelAdapter {
 
     const requestBody: Record<string, unknown> = {
       outTrackId: statusId,
-      guid: generateUUID(),
+      guid: crypto.randomUUID(),
       key: 'content',
       content,
       isFull: true,
@@ -514,7 +464,7 @@ export class DingtalkAdapter implements ChannelAdapter {
    *   - Markdown headings, lists, inline code
    *
    * This transformer:
-   *   1. Parses TUI Unicode tables → DingTalk Markdown tables
+   *   1. Parses TUI Unicode tables → HTML tables (DingTalk cards don't render pipe tables)
    *   2. Strips code block fences
    *   3. Cleans up heading/list formatting
    */
@@ -524,14 +474,18 @@ export class DingtalkAdapter implements ChannelAdapter {
   /** Characters used in TUI box-drawing table borders */
   private static readonly TUI_BOX_CHARS = '┌┐└┘├┤┬┴┼─│═╔╗╚╝║╠╣╦╩╬';
 
-  /** Check if a line is part of a TUI box-drawing table */
-  private isTUITableLine(line: string): boolean {
+  /** Separator char set: box-drawing chars minus │ (data pipe) */
+  private static readonly TUI_SEPARATOR_CHARS = '┌┐└┘├┤┬┴┼─═╔╗╚╝║╠╣╦╩╬';
+
+  /**
+   * Classify a TUI table line.
+   * Returns 'data' (has │ column separator), 'separator' (only box-drawing chars),
+   * or null if not a TUI table line.
+   */
+  private classifyTUILine(line: string): 'data' | 'separator' | null {
     const trimmed = line.trim();
-    if (!trimmed) return false;
-    // TUI data rows use │ as column separators.
-    // TUI border/separator lines use ─ ┌ ┐ └ ┘ ├ ┤ ┬ ┴ ┼ exclusively.
-    // Require at least 3 box-drawing chars AND the line must contain │ (data)
-    // or be composed almost entirely of box-drawing chars (separator).
+    if (!trimmed) return null;
+
     let boxCharCount = 0;
     let totalNonSpace = 0;
     let hasPipe = false;
@@ -543,22 +497,14 @@ export class DingtalkAdapter implements ChannelAdapter {
         if (ch === '│') hasPipe = true;
       }
     }
-    // Must have enough box chars relative to content
-    if (boxCharCount < 3) return false;
-    // Data row: must contain │ column separator
-    if (hasPipe) return true;
-    // Separator row: >60% of non-space chars must be box-drawing
-    return totalNonSpace > 0 && boxCharCount / totalNonSpace > 0.6;
-  }
 
-  /** Check if a line is a TUI table separator (no text content, only box chars and spaces) */
-  private isTUISeparator(line: string): boolean {
-    const trimmed = line.trim();
-    if (!trimmed) return false;
+    if (boxCharCount < 3) return null;
+    if (hasPipe) return 'data';
+    // Separator row: all non-space chars are box-drawing (excluding │)
     for (const ch of trimmed) {
-      if (ch !== ' ' && !DingtalkAdapter.TUI_BOX_CHARS.includes(ch)) return false;
+      if (ch !== ' ' && !DingtalkAdapter.TUI_SEPARATOR_CHARS.includes(ch)) return null;
     }
-    return true;
+    return 'separator';
   }
 
   /**
@@ -567,7 +513,6 @@ export class DingtalkAdapter implements ChannelAdapter {
    * Returns array of trimmed cell strings.
    */
   private parseTUIDataRow(line: string): string[] {
-    // Split by │ and filter empty/whitespace cells
     return line
       .split('│')
       .map((c) => c.trim())
@@ -575,29 +520,28 @@ export class DingtalkAdapter implements ChannelAdapter {
   }
 
   /**
-   * Find and convert TUI Unicode tables in the text to Markdown tables.
+   * Find and convert TUI Unicode tables in the text to HTML tables.
    * Returns [modifiedText, foundAnyTable].
    */
   private convertTUITables(text: string): { text: string; converted: boolean } {
     const lines = text.split('\n');
     const result: string[] = [];
-    let tableRows: string[][] = []; // collected data rows (header + body)
+    let tableRows: string[][] = [];
     let inTable = false;
     let foundAny = false;
     let i = 0;
 
     while (i < lines.length) {
       const line = lines[i];
+      const classification = this.classifyTUILine(line);
 
-      if (this.isTUITableLine(line)) {
-        // We're at a table line
+      if (classification) {
         if (!inTable) {
           inTable = true;
           tableRows = [];
         }
 
-        if (this.isTUISeparator(line)) {
-          // Separator line between header and body, or between rows — skip
+        if (classification === 'separator') {
           i++;
           continue;
         }
@@ -611,9 +555,9 @@ export class DingtalkAdapter implements ChannelAdapter {
       } else {
         // Non-table line — flush any accumulated table
         if (inTable && tableRows.length > 0) {
-          const mdTable = this.buildMarkdownTable(tableRows);
-          if (mdTable) {
-            result.push(mdTable);
+          const htmlTable = this.buildHTMLTable(tableRows);
+          if (htmlTable) {
+            result.push(htmlTable);
             foundAny = true;
           }
           tableRows = [];
@@ -626,9 +570,9 @@ export class DingtalkAdapter implements ChannelAdapter {
 
     // Flush trailing table
     if (inTable && tableRows.length > 0) {
-      const mdTable = this.buildMarkdownTable(tableRows);
-      if (mdTable) {
-        result.push(mdTable);
+      const htmlTable = this.buildHTMLTable(tableRows);
+      if (htmlTable) {
+        result.push(htmlTable);
         foundAny = true;
       }
     }
@@ -644,7 +588,7 @@ export class DingtalkAdapter implements ChannelAdapter {
    *
    * First row = header (bold, light background), rest = body.
    */
-  private buildMarkdownTable(rows: string[][]): string | null {
+  private buildHTMLTable(rows: string[][]): string | null {
     if (rows.length === 0) return null;
 
     const numCols = Math.max(...rows.map((r) => r.length));
@@ -694,86 +638,25 @@ export class DingtalkAdapter implements ChannelAdapter {
   private simplifyMarkdownForCard(raw: string): string {
     let text = raw;
 
-    // 1. Convert TUI Unicode tables to Markdown tables
-    const { text: afterTable, converted } = this.convertTUITables(text);
+    // 1. Convert TUI Unicode tables to HTML tables
+    const { text: afterTable } = this.convertTUITables(text);
     text = afterTable;
 
-    // 2. Convert standard Markdown tables (pipe-delimited) to bullet lists
-    //    Only if there was no TUI table conversion (avoid double-processing)
-    if (!converted) {
-      text = this.convertMarkdownPipeTables(text);
-    }
-
-    // 3. Remove fenced code block markers (keep content)
-    //    ```json ... ``` → plain text block
+    // 2. Remove fenced code block markers (keep content)
     text = text.replace(/```[a-zA-Z]*\n?/g, '');
     text = text.replace(/```/g, '');
 
-    // 4. Convert |command| style formatting to clean bullets
-    //    e.g. "|/help| 显示帮助" → "• `/help` 显示帮助"
+    // 3. Convert |command| style formatting to clean bullets
     text = text.replace(/^[\s]*\|([^|]+)\|\s+(.+)$/gm, '• `$1` $2');
 
-    // 5. Convert ### headings to **bold** text
+    // 4. Convert ### headings to **bold** text
     text = text.replace(/^\s*#{1,4}\s+(.+)$/gm, '**$1**');
 
-    // 6. Clean up excessive blank lines (max 1 consecutive)
+    // 5. Clean up excessive blank lines (max 1 consecutive)
     text = text.replace(/\n{3,}/g, '\n\n');
 
-    // 7. Remove leading/trailing whitespace
+    // 6. Remove leading/trailing whitespace
     text = text.trim();
-
-    return text;
-  }
-
-  /**
-   * Convert pipe-delimited Markdown tables to bullet lists.
-   * Used as fallback when no TUI tables are detected.
-   */
-  private convertMarkdownPipeTables(text: string): string {
-    // Find consecutive pipe-delimited table blocks
-    const tableRegex = /((?:^\s*\|.+\|\s*$\n?)+)/gm;
-    const segments: string[] = [];
-    let lastEnd = 0;
-    let match: RegExpExecArray | null;
-    let found = false;
-
-    while ((match = tableRegex.exec(text)) !== null) {
-      if (match.index > lastEnd) {
-        segments.push(text.slice(lastEnd, match.index));
-      }
-
-      const block = match[1];
-      const rows = block
-        .split('\n')
-        .map((r) => r.trim())
-        .filter((r) => r && !r.match(/^\|[\s\-:|]+\|$/));
-
-      if (rows.length > 0) {
-        const bullets = rows
-          .map((row) => {
-            const cells = row
-              .split('|')
-              .map((c) => c.trim())
-              .filter((c) => c);
-            if (cells.length >= 2) {
-              return `• **${cells[0]}** ${cells.slice(1).join(' ')}`;
-            } else if (cells.length === 1) {
-              return `• ${cells[0]}`;
-            }
-            return '';
-          })
-          .filter(Boolean);
-        segments.push(bullets.join('\n'));
-        found = true;
-      }
-
-      lastEnd = match.index + match[0].length;
-    }
-
-    if (found) {
-      if (lastEnd < text.length) segments.push(text.slice(lastEnd));
-      return segments.join('\n');
-    }
 
     return text;
   }
