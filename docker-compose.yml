@@ -1,12 +1,14 @@
 services:
   golem:
-    build: .
+    image: golembot:fix
     ports:
-      - "3000:3000"
+      - "3003:3000"
     volumes:
-      - ./:/assistant
-    env_file:
-      - .env
+      - ./golem.yaml:/assistant/golem.yaml:ro
+      - ./.golem:/assistant/.golem
+      - ./.claude.json:/home/golem/.claude.json
+      - ./.claude/settings.json:/home/golem/.claude/settings.json
+      - ./skills:/home/golem/.claude/skills
     restart: unless-stopped
     environment:
       - NODE_ENV=production

@@ -1,0 +1,35 @@
+name: 我的机器人
+engine: claude-code
+model: sonnet
+skipPermissions: true
+
+# 通道配置（根据需要启用）
+channels:
+  # 钉钉配置
+  # dingtalk:
+  #   clientId: your-client-id
+  #   clientSecret: your-client-secret
+  #   cardTemplateId: your-template-id.schema
+
+  # Slack 配置
+  # slack:
+  #   signingSecret: your-signing-secret
+  #   botToken: xoxb-your-bot-token
+
+  # Telegram 配置
+  # telegram:
+  #   botToken: your-bot-token
+
+  # 飞书配置
+  # feishu:
+  #   appId: your-app-id
+  #   appSecret: your-app-secret
+
+# Claude Code 引擎配置
+claudeCode:
+  effort: medium        # 思考力度: low | medium | high | max
+  maxTurns: 20          # 每次调用的最大轮次
+  # workingContext: ./context  # 工作上下文目录
+  # skipPermissions: true      # 跳过权限检查
+  # extraFlags:
+  #   dangerouslySkipPermissions: true
